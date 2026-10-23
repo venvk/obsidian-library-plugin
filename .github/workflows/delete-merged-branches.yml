@@ -11,7 +11,13 @@ on:
         types: [completed]
     schedule:
         - cron: "17 4 * * *"
+    # Auto-merge starts it with the branch of a draft made ready.
     workflow_dispatch:
+        inputs:
+            branch:
+                description: Branch to delete once merged; empty sweeps every merged branch
+                required: false
+                default: ""
 
 permissions: {}
 
@@ -35,7 +41,7 @@ jobs:
                   REPO: ${{ github.repository }}
                   OWNER: ${{ github.repository_owner }}
                   DEFAULT: ${{ github.event.repository.default_branch || 'main' }}
-                  BRANCH: ${{ github.event.workflow_run.head_branch }}
+                  BRANCH: ${{ github.event.workflow_run.head_branch || inputs.branch }}
               run: |
                   # state: "merged <sha>", "waiting" (open with auto-merge on) or "keep";
                   # delete_if_merged: "gone" once handled, otherwise the state.
