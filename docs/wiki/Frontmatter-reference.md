@@ -9,10 +9,10 @@ Name: Stranger Things
 Year: 2016
 End Year: 2025
 Season: 5
-Genre: ["[[Drama]]", "[[Horror]]"]
+Genre: ["[[Drama.canvas|Drama]]", "[[Horror.canvas|Horror]]"]
 Country: ["United States"]
-Creator: ["[[The Duffer Brothers]]"]
-Cast: ["[[Winona Ryder]]", "[[David Harbour]]"]
+Creator: ["[[The Duffer Brothers.canvas|The Duffer Brothers]]"]
+Cast: ["[[Winona Ryder.canvas|Winona Ryder]]", "[[David Harbour.canvas|David Harbour]]"]
 Rating IMDB: 8.7
 Rating RT: 91
 Runtime: 42
@@ -47,8 +47,8 @@ Type: Game
 Name: Elden Ring
 Year: 2022
 Released: 25.02.2022
-Genre: ["[[Action role-playing]]"]
-Creator: ["[[FromSoftware]]"]
+Genre: ["[[Action role-playing.canvas|Action role-playing]]"]
+Creator: ["[[FromSoftware.canvas|FromSoftware]]"]
 Rating MC: 9.4
 Platforms: ["PS5", "Steam"]
 Playtime PS5: 96.5
@@ -141,7 +141,7 @@ Notes from older versions can have another `Source`, such as `rawg` or `steam`. 
 
 ## Links
 
-`Genre`, `Creator`, and `Cast` hold internal links, so the note of a genre or a person lists its titles in backlinks and the graph. Names you type by hand become links the next time the note changes. `Rebuild graph links` converts the whole library at once.
+`Genre`, `Creator`, and `Cast` hold links to canvases, such as `[[Drama.canvas|Drama]]`. Opening one draws the covers of every title with that genre or person, grouped by category, and a canvas made from a link moves to a Canvases folder in your library folder. The canvas is drawn again each time you open it, until you add a card of your own; then Library leaves it as it is. A name that already has a note of its own, not a title's, links that note instead. Names you type by hand become links the next time the note changes. `Rebuild graph links` converts the whole library at once, older `[[Drama]]` links included.
 
 ## Cover
 

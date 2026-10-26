@@ -14,8 +14,9 @@ export interface MapTitle {
 
 interface CanvasNode {
 	id: string
-	type: 'text'
-	text: string
+	type: 'text' | 'group'
+	text?: string
+	label?: string
 	x: number
 	y: number
 	width: number
@@ -124,4 +125,31 @@ export function libraryMap(titles: MapTitle[], maxPeople = 40): Canvas {
 	})
 
 	return { nodes, edges }
+}
+
+// A genre's or a person's canvas: a heading, then the titles that credit them
+// in a grid per category. Every node id starts with lib-, so a canvas holding
+// nothing else is still Library's to redraw.
+export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[]): Canvas {
+	const cols = 6
+	const nodes: CanvasNode[] = [{ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: 80 }]
+	let y = 140
+	sections.forEach((section, i) => {
+		const rows = Math.ceil(section.titles.length / cols)
+		const width = Math.min(section.titles.length, cols) * (POSTER.width + GAP) + GAP
+		const height = rows * (POSTER.height + GAP) + GAP
+		nodes.push({ id: `lib-g${String(i)}`, type: 'group', label: section.label, x: 0, y, width, height })
+		section.titles.forEach((title, j) => {
+			nodes.push({
+				id: `lib-t${String(nodes.length)}`,
+				type: 'text',
+				text: `${title.cover}${title.cover ? '\n\n' : ''}**${link(title.path, title.name)}**`,
+				x: GAP + (j % cols) * (POSTER.width + GAP),
+				y: y + GAP + Math.floor(j / cols) * (POSTER.height + GAP),
+				...POSTER,
+			})
+		})
+		y += height + 100
+	})
+	return { nodes, edges: [] }
 }
