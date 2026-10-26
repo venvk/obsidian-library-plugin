@@ -31,7 +31,7 @@
 - **Library blocks.** A `library` code block in any note shows cards picked by category, genre, year or score, what you are in the middle of, the Soon list or the statistics.
 - **A library map.** One command draws your library as a canvas, with posters grouped around the actors and creators they share.
 - **Covers offline.** Turn on "Keep covers in the vault" and covers are saved to a Covers folder, so the library looks the same without internet.
-- **Linked notes.** Genres, creators and actors are links. Open the Horror note and it lists every horror title in your library.
+- **Linked canvases.** Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
 - Works on desktop and mobile, in every Obsidian language.
 
 ## Getting started
@@ -92,7 +92,7 @@ Source ID: tt4574334
 ---
 ```
 
-`Progress: 8/42` means 8 of 42 episodes watched. Genre, creator and cast are written as links to their own notes. Refreshing a note fills in empty fields and updates ratings from the source. It never overwrites your own rating or progress.
+`Progress: 8/42` means 8 of 42 episodes watched. Genre, creator and cast are written as links to their canvases. Refreshing a note fills in empty fields and updates ratings from the source. It never overwrites your own rating or progress.
 
 <details>
 <summary><b>Commands</b></summary>

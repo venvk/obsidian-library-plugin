@@ -55,7 +55,7 @@ import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKit
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
-import { libraryMap } from './libraryMap'
+import { libraryMap, linkCanvas } from './libraryMap'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
 import { refreshTraktTokens, traktChanges, traktData, traktExpired, traktHistory, traktRemove, traktSend, type TraktEcho } from './trakt'
@@ -103,6 +103,8 @@ import {
 	SEARCH_BUDGET_MS,
 	safeUrl,
 	linkLabel,
+	linkTarget,
+	NAME_FIELDS,
 	toLinks,
 	coverKey,
 	imageExtension,
@@ -110,8 +112,8 @@ import {
 	plainCopy
 } from './util'
 
-// Genre, Creator and Cast hold [[links]]: each linked note lists the title as a
-// backlink and the graph draws them.
+// Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
+// the name, or to a note of that name when there is one; the graph draws them.
 const LINK_FIELDS = ['Genre', 'Creator', 'Cast']
 
 // let the vault settle before the walk starts
@@ -207,6 +209,7 @@ export default class LibraryPlugin extends Plugin {
 	private refreshCooldowns = new Map<string, number>()
 	private syncingLinks = new Set<string>()
 	private linkTimers = new Map<string, number>()
+	private fillingCanvases = new Set<string>()
 	private malPushTimers = new Map<string, number>()
 	private imdbPushTimers = new Map<string, number>()
 	private traktPushTimers = new Map<string, number>()
@@ -278,7 +281,8 @@ export default class LibraryPlugin extends Plugin {
 		}
 		this.registerEvent(this.app.workspace.on('file-open', (file) => {
 			banner()
-			if (file instanceof TFile) {
+			if (file instanceof TFile && file.extension === 'canvas') void this.fillLinkCanvas(file)
+			else if (file instanceof TFile) {
 				const existing = this.linkTimers.get(file.path)
 				if (existing) window.clearTimeout(existing)
 				this.linkTimers.set(file.path, window.setTimeout(() => {
@@ -845,7 +849,7 @@ export default class LibraryPlugin extends Plugin {
 			Array.isArray(current) && current.length === links.length && current.every((v, i) => String(v) === links[i])
 		const patch: Record<string, string[]> = {}
 		for (const key of LINK_FIELDS) {
-			const links = toLinks(fields[key])
+			const links = this.toLinks(fields[key])
 			if (links.length > 0 && !same(cache?.[key], links)) patch[key] = links
 		}
 		const dropRelated = cache?.Related !== undefined
@@ -886,6 +890,87 @@ export default class LibraryPlugin extends Plugin {
 		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => addLog(current, todayIso(), ''))
 	}
 
+	// A name links its own note when there is one that isn't a title's.
+	private toLinks(value: unknown): string[] {
+		return toLinks(value, name => {
+			const dest = this.app.metadataCache.getFirstLinkpathDest(name, '')
+			const fm = dest?.extension === 'md' ? this.app.metadataCache.getFileCache(dest)?.frontmatter : undefined
+			return dest?.extension === 'md' && !(fm && this.kindOf(fm))
+		})
+	}
+
+	// a cover from the web as an image link, one in the vault as an embed
+	private poster(file: TFile, fm: Record<string, unknown>): { path: string; name: string; cover: string } {
+		const raw = toStr(coverValue(fm, this.coverProperty())).trim()
+		const local = /^!?\[\[([^\]|#]+)/.exec(raw)?.[1]
+		const web = safeUrl(raw)
+		const cover = web ? `![](${web})` : local ? `![[${local}]]` : ''
+		return { path: file.path, name: toStr(fm.Name) || file.basename, cover }
+	}
+
+	// A genre's or a person's canvas, drawn when it is opened (a click on an
+	// unmade link creates it empty). A canvas you added your own cards to is left alone.
+	private async fillLinkCanvas(file: TFile): Promise<void> {
+		if (this.fillingCanvases.has(file.path)) return
+		this.fillingCanvases.add(file.path)
+		try {
+			await this.drawLinkCanvas(file)
+		} finally {
+			this.fillingCanvases.delete(file.path)
+		}
+	}
+
+	private async drawLinkCanvas(file: TFile): Promise<void> {
+		const text = await this.app.vault.read(file)
+		try {
+			const nodes = text.trim() ? (JSON.parse(text) as { nodes?: { id?: unknown }[] }).nodes ?? [] : []
+			if (!nodes.every(node => typeof node.id === 'string' && node.id.startsWith('lib-'))) return
+		} catch {
+			return
+		}
+		const sections = new Map<string, { path: string; name: string; cover: string }[]>()
+		for (const note of this.app.vault.getMarkdownFiles()) {
+			if (isTemplateFile(note.path)) continue
+			const fm = this.app.metadataCache.getFileCache(note)?.frontmatter
+			const category = fm ? this.settings.categories.find(c => c.typeValue === toStr(fm.Type)) : undefined
+			if (!fm || !category) continue
+			const named = NAME_FIELDS.some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))
+			if (!named) continue
+			const list = sections.get(category.name) ?? []
+			list.push(this.poster(note, fm))
+			sections.set(category.name, list)
+		}
+		if (sections.size === 0) return
+		const ordered = this.settings.categories
+			.filter(c => sections.has(c.name))
+			.map(c => ({ label: c.name, titles: (sections.get(c.name) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
+		const fresh = JSON.stringify(linkCanvas(file.basename, ordered), null, '\t')
+		if (fresh !== text) await this.app.vault.modify(file, fresh)
+		// one a link click just made moves out of the vault root into the library
+		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`
+		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
+			await this.ensureFolder(folder)
+			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
+		}
+	}
+
+	// A genre or a person shown in Library opens like its link: its note, or its canvas.
+	linkName(el: HTMLElement, value: string): void {
+		const link = this.toLinks(value)[0]
+		const target = link ? /^\[\[([^\]|]+)/.exec(link)?.[1] : undefined
+		if (!target) return
+		el.classList.add('library-name-link')
+		el.setAttribute('role', 'link')
+		el.setAttribute('tabindex', '0')
+		const open = (event: Event): void => {
+			event.preventDefault()
+			event.stopPropagation()
+			void this.app.workspace.openLinkText(target, '', false)
+		}
+		el.addEventListener('click', open)
+		el.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') open(event) })
+	}
+
 	// A canvas of the library: titles joined by the people they share.
 	async buildLibraryMap(): Promise<void> {
 		const titles: { path: string; name: string; cover: string; people: string[] }[] = []
@@ -896,12 +981,7 @@ export default class LibraryPlugin extends Plugin {
 			if (!fm || !kind) continue
 			const people = [...toStrArray(fm.Creator), ...toStrArray(fm.Cast)].map(linkLabel).filter(Boolean)
 			if (people.length === 0) continue
-			// a cover from the web as an image link, one in the vault as an embed
-			const raw = toStr(coverValue(fm, this.coverProperty())).trim()
-			const local = /^!?\[\[([^\]|#]+)/.exec(raw)?.[1]
-			const web = safeUrl(raw)
-			const cover = web ? `![](${web})` : local ? `![[${local}]]` : ''
-			titles.push({ path: file.path, name: toStr(fm.Name) || file.basename, cover, people })
+			titles.push({ ...this.poster(file, fm), people })
 		}
 		const canvas = libraryMap(titles)
 		if (canvas.edges.length === 0) {
@@ -3175,7 +3255,7 @@ export default class LibraryPlugin extends Plugin {
 			if (isEmptyValue(value) || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			if (!isEmptyValue(fm[target])) continue
-			fm[target] = LINK_FIELDS.indexOf(key) >= 0 ? toLinks(value) : value
+			fm[target] = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
 		}
 	}
 
@@ -3635,7 +3715,7 @@ export default class LibraryPlugin extends Plugin {
 			if (key === 'Seasons' && !isEmptyValue(present)) current[target] = mergeSeasons(present, value)
 			// A Steam trailer stream gives way once a YouTube one is found.
 			else if (key === 'Trailer' && /steamstatic\.com\//.test(toStr(present)) && /youtube\.com\//.test(toStr(value))) current[target] = value
-			else if (isEmptyValue(present)) current[target] = LINK_FIELDS.indexOf(key) >= 0 ? toLinks(value) : value
+			else if (isEmptyValue(present)) current[target] = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
 			// a junk runtime from an earlier pass must not shadow a plausible one
 			else if (key === 'Runtime' && plausibleRuntime(present) === null && plausibleRuntime(value) !== null) current[target] = value
 			// a source's own score moves: refresh brings the current one, not the first
@@ -3696,8 +3776,8 @@ export default class LibraryPlugin extends Plugin {
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {
 		const cover = coverValue(fm, this.coverProperty())
 		const name = toStr(fm.Name) || file.basename
-		const creatorStr = toStrArray(fm.Creator || fm.Director || fm.Author || fm.Artist).map(linkLabel).join(', ')
-		const cast = toStrArray(fm.Cast).map(linkLabel)
+		const creators = toStrArray(fm.Creator || fm.Director || fm.Author || fm.Artist)
+		const cast = toStrArray(fm.Cast)
 		const year = fm.Year ? toStr(fm.Year) : ''
 		const endYear = fm['End Year'] ? toStr(fm['End Year']) : ''
 		const season = fm.Season ? toStr(fm.Season) : ''
@@ -3768,16 +3848,26 @@ export default class LibraryPlugin extends Plugin {
 			infoSide.appendChild(row)
 		}
 
-		if (creatorStr) addRow(tr('header.creator'), creatorStr)
-		if (cast.length > 0) addRow(tr('header.cast'), cast.join(', '))
+		// each name opens its canvas; the link as written decides where
+		const addNames = (label: string, values: string[]): void => {
+			if (values.length === 0) return
+			const row = infoSide.createDiv({ cls: 'note-header-row' })
+			row.createEl('b', { text: label + ': ' })
+			values.forEach((value, i) => {
+				if (i > 0) row.appendText(', ')
+				this.linkName(row.createSpan({ text: linkLabel(value) }), value)
+			})
+		}
+
+		addNames(tr('header.creator'), creators)
+		addNames(tr('header.cast'), cast)
 		const yearsStr = year + (endYear ? '–' + endYear : '')
 		if (yearsStr) addRow(tr('header.years'), yearsStr)
 		if (season) addRow(tr('header.seasons'), season)
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
-		const genres = toStrArray(fm.Genre).map(linkLabel)
-		if (genres.length > 0) addRow(tr('header.genre'), genres.join(', '))
+		addNames(tr('header.genre'), toStrArray(fm.Genre))
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 

@@ -1860,3 +1860,14 @@ sort trigger, the chosen one in the accent colour. */
 	font-weight: var(--font-semibold);
 	font-variant-numeric: tabular-nums;
 }
+
+/* a genre or a person that opens its canvas */
+.library-name-link {
+	cursor: pointer;
+}
+
+.library-name-link:hover,
+.library-name-link:focus-visible {
+	color: var(--text-accent);
+	text-decoration: underline;
+}

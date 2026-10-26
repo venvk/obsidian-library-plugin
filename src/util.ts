@@ -337,16 +337,30 @@ function titleKey(value: string): string {
 export function linkLabel(value: string): string {
 	const match = value.match(/^\[\[([^\]|]*)(?:\|([^\]]*))?\]\]$/)
 	if (!match) return value
-	return (match[2] ?? match[1] ?? '').trim()
+	return (match[2] ?? match[1] ?? '').replace(/\.canvas$/i, '').trim()
 }
 
-// Plain names → [[links]]; hand-written links (alias and all) kept.
-export function toLinks(value: unknown): string[] {
+// What a name's canvas gathers: the link properties and the plain names older notes keep.
+export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist']
+
+// The file a link property points at, without .canvas: [[Drama.canvas|Drama]] → Drama.
+export function linkTarget(value: string): string {
+	const target = /^\[\[([^\]|#^]+)/.exec(value)?.[1] ?? sanitizeLink(value)
+	return target.replace(/\.canvas$/i, '').trim()
+}
+
+// Plain names → [[Name.canvas|Name]], the canvas of the titles that share the
+// name; a name with a note of its own (hasNote) links the note. Written links
+// are kept, except a bare [[Name]] with no note behind it.
+export function toLinks(value: unknown, hasNote: (name: string) => boolean = () => false): string[] {
 	const links: string[] = []
 	for (const item of toStrArray(value)) {
-		const target = /^\[\[[^\]]+\]\]$/.test(item) ? item : sanitizeLink(item)
-		const link = target.startsWith('[[') ? target : `[[${target}]]`
-		if (target && links.indexOf(link) < 0) links.push(link)
+		const bare = /^\[\[([^\]|#^/]+)\]\]$/.exec(item)?.[1]
+		const written = /^\[\[[^\]]+\]\]$/.test(item)
+		const name = sanitizeLink(bare ?? item)
+		const keep = written && (bare === undefined || /\.(md|canvas)$/i.test(bare) || hasNote(bare))
+		const link = keep ? item : !name ? '' : hasNote(name) ? `[[${name}]]` : `[[${name}.canvas|${name}]]`
+		if (link && links.indexOf(link) < 0) links.push(link)
 	}
 	return links
 }

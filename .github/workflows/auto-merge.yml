@@ -20,6 +20,7 @@ jobs:
         if: github.repository == 'venvk/obsidian-library-plugin' && github.event.pull_request.user.login == 'venvk' && !github.event.pull_request.draft
         runs-on: ubuntu-latest
         permissions:
+            actions: write
             contents: write
             pull-requests: write
 
@@ -39,6 +40,16 @@ jobs:
                   # First paragraph of the description, without template comments.
                   body="$(printf '%s\n' "$PR_BODY" | tr -d '\r' | awk '/^<!--.*-->$/ { next } NF { p = 1 } p && !NF { exit } p')"
                   gh pr merge --auto --merge --subject "$subject" --body "$body" "$PR_URL"
+
+            # A draft's check passed before it was ready, so "Delete merged
+            # branches" already ran and found nothing to delete: start it again.
+            - name: Delete the branch once merged
+              if: github.event.action == 'ready_for_review'
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+                  REPO: ${{ github.repository }}
+                  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+              run: gh workflow run delete-merged-branches.yml --repo "$REPO" -f branch="$HEAD_REF"
 
     dependabot:
         if: github.repository == 'venvk/obsidian-library-plugin' && github.event.pull_request.user.login == 'dependabot[bot]'
