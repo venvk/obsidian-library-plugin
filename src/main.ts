@@ -209,6 +209,7 @@ export default class LibraryPlugin extends Plugin {
 	private refreshCooldowns = new Map<string, number>()
 	private syncingLinks = new Set<string>()
 	private linkTimers = new Map<string, number>()
+	private fillingCanvases = new Set<string>()
 	private malPushTimers = new Map<string, number>()
 	private imdbPushTimers = new Map<string, number>()
 	private traktPushTimers = new Map<string, number>()
@@ -910,6 +911,16 @@ export default class LibraryPlugin extends Plugin {
 	// A genre's or a person's canvas, drawn when it is opened (a click on an
 	// unmade link creates it empty). A canvas you added your own cards to is left alone.
 	private async fillLinkCanvas(file: TFile): Promise<void> {
+		if (this.fillingCanvases.has(file.path)) return
+		this.fillingCanvases.add(file.path)
+		try {
+			await this.drawLinkCanvas(file)
+		} finally {
+			this.fillingCanvases.delete(file.path)
+		}
+	}
+
+	private async drawLinkCanvas(file: TFile): Promise<void> {
 		const text = await this.app.vault.read(file)
 		try {
 			const nodes = text.trim() ? (JSON.parse(text) as { nodes?: { id?: unknown }[] }).nodes ?? [] : []
@@ -944,8 +955,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// A genre or a person shown in Library opens like its link: its note, or its canvas.
-	linkName(el: HTMLElement, name: string): void {
-		const link = this.toLinks(name)[0]
+	linkName(el: HTMLElement, value: string): void {
+		const link = this.toLinks(value)[0]
 		const target = link ? /^\[\[([^\]|]+)/.exec(link)?.[1] : undefined
 		if (!target) return
 		el.classList.add('library-name-link')
@@ -3765,8 +3776,8 @@ export default class LibraryPlugin extends Plugin {
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {
 		const cover = coverValue(fm, this.coverProperty())
 		const name = toStr(fm.Name) || file.basename
-		const creators = toStrArray(fm.Creator || fm.Director || fm.Author || fm.Artist).map(linkLabel)
-		const cast = toStrArray(fm.Cast).map(linkLabel)
+		const creators = toStrArray(fm.Creator || fm.Director || fm.Author || fm.Artist)
+		const cast = toStrArray(fm.Cast)
 		const year = fm.Year ? toStr(fm.Year) : ''
 		const endYear = fm['End Year'] ? toStr(fm['End Year']) : ''
 		const season = fm.Season ? toStr(fm.Season) : ''
@@ -3837,14 +3848,14 @@ export default class LibraryPlugin extends Plugin {
 			infoSide.appendChild(row)
 		}
 
-		// each name opens its canvas
-		const addNames = (label: string, names: string[]): void => {
-			if (names.length === 0) return
+		// each name opens its canvas; the link as written decides where
+		const addNames = (label: string, values: string[]): void => {
+			if (values.length === 0) return
 			const row = infoSide.createDiv({ cls: 'note-header-row' })
 			row.createEl('b', { text: label + ': ' })
-			names.forEach((name, i) => {
+			values.forEach((value, i) => {
 				if (i > 0) row.appendText(', ')
-				this.linkName(row.createSpan({ text: name }), name)
+				this.linkName(row.createSpan({ text: linkLabel(value) }), value)
 			})
 		}
 
@@ -3856,7 +3867,7 @@ export default class LibraryPlugin extends Plugin {
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
-		addNames(tr('header.genre'), toStrArray(fm.Genre).map(linkLabel))
+		addNames(tr('header.genre'), toStrArray(fm.Genre))
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 
