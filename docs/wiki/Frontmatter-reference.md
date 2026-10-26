@@ -141,7 +141,7 @@ Notes from older versions can have another `Source`, such as `rawg` or `steam`. 
 
 ## Links
 
-`Genre`, `Creator`, and `Cast` hold links to canvases, such as `[[Drama.canvas|Drama]]`. Opening one draws the covers of every title with that genre or person, grouped by category, and a canvas made from a link moves to a Canvases folder in your library folder. The canvas is drawn again each time you open it, until you add a card of your own; then Library leaves it as it is. A name that already has a note of its own, not a title's, links that note instead. Names you type by hand become links the next time the note changes. `Rebuild graph links` converts the whole library at once, older `[[Drama]]` links included.
+`Genre`, `Creator`, and `Cast` hold links to canvases, such as `[[Drama.canvas|Drama]]`. Opening one, or clicking the name in the note header, in a statistics top, or among your favourite genres, draws the covers of every title with that genre or person, grouped by category, and a canvas made from a link moves to a Canvases folder in your library folder. The canvas is drawn again each time you open it, until you add a card of your own; then Library leaves it as it is. A name that already has a note of its own, not a title's, links that note instead. Names you type by hand become links the next time the note changes. `Rebuild graph links` converts the whole library at once, older `[[Drama]]` links included.
 
 ## Cover
 

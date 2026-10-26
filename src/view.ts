@@ -16,6 +16,7 @@ import {
 	parseDate,
 	isTemplateFile,
 	linkLabel,
+	NAME_FIELDS,
 	notStarted,
 	shownProgress,
 	isFinished,
@@ -379,7 +380,8 @@ export class LibraryRenderer {
 					const row = col.createDiv({ cls: 'library-stats-medal' })
 					row.createSpan({ cls: 'library-stats-medal-icon', text: medals[i] || '' })
 					const label = row.createDiv({ cls: 'library-stats-medal-label' })
-					label.createSpan({ cls: 'library-stats-medal-name', text: name })
+					const nameEl = label.createSpan({ cls: 'library-stats-medal-name', text: name })
+					if (NAME_FIELDS.some(key => key.toLowerCase() === column.top.key.toLowerCase())) this.plugin.linkName(nameEl, name)
 					label.createSpan({ cls: 'library-stats-medal-count', text: `${count} ${trCount('stats.works', count)}` })
 				})
 				continue
@@ -471,6 +473,7 @@ export class LibraryRenderer {
 				const chips = row.createDiv({ cls: 'library-taste-chips' })
 				for (const genre of taste.genres) {
 					const chip = chips.createSpan({ cls: 'library-taste-chip' })
+					this.plugin.linkName(chip, genre.name)
 					chip.createSpan({ text: genre.name })
 					chip.createSpan({ cls: 'library-taste-chip-score', text: formatNumber(genre.average) })
 				}

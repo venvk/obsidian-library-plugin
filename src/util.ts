@@ -340,6 +340,9 @@ export function linkLabel(value: string): string {
 	return (match[2] ?? match[1] ?? '').replace(/\.canvas$/i, '').trim()
 }
 
+// What a name's canvas gathers: the link properties and the plain names older notes keep.
+export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist']
+
 // The file a link property points at, without .canvas: [[Drama.canvas|Drama]] → Drama.
 export function linkTarget(value: string): string {
 	const target = /^\[\[([^\]|#^]+)/.exec(value)?.[1] ?? sanitizeLink(value)

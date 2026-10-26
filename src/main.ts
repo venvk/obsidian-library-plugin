@@ -104,6 +104,7 @@ import {
 	safeUrl,
 	linkLabel,
 	linkTarget,
+	NAME_FIELDS,
 	toLinks,
 	coverKey,
 	imageExtension,
@@ -922,7 +923,7 @@ export default class LibraryPlugin extends Plugin {
 			const fm = this.app.metadataCache.getFileCache(note)?.frontmatter
 			const category = fm ? this.settings.categories.find(c => c.typeValue === toStr(fm.Type)) : undefined
 			if (!fm || !category) continue
-			const named = LINK_FIELDS.some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))
+			const named = NAME_FIELDS.some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))
 			if (!named) continue
 			const list = sections.get(category.name) ?? []
 			list.push(this.poster(note, fm))
@@ -940,6 +941,23 @@ export default class LibraryPlugin extends Plugin {
 			await this.ensureFolder(folder)
 			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
 		}
+	}
+
+	// A genre or a person shown in Library opens like its link: its note, or its canvas.
+	linkName(el: HTMLElement, name: string): void {
+		const link = this.toLinks(name)[0]
+		const target = link ? /^\[\[([^\]|]+)/.exec(link)?.[1] : undefined
+		if (!target) return
+		el.classList.add('library-name-link')
+		el.setAttribute('role', 'link')
+		el.setAttribute('tabindex', '0')
+		const open = (event: Event): void => {
+			event.preventDefault()
+			event.stopPropagation()
+			void this.app.workspace.openLinkText(target, '', false)
+		}
+		el.addEventListener('click', open)
+		el.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') open(event) })
 	}
 
 	// A canvas of the library: titles joined by the people they share.
@@ -3747,7 +3765,7 @@ export default class LibraryPlugin extends Plugin {
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {
 		const cover = coverValue(fm, this.coverProperty())
 		const name = toStr(fm.Name) || file.basename
-		const creatorStr = toStrArray(fm.Creator || fm.Director || fm.Author || fm.Artist).map(linkLabel).join(', ')
+		const creators = toStrArray(fm.Creator || fm.Director || fm.Author || fm.Artist).map(linkLabel)
 		const cast = toStrArray(fm.Cast).map(linkLabel)
 		const year = fm.Year ? toStr(fm.Year) : ''
 		const endYear = fm['End Year'] ? toStr(fm['End Year']) : ''
@@ -3819,16 +3837,26 @@ export default class LibraryPlugin extends Plugin {
 			infoSide.appendChild(row)
 		}
 
-		if (creatorStr) addRow(tr('header.creator'), creatorStr)
-		if (cast.length > 0) addRow(tr('header.cast'), cast.join(', '))
+		// each name opens its canvas
+		const addNames = (label: string, names: string[]): void => {
+			if (names.length === 0) return
+			const row = infoSide.createDiv({ cls: 'note-header-row' })
+			row.createEl('b', { text: label + ': ' })
+			names.forEach((name, i) => {
+				if (i > 0) row.appendText(', ')
+				this.linkName(row.createSpan({ text: name }), name)
+			})
+		}
+
+		addNames(tr('header.creator'), creators)
+		addNames(tr('header.cast'), cast)
 		const yearsStr = year + (endYear ? '–' + endYear : '')
 		if (yearsStr) addRow(tr('header.years'), yearsStr)
 		if (season) addRow(tr('header.seasons'), season)
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
-		const genres = toStrArray(fm.Genre).map(linkLabel)
-		if (genres.length > 0) addRow(tr('header.genre'), genres.join(', '))
+		addNames(tr('header.genre'), toStrArray(fm.Genre).map(linkLabel))
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 
