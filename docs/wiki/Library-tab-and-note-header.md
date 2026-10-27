@@ -45,18 +45,18 @@ Soon lists the next episodes of the series and anime you are watching, with thei
 
 ## The note header
 
-A library note shows a header above its text: the cover, creator, cast, years, seasons, the next episode's air date, genres, runtime, last played, ratings, your score, and your progress. The header is drawn on screen; the text of the note stays as you wrote it.
+A library note shows a header above its text: the cover, creator, cast, years, seasons, the next episode's air date, genres, an album's awards from Wikidata, runtime, last played, ratings, your score, and your progress. The header is drawn on screen; the text of the note stays as you wrote it.
 
 Depending on the note it also has:
 
 - a trailer: Watch trailer plays it inside Obsidian;
 - a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close;
-- the seasons and episodes, or the chapters, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
+- the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
 - for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected.
 
 ## Recommendations
 
-Movie, series, anime, game, and book notes show a row of similar titles you don't have yet: from AniList for anime, from TMDB or Cinemeta for movies and series, from RAWG or Wikidata for games, and from Open Library for books. They load when you open the note. Click a cover, or press Enter on it, to add the title.
+Movie, series, anime, game, book, and music notes show a row of similar titles you don't have yet: from AniList for anime, from TMDB or Cinemeta for movies and series, from RAWG or Wikidata for games, from Open Library for books, and from Deezer for music, an album by each related artist. They load when you open the note. Click a cover, or press Enter on it, to add the title.
 
 Settings → Library → Show recommendations hides the row and stops those requests.
 

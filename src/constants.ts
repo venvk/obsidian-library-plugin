@@ -160,6 +160,8 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'header.myRating': 'My rating',
 		'header.progress': 'Progress',
 		'header.complete': 'Complete',
+		'header.awards': 'Awards',
+		'header.tracklist': 'Tracklist',
 		'header.trailer': 'Trailer',
 		'header.watchTrailer': 'Watch trailer',
 		'header.episodes1': '{count} episode',

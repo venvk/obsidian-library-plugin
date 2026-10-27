@@ -36,6 +36,6 @@ Settings → Library → Skip properties takes the fields that notes should not 
 - Capitals don't matter.
 - The cover can be listed under either name: with Cover property set to `image`, both `Cover` and `image` skip it.
 - Only fields from the sources can be skipped. The seven properties Library manages, and the fields connected accounts write, such as `Platforms`, `Playtime`, `Last Played`, or the trophy counts, are always written.
-- Some fields feed features. Without `Runtime` the time chart can't count a title, without `Seasons` or `Chapters` there is nothing to tick in the note header, and without `Genre` or `Country` the filters have less to offer.
+- Some fields feed features. Without `Runtime` the time chart can't count a title, without `Seasons`, `Chapters`, or `Tracks` there is nothing to tick in the note header, and without `Genre` or `Country` the filters have less to offer.
 
 Other property names can't be changed, because refresh, statistics, filters, and sync read them by name. The cover is the one exception; see [[Note properties|Frontmatter-reference]].

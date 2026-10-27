@@ -4,7 +4,7 @@ import { SteamProvider } from './providers/steam'
 import type { ContentType } from './providers/types'
 import { claim, entities, itemIds, languages, searchItems, textIn, yearIn } from './providers/wikidata'
 
-// Similar titles per source: AniList (anime), TMDB→Cinemeta (film), Steam→RAWG→Wikidata (games), Open Library (books); no comics/music.
+// Similar titles per source: AniList (anime), TMDB→Cinemeta (film), Steam→RAWG→Wikidata (games), Open Library (books), Deezer (music); no comics.
 
 export interface Recommendation {
 	title: string
@@ -27,6 +27,7 @@ const TMDB_IMG = 'https://image.tmdb.org/t/p/w342'
 const RAWG = 'https://api.rawg.io/api'
 const STEAM_MORE = 'https://store.steampowered.com/recommended/morelike/app'
 const OPENLIB = 'https://openlibrary.org'
+const DEEZER = 'https://api.deezer.com'
 
 async function getJson<T>(url: string, body?: unknown): Promise<T | null> {
 	try {
@@ -82,6 +83,7 @@ async function pick(source: string, sourceId: string, name: string, genres: stri
 			return wikidataGames(sourceId, name)
 		}
 		case 'books': case 'openlibrary': case 'googlebooks': return openLibrary(sourceId, name, genres)
+		case 'deezer': return deezerSimilar(sourceId)
 		default: return []
 	}
 }
@@ -286,4 +288,22 @@ async function openLibrary(sourceId: string, name: string, genres: string[]): Pr
 			type: 'book',
 			sourceId: d.key
 		}))
+}
+
+// Deezer has no similar albums: the most-followed album of each related artist.
+async function deezerSimilar(albumId: string): Promise<Recommendation[]> {
+	if (!/^\d+$/.test(albumId)) return []
+	const album = await getJson<{ artist?: { id?: number } }>(`${DEEZER}/album/${albumId}`)
+	const artist = album?.artist?.id
+	if (typeof artist !== 'number') return []
+	const related = await getJson<{ data?: { id: number }[] }>(`${DEEZER}/artist/${String(artist)}/related?limit=${String(LIMIT)}`)
+	type Album = { id: number; title?: string; record_type?: string; fans?: number; release_date?: string; cover_xl?: string; cover_big?: string }
+	const picks = await Promise.all((related?.data ?? []).map(async (other): Promise<Recommendation | null> => {
+		const albums = await getJson<{ data?: Album[] }>(`${DEEZER}/artist/${String(other.id)}/albums?limit=25`)
+		const best = (albums?.data ?? [])
+			.filter(item => item.record_type === 'album' && item.title)
+			.sort((a, b) => (b.fans ?? 0) - (a.fans ?? 0))[0]
+		return best ? { title: best.title ?? '', year: yearOf(best.release_date), cover: best.cover_xl ?? best.cover_big ?? null, type: 'music', sourceId: String(best.id) } : null
+	}))
+	return picks.filter((pick): pick is Recommendation => pick !== null)
 }
