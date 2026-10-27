@@ -73,11 +73,12 @@ interface SortChoice {
 	asc: boolean
 }
 
-type Facet = 'year' | 'genre' | 'country' | 'platform'
+type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform'
 
 const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'year', label: 'sort.year' },
 	{ facet: 'genre', label: 'header.genre' },
+	{ facet: 'artist', label: 'header.creator' },
 	{ facet: 'country', label: 'filter.country' },
 	{ facet: 'platform', label: 'settings.stats.groupPlatforms' },
 ]
@@ -86,6 +87,8 @@ function facetValues(card: CardData, facet: Facet): string[] {
 	switch (facet) {
 		case 'year': return card.year > 0 ? [String(card.year)] : []
 		case 'genre': return toStrArray(card.fm.Genre).map(linkLabel).filter(Boolean)
+		// an album's artist; other media have too many creators to pick from
+		case 'artist': return card.kind === 'music' ? toStrArray(card.fm.Creator).map(linkLabel).filter(Boolean) : []
 		case 'country': return toStrArray(card.fm.Country)
 		case 'platform': return toStrArray(card.fm.Platforms)
 	}

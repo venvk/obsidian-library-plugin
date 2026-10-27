@@ -10,7 +10,7 @@ The title row of a section holds:
 
 - the fold arrow. A folded section shows one row of cards that scrolls sideways. The fold is remembered.
 - the number of titles, and, for movies, series, anime, music, and games, the time you spent on them. Hover over the time to see the exact hours.
-- Filter, when there is something to filter by: year, genre, country, or platform. Each list shows how many titles have that value, and the button shows how many filters are on. Clear filters turns them all off.
+- Filter, when at least two titles differ in it: year, genre, the artist for music, country, or platform. Each list shows how many titles have that value, and the button shows how many filters are on. Clear filters turns them all off.
 - the sort menu on the right.
 
 Sort a section by:

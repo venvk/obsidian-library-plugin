@@ -104,7 +104,7 @@ Renaming or removing one of these breaks refresh, statistics, or sync for that n
 | `Season` | The number of seasons | series |
 | `Seasons` | Seasons and their episodes, as in the example. A season's `rating` is the source's score; `watched` and `my_rating` are yours | series, anime |
 | `Chapters` | Chapters, with the same `title`, `watched`, and `my_rating` | books |
-| `Tracks` | An album's tracks, with the same `title`, `watched`, and `my_rating`; a single has none | music |
+| `Tracks` | An album's or a single's tracks, with the same `title`, `watched`, and `my_rating`; a one-track single has none | music |
 | `ISBN` | The ISBN | books |
 | `Trailer` | A trailer link | movies, series, anime, games |
 | `Gallery` | Still images or screenshots | movies, series, anime, games |

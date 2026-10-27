@@ -4085,6 +4085,11 @@ export default class LibraryPlugin extends Plugin {
 			wrap.appendChild(add)
 			return
 		}
+		// a music note made before tracks were kept fetches them once a session
+		if (kind === 'music' && seasons.length === 0 && !this.chapterLookups.has(file.path)) {
+			this.chapterLookups.add(file.path)
+			void this.lookUpTracks(file, fm)
+		}
 		if (seasons.length === 0) return
 		const open = this.openSeasons.get(file.path) ?? new Set<number>()
 		this.openSeasons.set(file.path, open)
@@ -4295,6 +4300,18 @@ export default class LibraryPlugin extends Plugin {
 		} catch (e) {
 			console.error('Library: episode update error', file.path, e)
 		}
+	}
+
+	private async lookUpTracks(file: TFile, fm: Record<string, unknown>): Promise<void> {
+		const sourceId = toStr(fm['Source ID'])
+		const provider = this.registry.forType('music')
+		if (!sourceId || !provider || this.skipped('Tracks')) return
+		const tracks = (await provider.fetch(sourceId, 'music'))?.fields.Tracks
+		if (!Array.isArray(tracks) || tracks.length === 0 || this.unloaded) return
+		// Progress so far counts the first tracks as played until one is ticked
+		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+			if (!Array.isArray(current.Tracks) || current.Tracks.length === 0) current.Tracks = tracks
+		})
 	}
 
 	private lookUpChapters(file: TFile, fm: Record<string, unknown>): Promise<string[]> {
