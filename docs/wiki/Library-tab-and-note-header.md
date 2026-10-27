@@ -30,7 +30,7 @@ Pick the same sort again to reverse it. Sort and filters are remembered per sect
 
 ### A card
 
-A card shows the cover, title, creator, year, and ratings (IMDb, Rotten Tomatoes 🍅, RAWG, Metacritic, and your score). Depending on the note it also has:
+A card shows the cover (square for music, as album covers are), title, creator, year, and ratings (IMDb, Rotten Tomatoes 🍅, RAWG, Metacritic, and your score). Depending on the note it also has:
 
 - platform marks on the cover for games and for titles from Netflix;
 - trophy counts for PlayStation games;

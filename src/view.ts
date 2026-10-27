@@ -540,8 +540,9 @@ export class LibraryRenderer {
 
 	renderCard(grid: HTMLElement, card: CardData): void {
 		const { file, fm } = card
+		// album covers are square
 		const cardEl = grid.createDiv({
-			cls: 'library-card',
+			cls: card.kind === 'music' ? 'library-card is-square' : 'library-card',
 			attr: {
 				'role': 'button',
 				'tabindex': '0',
