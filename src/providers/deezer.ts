@@ -30,6 +30,7 @@ interface DeezerAlbumFull {
 	duration?: number
 	genres?: { data?: { name?: string }[] }
 	link?: string
+	tracks?: { data?: { title?: string }[] }
 }
 
 export class DeezerProvider implements ContentProvider {
@@ -87,6 +88,16 @@ export class DeezerProvider implements ContentProvider {
 				Cover: this.cover(album)
 			}
 			if (album.link) fields['URL'] = album.link
+			// tracks to tick and rate; a one-track single has none
+			let listed = album.tracks?.data ?? []
+			// the album answer carries 25 tracks at most
+			if (album.nb_tracks && album.nb_tracks > listed.length) {
+				const all = await requestUrl({ url: `${DeezerProvider.ALBUM}${encodeURIComponent(sourceId)}/tracks?limit=500`, throw: false })
+				const more = all.status === 200 ? (all.json as { data?: { title?: string }[] }).data : undefined
+				if (more && more.length > listed.length) listed = more
+			}
+			const tracks = listed.map((track) => track.title).filter((title): title is string => Boolean(title))
+			if (tracks.length > 1) fields['Tracks'] = tracks.map((title) => ({ title }))
 			// Whole album, minutes.
 			if (typeof album.duration === 'number' && album.duration > 0) fields['Runtime'] = Math.max(1, Math.round(album.duration / 60))
 

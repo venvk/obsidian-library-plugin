@@ -171,19 +171,21 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 
 	const posterX = PAD
 	const posterY = (H - POSTER_H) / 2
+	// album covers are square
+	const posterW = toStr(fm.Type).toLowerCase() === 'music' ? POSTER_H : POSTER_W
 	const coverBytes = await loadCoverBytes(app, coverValue(fm, coverProperty))
 	const img = coverBytes ? await loadImage(coverBytes) : null
-	roundRect(ctx, posterX, posterY, POSTER_W, POSTER_H, 16)
+	roundRect(ctx, posterX, posterY, posterW, POSTER_H, 16)
 	ctx.save()
 	ctx.clip()
 	if (img && img.width > 0 && img.height > 0) {
-		const scale = Math.max(POSTER_W / img.width, POSTER_H / img.height)
+		const scale = Math.max(posterW / img.width, POSTER_H / img.height)
 		const dw = img.width * scale
 		const dh = img.height * scale
-		ctx.drawImage(img, posterX + (POSTER_W - dw) / 2, posterY + (POSTER_H - dh) / 2, dw, dh)
+		ctx.drawImage(img, posterX + (posterW - dw) / 2, posterY + (POSTER_H - dh) / 2, dw, dh)
 	} else {
 		ctx.fillStyle = '#24242e'
-		ctx.fillRect(posterX, posterY, POSTER_W, POSTER_H)
+		ctx.fillRect(posterX, posterY, posterW, POSTER_H)
 		ctx.fillStyle = '#5a5a6e'
 		ctx.font = '140px sans-serif'
 		ctx.textAlign = 'center'
@@ -194,11 +196,11 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 			: type === 'anime' ? '🎌'
 			: type === 'comic' ? '📚'
 			: '🎬'
-		ctx.fillText(glyph, posterX + POSTER_W / 2, posterY + POSTER_H / 2 + 50)
+		ctx.fillText(glyph, posterX + posterW / 2, posterY + POSTER_H / 2 + 50)
 	}
 	ctx.restore()
 
-	const colX = posterX + POSTER_W + PAD
+	const colX = posterX + posterW + PAD
 	const colW = W - colX - PAD
 	ctx.textAlign = 'left'
 	ctx.textBaseline = 'alphabetic'

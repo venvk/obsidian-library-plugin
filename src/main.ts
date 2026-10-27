@@ -56,6 +56,7 @@ import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
 import { libraryMap, linkCanvas } from './libraryMap'
+import { albumAwards, type Award } from './music'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
 import { refreshTraktTokens, traktChanges, traktData, traktExpired, traktHistory, traktRemove, traktSend, type TraktEcho } from './trakt'
@@ -204,6 +205,8 @@ export default class LibraryPlugin extends Plugin {
 	private psnRenewAfter = 0
 	// keyed Source:Source ID, fetched once a session
 	private recommendations = new Map<string, Promise<Recommendation[]>>()
+	// an album's awards, looked up once a session
+	private albumAwards = new Map<string, Promise<Award[]>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
 	private refreshCooldowns = new Map<string, number>()
@@ -3868,6 +3871,7 @@ export default class LibraryPlugin extends Plugin {
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
 		addNames(tr('header.genre'), toStrArray(fm.Genre))
+		if (kind === 'music') this.addAwards(infoSide, fm, name)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 
@@ -3919,6 +3923,24 @@ export default class LibraryPlugin extends Plugin {
 		this.buildTrophiesBlock(wrap, fm, file)
 		this.buildRecommendations(wrap, fm)
 		return wrap
+	}
+
+	// an album's awards from Wikidata, a row that appears once they arrive
+	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string): void {
+		const artist = linkLabel(toStrArray(fm.Creator)[0] ?? '')
+		if (!artist) return
+		const key = `${name}\u0000${artist}`
+		let pending = this.albumAwards.get(key)
+		if (!pending) {
+			pending = albumAwards(name, artist).catch(() => [] as Award[])
+			this.albumAwards.set(key, pending)
+		}
+		const row = infoSide.createDiv({ cls: 'note-header-row' })
+		void pending.then(awards => {
+			if (awards.length === 0 || this.unloaded) { row.remove(); return }
+			row.createEl('b', { text: tr('header.awards') + ': ' })
+			row.appendText(awards.map(award => award.year ? `${award.name} (${String(award.year)})` : award.name).join(', '))
+		})
 	}
 
 	private buildRecommendations(wrap: HTMLElement, fm: Record<string, unknown>): void {
@@ -4032,7 +4054,7 @@ export default class LibraryPlugin extends Plugin {
 	// which list a note tracks: seasons of episodes, or a book's chapters
 	private trackKind(fm: Record<string, unknown>): TrackKind | null {
 		const contentType = this.settings.categories.find(c => c.typeValue === toStr(fm.Type))?.contentType
-		if (contentType === 'series' || contentType === 'anime' || contentType === 'book') return contentType
+		if (contentType === 'series' || contentType === 'anime' || contentType === 'book' || contentType === 'music') return contentType
 		return null
 	}
 
@@ -4042,6 +4064,8 @@ export default class LibraryPlugin extends Plugin {
 		const kind = this.trackKind(fm)
 		const trackable = kind !== null
 		const book = kind === 'book'
+		// a book's chapters or an album's tracks: one flat list
+		const flat = book || kind === 'music'
 		const seasons = seasonsOf(fm, kind ?? 'series')
 		if (book && seasons.length === 0) {
 			// Open Library notes are never refetched: a book looks its TOC up on open, once a session
@@ -4061,11 +4085,16 @@ export default class LibraryPlugin extends Plugin {
 			wrap.appendChild(add)
 			return
 		}
+		// a music note made before tracks were kept fetches them once a session
+		if (kind === 'music' && seasons.length === 0 && !this.chapterLookups.has(file.path)) {
+			this.chapterLookups.add(file.path)
+			void this.lookUpTracks(file, fm)
+		}
 		if (seasons.length === 0) return
 		const open = this.openSeasons.get(file.path) ?? new Set<number>()
 		this.openSeasons.set(file.path, open)
 		const airs = new Map<string, number>()
-		if (!book) {
+		if (!flat) {
 			const names = seasons.map(season => season.name)
 			for (const airing of this.airingDates(fm)) {
 				const index = airing.s === null ? (seasons.length === 1 ? 0 : -1) : seasonIndex(names, airing.s)
@@ -4084,14 +4113,14 @@ export default class LibraryPlugin extends Plugin {
 			const name = createDiv()
 			name.classList.add('note-header-season-name')
 			// Providers name untitled seasons "Season N" in English.
-			name.setText(book ? tr('header.chapters') : season.name.replace(/^Season (\d+)$/, (_, n: string) => tr('header.season', { number: n })))
+			name.setText(book ? tr('header.chapters') : flat ? tr('header.tracklist') : season.name.replace(/^Season (\d+)$/, (_, n: string) => tr('header.season', { number: n })))
 			row.appendChild(name)
 
 			if (season.episodes.length > 0) {
 				const episodes = createDiv()
 				episodes.classList.add('note-header-season-episodes')
 				const seen = season.episodes.filter(e => e.watched).length
-				const total = book ? String(season.episodes.length) : trCount('header.episodes', season.episodes.length)
+				const total = flat ? String(season.episodes.length) : trCount('header.episodes', season.episodes.length)
 				episodes.setText(trackable && seen > 0 && !season.watched ? `${String(seen)} / ${total}` : total)
 				row.appendChild(episodes)
 			}
@@ -4117,7 +4146,7 @@ export default class LibraryPlugin extends Plugin {
 
 			if (trackable) {
 				// a season rated through its episodes shows their average, no hand-typed rating
-				if (!book) row.appendChild(this.ratingInput(season.rating, season.ratedByEpisodes, (rating) => change({ season: index, rating })))
+				if (!flat) row.appendChild(this.ratingInput(season.rating, season.ratedByEpisodes, (rating) => change({ season: index, rating })))
 				const toggle = createEl('button')
 				toggle.classList.add('note-header-season-toggle', 'clickable-icon')
 				toggle.setAttribute('aria-label', tr('header.episodeList'))
@@ -4143,7 +4172,7 @@ export default class LibraryPlugin extends Plugin {
 				const label = createDiv()
 				label.classList.add('note-header-episode-name')
 				const number = String(e + 1)
-				label.setText(episode.title ? `${number}. ${episode.title}` : tr(book ? 'header.chapter' : 'header.episode', { number }))
+				label.setText(episode.title ? `${number}. ${episode.title}` : flat && !book ? `${number}.` : tr(book ? 'header.chapter' : 'header.episode', { number }))
 				item.appendChild(label)
 				const at = airs.get(`${String(index)}:${String(e)}`)
 				if (at !== undefined) {
@@ -4271,6 +4300,18 @@ export default class LibraryPlugin extends Plugin {
 		} catch (e) {
 			console.error('Library: episode update error', file.path, e)
 		}
+	}
+
+	private async lookUpTracks(file: TFile, fm: Record<string, unknown>): Promise<void> {
+		const sourceId = toStr(fm['Source ID'])
+		const provider = this.registry.forType('music')
+		if (!sourceId || !provider || this.skipped('Tracks')) return
+		const tracks = (await provider.fetch(sourceId, 'music'))?.fields.Tracks
+		if (!Array.isArray(tracks) || tracks.length === 0 || this.unloaded) return
+		// Progress so far counts the first tracks as played until one is ticked
+		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+			if (!Array.isArray(current.Tracks) || current.Tracks.length === 0) current.Tracks = tracks
+		})
 	}
 
 	private lookUpChapters(file: TFile, fm: Record<string, unknown>): Promise<string[]> {

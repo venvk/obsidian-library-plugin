@@ -26,6 +26,10 @@
 	justify-content: center;
 }
 
+.library-card.is-square .card-image {
+	aspect-ratio: 1 / 1;
+}
+
 .library-card .card-image img {
 	width: 100%;
 	height: 100%;

@@ -1,10 +1,13 @@
 // All state lives in the `Seasons` frontmatter list: `{name, episodes, rating, trailer, my_rating,
-// episode_list: [{title, watched, my_rating}]}`; a book keeps the same entries flat in `Chapters`.
+// episode_list: [{title, watched, my_rating}]}`; a book keeps the same entries flat in `Chapters`,
+// an album in `Tracks`.
 // Before any tick, the first N episodes (N = Progress numerator) count watched; the first tick writes them all.
 // No obsidian import: the logic is unit-tested on plain objects.
 
-// series/anime: `Seasons`; book: flat `Chapters` as one season.
-export type TrackKind = 'series' | 'anime' | 'book'
+// series/anime: `Seasons`; book: flat `Chapters`, music: flat `Tracks`, as one season.
+export type TrackKind = 'series' | 'anime' | 'book' | 'music'
+
+const FLAT: Partial<Record<TrackKind, string>> = { book: 'Chapters', music: 'Tracks' }
 
 export interface EpisodeState {
 	title: string
@@ -56,9 +59,10 @@ function progressOf(fm: Record<string, unknown>): { watched: number; total: numb
 }
 
 function rawSeasons(fm: Record<string, unknown>, kind: TrackKind = 'series'): Record<string, unknown>[] {
-	if (kind === 'book') {
-		const chapters = Array.isArray(fm.Chapters) ? (fm.Chapters as unknown[]) : []
-		return chapters.length > 0 ? [{ name: 'Chapters', episodes: chapters.length, episode_list: chapters }] : []
+	const flat = FLAT[kind]
+	if (flat) {
+		const entries = Array.isArray(fm[flat]) ? (fm[flat] as unknown[]) : []
+		return entries.length > 0 ? [{ name: flat, episodes: entries.length, episode_list: entries }] : []
 	}
 	const list = Array.isArray(fm.Seasons) ? (fm.Seasons as unknown[]) : []
 	const out: Record<string, unknown>[] = []
@@ -150,15 +154,16 @@ function writeBack(fm: Record<string, unknown>, states: SeasonState[], kind: Tra
 		else delete season.my_rating
 		return season
 	})
-	if (kind === 'book') fm.Chapters = seasons[0]?.episode_list ?? []
+	const flat = FLAT[kind]
+	if (flat) fm[flat] = seasons[0]?.episode_list ?? []
 	else fm.Seasons = seasons
 
 	const episodes = states.reduce((all, season) => all.concat(season.episodes), [] as EpisodeState[])
 	const total = episodes.length
 	const watched = episodes.filter((e) => e.watched).length
 	if (total > 0) {
-		// Book total = chapters; all episodes ticked = 100%, even when the source counted more.
-		const recorded = kind === 'book' || watched === total ? total : Math.max(total, progressOf(fm).total)
+		// Book or album total = its entries; all episodes ticked = 100%, even when the source counted more.
+		const recorded = FLAT[kind] || watched === total ? total : Math.max(total, progressOf(fm).total)
 		fm.Progress = `${String(watched)}/${String(recorded)}`
 		delete fm.Complete
 	}
