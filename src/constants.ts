@@ -32558,6 +32558,8 @@ export interface ILibrarySettings {
 	sortState: Record<string, ISortState>
 	// Per category name: chosen year/genre/country/platform.
 	filterState: Record<string, Record<string, string>>
+	// media folded in the Add content search
+	searchFolded: string[]
 	statsCollapsed: boolean
 	stats: IStatsSettings
 	enrichMarks: Record<string, string>
@@ -32620,6 +32622,7 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	tmdbApiKey: '',
 	sortState: {},
 	filterState: {},
+	searchFolded: [],
 	statsCollapsed: false,
 	stats: {
 		watchTime: true,

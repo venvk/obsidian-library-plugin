@@ -635,8 +635,23 @@ export default class LibraryPlugin extends Plugin {
 
 	// one search over every medium; a title goes to the first category of its medium, made if missing
 	openAddContent(): void {
-		new SearchEverythingModal(this.app, (type) => this.registry.forType(type) ?? undefined, (type, result) => {
-			void this.createFromResult(this.settings.categories.find(c => c.contentType === type) ?? type, result)
+		const known = new Set<string>()
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const id = toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.['Source ID'])
+			if (id) known.add(id)
+		}
+		new SearchEverythingModal(this.app, {
+			providerFor: (type) => this.registry.forType(type) ?? undefined,
+			known,
+			folded: (type) => this.settings.searchFolded.indexOf(type) >= 0,
+			toggle: (type) => {
+				const folded = this.settings.searchFolded
+				this.settings.searchFolded = folded.indexOf(type) >= 0 ? folded.filter(t => t !== type) : [...folded, type]
+				void this.persistSettings()
+			},
+			onPick: (type, result) => {
+				void this.createFromResult(this.settings.categories.find(c => c.contentType === type) ?? type, result)
+			}
 		}).open()
 	}
 
@@ -4369,6 +4384,8 @@ export default class LibraryPlugin extends Plugin {
 		this.settings.categories = this.settings.categories.filter(cat => !!cat && typeof cat === 'object')
 		if (!this.settings.sortState || typeof this.settings.sortState !== 'object') this.settings.sortState = {}
 		if (!this.settings.filterState || typeof this.settings.filterState !== 'object') this.settings.filterState = {}
+		if (!Array.isArray(this.settings.searchFolded)) this.settings.searchFolded = []
+		this.settings.searchFolded = this.settings.searchFolded.filter((type): type is string => typeof type === 'string')
 		if (typeof this.settings.statsCollapsed !== 'boolean') this.settings.statsCollapsed = false
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
 		if (typeof this.settings.upNextCollapsed !== 'boolean') this.settings.upNextCollapsed = false

@@ -6,7 +6,7 @@ To install by hand, download `main.js`, `manifest.json`, and `styles.css` from t
 
 ## Add a title
 
-Open the Library tab with the library icon in the ribbon or the `Open Library` command. Press + at the top of the tab, or run `Add content`, and type a title. Search looks through every kind at once and groups what it finds: movies, series, anime, books, comics, music, then games. A film or series also says what it is when Wikidata knows, such as Miniseries, Short film or Animated film. Search starts once you pause for a second or type a space, not on every letter. The title you pick goes to the first category of its kind, made if you have none; see [[Sources and API keys|Sources-and-API-keys]] for where each kind looks.
+Open the Library tab with the library icon in the ribbon or the `Open Library` command. Press + at the top of the tab, or run `Add content`, and type a title. Search looks through every kind at once and groups what it finds: movies, series, anime, books, comics, music, then games. A film or series also says what it is when Wikidata knows, such as Miniseries, Short film or Animated film. Search starts once you pause for a second, or at once with Enter, and each kind shows as soon as its sources answer. Titles you already have are left out. Click a kind's heading, or press Enter on it, to fold or unfold it; the folded kinds stay folded the next time. The title you pick goes to the first category of its kind, made if you have none; see [[Sources and API keys|Sources-and-API-keys]] for where each kind looks.
 
 To put a title into a particular category, such as a manual one or the second of two movie categories, run `Add to a category`. It lists your categories, then each kind you have no category for yet, marked "new category".
 

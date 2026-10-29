@@ -724,6 +724,27 @@ sort trigger, the chosen one in the accent colour. */
 	letter-spacing: 0.04em;
 }
 
+.library-suggest-group {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	cursor: pointer;
+}
+
+.library-suggest-group-chevron {
+	display: inline-flex;
+}
+
+.library-suggest-group-chevron svg {
+	width: 14px;
+	height: 14px;
+}
+
+.library-suggest-group-count {
+	margin-left: 4px;
+	font-weight: normal;
+}
+
 .library-suggest-kind {
 	margin-left: 8px;
 	padding: 1px 6px;
