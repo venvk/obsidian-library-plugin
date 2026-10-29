@@ -110,6 +110,8 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 	private go: (() => void) | null = null
 	// bumped by every new query; an older search's answers are dropped
 	private latest = 0
+	// a heading folded or unfolded: kept where it was on screen through the redraw
+	private anchor: { type: ContentType; top: number } | null = null
 
 	constructor(app: App, private options: SearchEverythingOptions) {
 		super(app)
@@ -125,8 +127,11 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 
 	async getSuggestions(input: string): Promise<Found[]> {
 		const query = input.trim()
-		// a medium's answer arrived and asked for a redraw
-		if (query === this.query && this.started) return this.shown()
+		// a medium's answer arrived, or a heading folded: redraw without jumping to the top
+		if (query === this.query && this.started) {
+			this.keepPlace()
+			return this.shown()
+		}
 		const turn = ++this.latest
 		if (this.timer) window.clearTimeout(this.timer)
 		this.query = query
@@ -185,8 +190,23 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 	}
 
 	private toggle(type: ContentType): void {
+		const head = this.resultContainerEl.querySelector(`.library-suggest-group[data-type="${type}"]`)
+		if (head) this.anchor = { type, top: head.getBoundingClientRect().top }
 		this.options.toggle(type)
 		this.inputEl.dispatchEvent(new Event('input'))
+	}
+
+	// the list is rebuilt from the top after the returned suggestions render
+	private keepPlace(): void {
+		const list = this.resultContainerEl
+		const scroll = list.scrollTop
+		const anchor = this.anchor
+		this.anchor = null
+		window.setTimeout(() => {
+			list.scrollTop = scroll
+			const head = anchor ? list.querySelector(`.library-suggest-group[data-type="${anchor.type}"]`) : null
+			if (anchor && head) list.scrollTop += head.getBoundingClientRect().top - anchor.top
+		}, 0)
 	}
 
 	// a heading folds or unfolds its medium and keeps the search open
@@ -197,7 +217,7 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 
 	renderSuggestion(found: Found, el: HTMLElement): void {
 		if (found.head) {
-			const head = el.createDiv({ cls: 'library-suggest-group', attr: { 'aria-expanded': found.folded === undefined ? 'true' : 'false' } })
+			const head = el.createDiv({ cls: 'library-suggest-group', attr: { 'data-type': found.type, 'aria-expanded': found.folded === undefined ? 'true' : 'false' } })
 			setIcon(head.createSpan({ cls: 'library-suggest-group-chevron' }), found.folded === undefined ? 'chevron-down' : 'chevron-right')
 			head.createSpan({ text: tr(`settings.default.${found.type}`) })
 			if (found.folded !== undefined) {
