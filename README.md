@@ -97,7 +97,7 @@ Source ID: tt4574334
 <details>
 <summary><b>Commands</b></summary>
 
-- Open Library · Add content · Search your library
+- Open Library · Add content · Add to a category · Search your library
 - Refresh metadata for current note · Refresh metadata of all notes
 - Rebuild graph links · Find & remove duplicates · Share current note
 - Import from AniList, MyAnimeList or Kitsu · Push and pull progress for each

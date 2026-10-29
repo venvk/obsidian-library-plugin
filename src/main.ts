@@ -366,6 +366,12 @@ export default class LibraryPlugin extends Plugin {
 		})
 
 		this.addCommand({
+			id: 'add-to-category',
+			name: tr('cmd.addToCategory'),
+			callback: () => this.openAddToCategory()
+		})
+
+		this.addCommand({
 			id: 'refresh-metadata',
 			name: tr('cmd.refresh'),
 			checkCallback: (checking: boolean) => {
@@ -620,22 +626,23 @@ export default class LibraryPlugin extends Plugin {
 	// categories first, then media with none yet
 	addChoices(): AddChoice[] {
 		const categories = this.settings.categories
-		const choices: AddChoice[] = [{ everything: true }, ...categories.map(category => ({ category }))]
+		const choices: AddChoice[] = categories.map(category => ({ category }))
 		for (const type of MEDIA) {
 			if (!categories.some(c => c.contentType === type)) choices.push({ type })
 		}
 		return choices
 	}
 
+	// one search over every medium; a title goes to the first category of its medium, made if missing
 	openAddContent(): void {
+		new SearchEverythingModal(this.app, (type) => this.registry.forType(type) ?? undefined, (type, result) => {
+			void this.createFromResult(this.settings.categories.find(c => c.contentType === type) ?? type, result)
+		}).open()
+	}
+
+	// a chosen category: the way into a manual one, or into one of two of the same medium
+	openAddToCategory(): void {
 		new PickTypeModal(this.app, this.addChoices(), (choice) => {
-			if ('everything' in choice) {
-				// a title goes to the first category of its medium, made if missing
-				new SearchEverythingModal(this.app, (type) => this.registry.forType(type) ?? undefined, (type, result) => {
-					void this.createFromResult(this.settings.categories.find(c => c.contentType === type) ?? type, result)
-				}).open()
-				return
-			}
 			const target: Target = 'category' in choice ? choice.category : choice.type
 			const provider = this.registry.forType(typeOf(target))
 			if (!provider) {

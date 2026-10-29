@@ -4,7 +4,7 @@ import { tr } from '../i18n'
 import type { ContentType } from '../providers/types'
 
 // A medium without a category gets one with its first title.
-export type AddChoice = { category: ICategory } | { type: ContentType } | { everything: true }
+export type AddChoice = { category: ICategory } | { type: ContentType }
 
 export class PickTypeModal extends FuzzySuggestModal<AddChoice> {
 	private choices: AddChoice[]
@@ -22,14 +22,13 @@ export class PickTypeModal extends FuzzySuggestModal<AddChoice> {
 	}
 
 	getItemText(choice: AddChoice): string {
-		if ('everything' in choice) return tr('add.everything')
 		if ('category' in choice) return `${choice.category.name} (${choice.category.typeValue})`
 		return choice.type === 'manual' ? tr('settings.category.manual') : tr(`settings.default.${choice.type}`)
 	}
 
 	renderSuggestion(match: FuzzyMatch<AddChoice>, el: HTMLElement): void {
 		super.renderSuggestion(match, el)
-		if ('type' in match.item) el.createSpan({ cls: 'library-pick-new', text: tr('modal.pickType.new') })
+		if (!('category' in match.item)) el.createSpan({ cls: 'library-pick-new', text: tr('modal.pickType.new') })
 	}
 
 	onChooseItem(choice: AddChoice): void {

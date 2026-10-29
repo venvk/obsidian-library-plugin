@@ -91,6 +91,8 @@ export interface Found {
 export class SearchEverythingModal extends SuggestModal<Found> {
 	private timer: number | null = null
 	private cache = new Map<string, Found[]>()
+	// the latest query; an older search that ends later is dropped
+	private latest = 0
 
 	constructor(
 		app: App,
@@ -103,12 +105,13 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 
 	async getSuggestions(query: string): Promise<Found[]> {
 		const trimmed = query.trim()
+		const turn = ++this.latest
+		// an older call still waiting is dropped: its promise never settles
+		if (this.timer) window.clearTimeout(this.timer)
 		if (trimmed.length < 2) return []
 		const cached = this.cache.get(trimmed)
 		if (cached) return cached
 
-		// an older call still waiting is dropped: its promise never settles
-		if (this.timer) window.clearTimeout(this.timer)
 		if (!/\s$/.test(query)) {
 			await new Promise<void>((resolve) => { this.timer = window.setTimeout(resolve, PAUSE_MS) })
 		}
@@ -126,6 +129,7 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 		}))
 		const found = groups.reduce((all, group) => all.concat(group), [] as Found[])
 		this.cache.set(trimmed, found)
+		if (turn !== this.latest) return new Promise<Found[]>(() => undefined)
 		return found
 	}
 

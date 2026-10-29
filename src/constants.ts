@@ -227,7 +227,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.default.music': 'Music',
 		'settings.default.anime': 'Anime',
 		'settings.default.manual': 'Manual',
-		'add.everything': 'Everywhere',
+		'cmd.addToCategory': 'Add to a category',
 		'kind.miniseries': 'Miniseries',
 		'kind.webseries': 'Web series',
 		'kind.animatedseries': 'Animated series',
