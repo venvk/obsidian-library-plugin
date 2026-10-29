@@ -240,7 +240,9 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 			img.src = cover
 		}
 		const info = row.createDiv({ cls: 'library-suggest-info' })
-		const title = info.createDiv({ cls: 'library-suggest-title', text: result.title })
+		// a long title is cut short, its kind is not
+		const title = info.createDiv({ cls: 'library-suggest-title has-kind' })
+		title.createSpan({ cls: 'library-suggest-name', text: result.title })
 		if (result.kind) title.createSpan({ cls: 'library-suggest-kind', text: tr(`kind.${result.kind}`) })
 		const meta = [result.year ? String(result.year) : '', result.subtitle ?? '']
 			.filter(Boolean)

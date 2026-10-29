@@ -745,7 +745,19 @@ sort trigger, the chosen one in the accent colour. */
 	font-weight: normal;
 }
 
+.library-suggest-title.has-kind {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+.library-suggest-name {
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
 .library-suggest-kind {
+	flex-shrink: 0;
 	margin-left: 8px;
 	padding: 1px 6px;
 	border-radius: var(--radius-s);
