@@ -714,6 +714,30 @@ sort trigger, the chosen one in the accent colour. */
 	text-overflow: ellipsis;
 }
 
+/* Search everywhere: a heading per medium, and what a title is beyond it */
+.library-suggest-group {
+	margin: 4px 0 8px;
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-semibold);
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+
+.library-suggest-kind {
+	margin-left: 8px;
+	padding: 1px 6px;
+	border-radius: var(--radius-s);
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: 0.75em;
+	font-weight: normal;
+}
+
+.library-suggest.is-square .library-suggest-cover {
+	height: 36px;
+}
+
 .library-suggest-meta {
 	font-size: 0.8em;
 	color: var(--text-muted);

@@ -40,7 +40,8 @@ export class WikidataGameProvider implements ContentProvider {
 					subtitle: [local !== english ? local : null, description].filter(Boolean).join(' · ') || null,
 					raw: null
 				}
-			})
+			// an item with no name in the reader's languages or English has nothing to show
+			}).filter(result => !/^Q\d+$/.test(result.title))
 		} catch (e) {
 			console.error('Library: Wikidata game search error', e)
 			return []

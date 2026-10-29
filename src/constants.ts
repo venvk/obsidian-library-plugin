@@ -227,6 +227,13 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.default.music': 'Music',
 		'settings.default.anime': 'Anime',
 		'settings.default.manual': 'Manual',
+		'add.everything': 'Everywhere',
+		'kind.miniseries': 'Miniseries',
+		'kind.webseries': 'Web series',
+		'kind.animatedseries': 'Animated series',
+		'kind.short': 'Short film',
+		'kind.tvfilm': 'TV film',
+		'kind.animatedfilm': 'Animated film',
 		'settings.section.example': 'Example note',
 		'settings.example.desc':
 			'To include a note in a category, set the Type field in frontmatter.',

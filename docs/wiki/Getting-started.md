@@ -8,6 +8,8 @@ To install by hand, download `main.js`, `manifest.json`, and `styles.css` from t
 
 Open the Library tab with the library icon in the ribbon or the `Open Library` command. Press + at the top of the tab, or run `Add content`. The list shows your categories, then each kind of title you have no category for yet, marked "new category". Pick one and type at least two letters of a title. The kind decides where search looks; see [[Sources and API keys|Sources-and-API-keys]].
 
+Everywhere, at the top of the list, searches every kind at once. Results come grouped: movies, series, anime, books, comics, music, then games. A film or series also says what it is when Wikidata knows, such as Miniseries, Short film or Animated film. Search starts once you pause for a second or type a space, not on every letter. The title you pick goes to the first category of its kind, made if you have none.
+
 - Movies, series, games, and comics can be found by their title in another language: `унесённые призраками` finds Spirited Away.
 - For movies and series, a year after the title picks between films that share a name: `dune 1984`.
 
