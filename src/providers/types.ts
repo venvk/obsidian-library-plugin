@@ -13,7 +13,12 @@ export interface SearchResult {
 	cover: string | null
 	subtitle: string | null
 	raw: unknown
+	// what the source says the title is beyond its medium, when it says it
+	kind?: TitleKind
 }
+
+// A film or series' own kind, from Wikidata classes.
+export type TitleKind = 'miniseries' | 'webseries' | 'animatedseries' | 'short' | 'tvfilm' | 'animatedfilm'
 
 export interface NormalizedMetadata {
 	fields: Record<string, unknown>

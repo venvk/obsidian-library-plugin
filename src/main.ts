@@ -41,7 +41,7 @@ import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } f
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
-import { AddContentModal } from './ui/addContentModal'
+import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
 import { PromptModal } from './ui/promptModal'
 import { DuplicateRemovalModal, type DuplicateGroup } from './ui/duplicateModal'
@@ -366,6 +366,12 @@ export default class LibraryPlugin extends Plugin {
 		})
 
 		this.addCommand({
+			id: 'add-to-category',
+			name: tr('cmd.addToCategory'),
+			callback: () => this.openAddToCategory()
+		})
+
+		this.addCommand({
 			id: 'refresh-metadata',
 			name: tr('cmd.refresh'),
 			checkCallback: (checking: boolean) => {
@@ -627,7 +633,30 @@ export default class LibraryPlugin extends Plugin {
 		return choices
 	}
 
+	// one search over every medium; a title goes to the first category of its medium, made if missing
 	openAddContent(): void {
+		const known = new Set<string>()
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const id = toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.['Source ID'])
+			if (id) known.add(id)
+		}
+		new SearchEverythingModal(this.app, {
+			providerFor: (type) => this.registry.forType(type) ?? undefined,
+			known,
+			folded: (type) => this.settings.searchFolded.indexOf(type) >= 0,
+			toggle: (type) => {
+				const folded = this.settings.searchFolded
+				this.settings.searchFolded = folded.indexOf(type) >= 0 ? folded.filter(t => t !== type) : [...folded, type]
+				void this.persistSettings()
+			},
+			onPick: (type, result) => {
+				void this.createFromResult(this.settings.categories.find(c => c.contentType === type) ?? type, result)
+			}
+		}).open()
+	}
+
+	// a chosen category: the way into a manual one, or into one of two of the same medium
+	openAddToCategory(): void {
 		new PickTypeModal(this.app, this.addChoices(), (choice) => {
 			const target: Target = 'category' in choice ? choice.category : choice.type
 			const provider = this.registry.forType(typeOf(target))
@@ -4355,6 +4384,8 @@ export default class LibraryPlugin extends Plugin {
 		this.settings.categories = this.settings.categories.filter(cat => !!cat && typeof cat === 'object')
 		if (!this.settings.sortState || typeof this.settings.sortState !== 'object') this.settings.sortState = {}
 		if (!this.settings.filterState || typeof this.settings.filterState !== 'object') this.settings.filterState = {}
+		if (!Array.isArray(this.settings.searchFolded)) this.settings.searchFolded = []
+		this.settings.searchFolded = this.settings.searchFolded.filter((type): type is string => typeof type === 'string')
 		if (typeof this.settings.statsCollapsed !== 'boolean') this.settings.statsCollapsed = false
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
 		if (typeof this.settings.upNextCollapsed !== 'boolean') this.settings.upNextCollapsed = false

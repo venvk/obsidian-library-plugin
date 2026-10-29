@@ -69,6 +69,17 @@ export async function claim(id: string, property: string): Promise<unknown> {
 	return json?.claims?.[property]?.[0]?.mainsnak?.datavalue?.value
 }
 
+// Every item one property of one item points at, such as all its classes (P31).
+export async function claimItems(id: string, property: string): Promise<string[]> {
+	const json = await api<{ claims?: Record<string, WikidataClaim[]> }>({ action: 'wbgetclaims', entity: id, property })
+	const ids: string[] = []
+	for (const c of json?.claims?.[property] ?? []) {
+		const item = (c.mainsnak?.datavalue?.value as { id?: unknown } | undefined)?.id
+		if (typeof item === 'string') ids.push(item)
+	}
+	return ids
+}
+
 export function claimValues(entity: WikidataEntity | undefined, property: string): unknown[] {
 	return (entity?.claims?.[property] ?? []).map(c => c.mainsnak?.datavalue?.value).filter(v => v !== undefined)
 }

@@ -1,12 +1,13 @@
 import { requestUrl } from 'obsidian'
 import { SEARCH_BUDGET_MS, isEmptyValue, plausibleRuntime, within } from '../util'
-import { NON_LATIN, claim, entities, languages, searchItems, textIn, yearIn } from './wikidata'
+import { NON_LATIN, claim, claimItems, entities, languages, searchItems, textIn, yearIn } from './wikidata'
 import type {
 	ContentProvider,
 	ContentType,
 	MetadataEnricher,
 	NormalizedMetadata,
-	SearchResult
+	SearchResult,
+	TitleKind
 } from './types'
 
 function delay(ms: number): Promise<void> {
@@ -90,8 +91,17 @@ function na(value: string | undefined): string | null {
 
 // P31 classes (Wikidata): film, feature film, television film, animated film, animated
 // feature film / television series, miniseries, web series, anime series, animated series.
-const FILM_CLASSES = ['Q11424', 'Q24869', 'Q506240', 'Q202866', 'Q29168811']
+const FILM_CLASSES = ['Q11424', 'Q24869', 'Q506240', 'Q202866', 'Q29168811', 'Q24862']
 const SERIES_CLASSES = ['Q5398426', 'Q1259759', 'Q526877', 'Q63952888', 'Q117467246']
+// a class that says more than "film" or "series", most telling first
+const KINDS: [string, TitleKind][] = [
+	['Q1259759', 'miniseries'], ['Q526877', 'webseries'], ['Q117467246', 'animatedseries'],
+	['Q24862', 'short'], ['Q506240', 'tvfilm'], ['Q202866', 'animatedfilm'], ['Q29168811', 'animatedfilm']
+]
+
+export function kindOf(classes: string[]): TitleKind | undefined {
+	return KINDS.find(([item]) => classes.indexOf(item) >= 0)?.[1]
+}
 
 // "brother 1997" searches "brother"; "1917"/"2049" stay titles.
 export function splitYear(query: string): { title: string; year: number | null } {
@@ -112,6 +122,7 @@ function arrange(results: SearchResult[], year: number | null): SearchResult[] {
 		kept.subtitle = kept.subtitle ?? result.subtitle
 		kept.year = kept.year ?? result.year
 		kept.cover = kept.cover ?? result.cover
+		kept.kind = kept.kind ?? result.kind
 	}
 	const unique = [...byId.values()]
 	if (year === null) return unique
@@ -234,9 +245,10 @@ export class OmdbProvider implements ContentProvider {
 			const classes = (kind === 'series' ? SERIES_CLASSES : FILM_CLASSES).map(c => `P31=${c}`).join('|')
 			const ids = await searchItems(query, `haswbstatement:P345 haswbstatement:${classes}`, 8)
 			const langs = languages()
-			const [found, imdbIds] = await Promise.all([
+			const [found, imdbIds, kinds] = await Promise.all([
 				entities(ids, 'labels|descriptions', langs),
-				Promise.all(ids.map(id => claim(id, 'P345')))
+				Promise.all(ids.map(id => claim(id, 'P345'))),
+				Promise.all(ids.map(id => claimItems(id, 'P31')))
 			])
 			const out: SearchResult[] = []
 			ids.forEach((id, i) => {
@@ -253,7 +265,8 @@ export class OmdbProvider implements ContentProvider {
 					year: yearIn(description),
 					cover: `https://images.metahub.space/poster/small/${imdb}/img`,
 					subtitle: [local !== english ? local : null, description].filter(Boolean).join(' · ') || null,
-					raw: null
+					raw: null,
+					kind: kindOf(kinds[i] ?? [])
 				})
 			})
 			return out
