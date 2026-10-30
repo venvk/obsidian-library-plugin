@@ -368,12 +368,13 @@ async function pageScanHeld(chain: string, address: string, hasCover: (key: stri
 	}
 	if (!Array.isArray(rows)) return { held: [], chains: [] }
 	const held = pageHeld(chain, info.site, rows)
-	// a collection whose metadata server is gone (Galxe, SecondLive) is dropped after three misses
+	// a collection whose metadata server is gone (Galxe, SecondLive) is dropped at its first miss, so the
+	// budget reaches every collection; the next import asks again, in case the server is back
 	let budget = 60
 	const misses = new Map<string, number>()
 	for (const token of held.sort((a, b) => Number(a.spam || a.oat) - Number(b.spam || b.oat))) {
 		if (budget <= 0) break
-		if (token.spam || hasCover(token.key) || (misses.get(token.contract) ?? 0) >= 3) continue
+		if (token.spam || hasCover(token.key) || misses.has(token.contract)) continue
 		budget--
 		token.image = await tokenImage(info.rpc, token.contract, token.id)
 		if (!token.image) misses.set(token.contract, (misses.get(token.contract) ?? 0) + 1)
