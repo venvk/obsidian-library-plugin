@@ -58,6 +58,7 @@ export interface VideoDetails {
 }
 
 export type YoutubeAction = 'like' | 'dislike' | 'removelike' | 'subscribe' | 'unsubscribe'
+const ACTIONS: YoutubeAction[] = ['like', 'dislike', 'removelike', 'subscribe', 'unsubscribe']
 
 const VIDEO_ID = /^[\w-]{11}$/
 const CHANNEL_ID = /^UC[\w-]{22}$/
@@ -162,10 +163,13 @@ const YOUTUBE_ASK = `
 	};
 	const text = (t) => t ? (t.content ?? t.simpleText ?? (t.runs || []).map(r => r.text).join('')) : '';`
 
+// Values go into page code only as literals of checked characters: JSON.stringify is no code escaper.
+const TOKEN = /^[\w%=+/-]*$/
+
 // One batch of the history: the page's own, or the continuation `token` names.
 function historyCode(token: string): string {
 	return `(async () => {${YOUTUBE_ASK}
-	const token = ${JSON.stringify(token)};
+	const token = '${TOKEN.test(token) ? token : ''}';
 	let entries;
 	if (token) {
 		const more = await ask('browse', { continuation: token });
@@ -230,7 +234,7 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 	if (clean.length === 0) return out
 	const code = `(async () => {${YOUTUBE_ASK}
 	const out = {};
-	for (const id of ${JSON.stringify(clean)}) {
+	for (const id of [${clean.map(id => `'${id}'`).join(',')}]) {
 		try {
 			const watch = await ask('next', { videoId: id });
 			const parts = watch.contents?.twoColumnWatchNextResults?.results?.results?.contents || [];
@@ -296,8 +300,8 @@ async function votes(id: string): Promise<{ likes: number | null; dislikes: numb
 export async function youtubeAct(videoId: string, action: YoutubeAction): Promise<boolean> {
 	if (!VIDEO_ID.test(videoId)) return false
 	const code = `(async () => {${YOUTUBE_ASK}
-	const id = ${JSON.stringify(videoId)};
-	const action = ${JSON.stringify(action)};
+	const id = '${videoId}';
+	const action = '${ACTIONS.indexOf(action) >= 0 ? action : ''}';
 	if (action === 'like' || action === 'dislike' || action === 'removelike') {
 		await ask('like/' + action, { target: { videoId: id } });
 		return 'ok';
