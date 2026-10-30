@@ -99,6 +99,16 @@ export const BLOCKSCOUT: Record<string, string> = {
 	Base: 'base.blockscout.com',
 	Arbitrum: 'arbitrum.blockscout.com',
 	Polygon: 'polygon.blockscout.com',
+	Gnosis: 'gnosis.blockscout.com',
+	Celo: 'celo.blockscout.com',
+	zkSync: 'zksync.blockscout.com',
+	Scroll: 'scroll.blockscout.com',
+	Ink: 'explorer.inkonchain.com',
+	Soneium: 'soneium.blockscout.com',
+	Unichain: 'unichain.blockscout.com',
+	Mode: 'explorer.mode.network',
+	'Arbitrum Nova': 'arbitrum-nova.blockscout.com',
+	Shape: 'shapescan.xyz',
 }
 
 interface BlockscoutItem {
@@ -107,6 +117,8 @@ interface BlockscoutItem {
 	image_url?: unknown
 	metadata?: { name?: unknown; image?: unknown } | null
 	token?: { address_hash?: unknown; name?: unknown; reputation?: unknown } | null
+	thumbnails?: Record<string, unknown> | null
+	media_url?: unknown
 }
 
 export function blockscoutTokens(chain: string, host: string, items: BlockscoutItem[]): HeldNft[] {
@@ -123,7 +135,8 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 			chain,
 			collection,
 			name,
-			image: mediaUrl(item.image_url) || mediaUrl(item.metadata?.image),
+			// Blockscout's own cached preview first: IPFS gateways often time out
+			image: mediaUrl(item.thumbnails?.['500x500']) || mediaUrl(item.media_url) || mediaUrl(item.image_url) || mediaUrl(item.metadata?.image),
 			url: `https://${host}/token/${contract}/instance/${id}`,
 			count: Math.max(1, Number(item.value) || 1),
 			spam: looksLikeSpam(name, collection), oat: isOat(name, collection),
@@ -352,7 +365,7 @@ async function solanaHeld(address: string): Promise<NftRead> {
 }
 
 // The networks a wallet list can name; "EVM" stands for every EVM network at once.
-export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko']
+export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko', 'Gnosis', 'Celo', 'zkSync', 'Scroll', 'Ink', 'Soneium', 'Unichain', 'Mode', 'Arbitrum Nova', 'Shape']
 export const WALLET_FIELDS = ['EVM', ...EVM_NETWORKS, 'TON', 'Solana']
 
 export interface WalletPair {

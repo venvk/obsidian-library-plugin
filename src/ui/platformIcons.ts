@@ -80,6 +80,16 @@ const MARKS: Record<string, { label: string; path: string }> = {
 const INITIALS: Record<string, { label: string; text: string }> = {
 	arbitrum: { label: 'Arbitrum', text: 'A' },
 	taiko: { label: 'Taiko', text: 'T' },
+	gnosis: { label: 'Gnosis', text: 'G' },
+	celo: { label: 'Celo', text: 'C' },
+	zksync: { label: 'zkSync', text: 'Z' },
+	scroll: { label: 'Scroll', text: 'S' },
+	ink: { label: 'Ink', text: 'I' },
+	soneium: { label: 'Soneium', text: 'S' },
+	unichain: { label: 'Unichain', text: 'U' },
+	mode: { label: 'Mode', text: 'M' },
+	'arbitrum-nova': { label: 'Arbitrum Nova', text: 'N' },
+	shape: { label: 'Shape', text: 'S' },
 }
 
 export function platformMark(family: string): SVGSVGElement {
@@ -107,6 +117,7 @@ export function platformFamily(value: string): string | null {
 	if (v === 'solana') return 'solana'
 	if (v === 'bnb') return 'bnb'
 	if (v === 'taiko') return 'taiko'
+	if (INITIALS[v.replace(/\s+/g, '-')]) return v.replace(/\s+/g, '-')
 	return null
 }
 
