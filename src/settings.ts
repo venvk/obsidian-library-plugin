@@ -50,9 +50,10 @@ interface Row {
 	searchable?: boolean;
 }
 
-// The pages of the tab: entries of its menu on 1.13+, tabs before.
+// The tabs of the settings, each with its sections under the strip.
 type Page = "general" | "categories" | "connectors" | "keys" | "stats";
 const PAGES: Page[] = ["general", "categories", "connectors", "keys", "stats"];
+const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", keys: "key-round", stats: "bar-chart-3" };
 
 // A group of rows; a group scopes row names — each category is its own (each has "Type value").
 interface Section {
@@ -77,7 +78,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private plugin: LibraryPlugin;
 	private expanded = new Set<ICategory>();
 	private dragging: ICategory | null = null;
-	// before 1.13: the tab shown
+	// the tab open
 	private page: Page = "general";
 	// Edits in progress, by starting value: notes move on blur/tab close, not per keystroke.
 	private libraryFrom: string | null = null;
@@ -88,19 +89,30 @@ export class LibrarySettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// 1.13+: a menu of pages, rendered and indexed for the settings search; no vault scans (called per refresh).
+	// 1.13+: a tab strip, then every section, shown while its tab is open; all of them indexed for the settings search.
 	getSettingDefinitions(): SettingDefinitionItem[] {
-		const sections = this.sections();
-		return PAGES.map((page) => {
-			const items: SettingDefinitionItem[] = [];
-			for (const section of sections) {
-				if (section.page !== page) continue;
-				const definitions = section.rows.map((row) => this.definition(row));
-				if (section.heading || section.group) items.push({ type: "group", heading: section.heading, items: definitions });
-				else items.push(...definitions);
-			}
-			return { type: "page", name: this.pageName(page), items };
-		});
+		const items: SettingDefinitionItem[] = [{ name: "", searchable: false, render: (row) => this.tabStrip(row.settingEl, () => this.refreshVisibility()) }];
+		for (const section of this.sections()) {
+			const page = section.page;
+			items.push({ type: "group", heading: section.heading, visible: () => this.page === page, items: section.rows.map((row) => this.definition(row)) });
+		}
+		return items;
+	}
+
+	// The strip replaces the row it is drawn in.
+	private tabStrip(el: HTMLElement, open: () => void): void {
+		el.empty();
+		el.className = "library-settings-tabs";
+		for (const page of PAGES) {
+			const tab = el.createEl("button", { cls: page === this.page ? "is-active" : "" });
+			setIcon(tab.createSpan(), PAGE_ICONS[page]);
+			tab.createSpan({ text: this.pageName(page) });
+			tab.addEventListener("click", () => {
+				this.page = page;
+				for (const other of Array.from(el.children)) other.toggleClass("is-active", other === tab);
+				open();
+			});
+		}
 	}
 
 	private pageName(page: Page): string {
@@ -143,14 +155,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private draw(): void {
 		const { containerEl } = this;
 		containerEl.empty();
-		const tabs = containerEl.createDiv({ cls: "library-settings-tabs" });
-		for (const page of PAGES) {
-			const tab = tabs.createEl("button", { text: this.pageName(page), cls: page === this.page ? "is-active" : "" });
-			tab.addEventListener("click", () => {
-				this.page = page;
-				this.draw();
-			});
-		}
+		this.tabStrip(containerEl.createDiv(), () => this.draw());
 		for (const section of this.sections()) {
 			if (section.page !== this.page) continue;
 			if (section.heading) new Setting(containerEl).setName(section.heading).setHeading();

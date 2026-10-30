@@ -1556,7 +1556,7 @@ export default class LibraryPlugin extends Plugin {
 				if (!category) category = await this.youtubeCategory()
 				const url = videoUrl(video.id)
 				const meta: NormalizedMetadata = {
-					fields: { Name: video.title, Creator: [video.channel], Cover: videoCover(video.id), URL: url, Trailer: url, ...(length > 0 ? { Runtime: length } : {}) },
+					fields: { Name: video.title, Creator: [video.channel], Cover: videoCover(video.id), URL: url, ...(length > 0 ? { Runtime: length } : {}) },
 					progressTotal: null,
 					imdbId: null,
 				}
@@ -4086,8 +4086,6 @@ export default class LibraryPlugin extends Plugin {
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
 		const video = toStr(fm.Source) === YOUTUBE_SOURCE
-		// the title links the video too; the button says so
-		if (video && url) titleEl.appendChild(this.youtubeLink(url, tr('header.openYoutube')))
 		if (video) {
 			const reaction = toStr(fm.Reaction)
 			for (const kind of ['like', 'dislike'] as const) {
@@ -4139,9 +4137,8 @@ export default class LibraryPlugin extends Plugin {
 			const row = infoSide.lastElementChild as HTMLElement
 			const channel = safeUrl(fm['Channel URL'])
 			if (channel) {
-				const go = row.createEl('a', { cls: 'note-header-pill', href: channel, attr: { target: '_blank', rel: 'noopener noreferrer' } })
-				setIcon(go.createSpan(), 'youtube')
-				go.createSpan({ text: tr('header.channel') })
+				const go = row.createEl('a', { cls: 'note-header-youtube', href: channel, attr: { 'aria-label': tr('header.openYoutube'), target: '_blank', rel: 'noopener noreferrer' } })
+				setIcon(go, 'external-link')
 			}
 			const subscribed = fm.Subscribed === true
 			const sub = row.createEl('button', { cls: `note-header-pill is-subscribe${subscribed ? ' is-on' : ''}`, attr: { 'aria-pressed': subscribed ? 'true' : 'false' } })
@@ -4218,12 +4215,6 @@ export default class LibraryPlugin extends Plugin {
 		return wrap
 	}
 
-	private youtubeLink(href: string, label: string): HTMLElement {
-		const a = createEl('a', { cls: 'note-header-youtube', href, attr: { 'aria-label': label, target: '_blank', rel: 'noopener noreferrer' } })
-		setIcon(a, 'youtube')
-		return a
-	}
-
 	// an album's awards from Wikidata, a row that appears once they arrive
 	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string): void {
 		const artist = linkLabel(toStrArray(fm.Creator)[0] ?? '')
@@ -4291,7 +4282,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private buildMediaBlock(wrap: HTMLElement, fm: Record<string, unknown>, name: string): void {
-		const trailer = toStr(fm.Trailer).trim()
+		// a video note plays the video itself
+		const trailer = toStr(fm.Trailer).trim() || (toStr(fm.Source) === YOUTUBE_SOURCE ? toStr(fm.URL).trim() : '')
 		const gallery = toStrArray(fm.Gallery)
 			.map(value => safeUrl(value))
 			.filter((value): value is string => value !== null)

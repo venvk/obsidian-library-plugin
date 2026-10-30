@@ -49,6 +49,7 @@
 .card-votes {
 	display: flex;
 	flex-wrap: wrap;
+	justify-content: center;
 	gap: 8px;
 }
 
@@ -2042,12 +2043,29 @@ sort trigger, the chosen one in the accent colour. */
 	text-decoration: underline;
 }
 
-/* Settings before 1.13: the pages as tabs */
+/* Settings: the pages as a tab strip, the open one's settings under it */
 .library-settings-tabs {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 6px;
+	gap: 2px;
 	margin-bottom: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.library-settings-tabs button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: var(--radius-s) var(--radius-s) 0 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+}
+
+.library-settings-tabs button svg {
+	width: 14px;
+	height: 14px;
 }
 
 .library-settings-tabs button.is-active {
