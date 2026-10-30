@@ -58,9 +58,9 @@ export function parseWallets(text: string): Wallet[] {
 export function mediaUrl(value: unknown): string {
 	const raw = typeof value === 'string' ? value.trim() : ''
 	const ipfs = /^ipfs:\/\/(?:ipfs\/)?(.+)$/i.exec(raw)?.[1]
-	if (ipfs) return `https://ipfs.io/ipfs/${ipfs}`
+	if (ipfs) return publicHttpsUrl(`https://ipfs.io/ipfs/${ipfs.replace(/^\/+/, '')}`) ?? ''
 	const ar = /^ar:\/\/(.+)$/i.exec(raw)?.[1]
-	if (ar) return `https://arweave.net/${ar}`
+	if (ar) return publicHttpsUrl(`https://arweave.net/${ar.replace(/^\/+/, '')}`) ?? ''
 	return publicHttpsUrl(raw) ?? ''
 }
 
@@ -276,10 +276,10 @@ async function etherscanHeld(chain: string, address: string, key: string): Promi
 	const held: HeldNft[] = []
 	for (const token of replayTransfers(address, transfers)) {
 		held.push({
-			key: nftKey(chain, token.contract, token.collection),
+			key: nftKey(chain, token.contract, `${token.collection} #${token.id}`),
 			chain,
 			collection: token.collection,
-			name: token.collection,
+			name: `${token.collection} #${token.id}`,
 			image: await tokenImage(info.rpc, token.contract, token.id),
 			url: `https://${info.site}/nft/${token.contract}/${token.id}`,
 			count: token.count,

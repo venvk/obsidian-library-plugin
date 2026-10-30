@@ -1747,10 +1747,14 @@ export default class LibraryPlugin extends Plugin {
 					console.error('Library: NFT import error', token.key, e)
 				}
 			}
-			// gone from a network read in full: to the trash, where it can be restored
+			// gone from a network read in full: to the trash, where it can be restored.
+			// A network that came back empty is more likely an explorer hiccup, and a favorite stays.
+			const live = new Set<string>()
+			seen.forEach(key => live.add(key.split(':')[0] ?? ''))
 			for (const [key, file] of notes) {
 				const chain = key.split(':')[0] ?? ''
-				if (seen.has(key) || read.chains.indexOf(chain) < 0) continue
+				if (seen.has(key) || read.chains.indexOf(chain) < 0 || !live.has(chain)) continue
+				if (this.app.metadataCache.getFileCache(file)?.frontmatter?.Favorite === true) continue
 				await this.app.fileManager.trashFile(file)
 				updated++
 			}
@@ -4249,8 +4253,11 @@ export default class LibraryPlugin extends Plugin {
 			star.addEventListener('click', (e) => {
 				e.preventDefault()
 				void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
-					if (on) delete current.Favorite
-					else current.Favorite = true
+					const next = current.Favorite !== true
+					if (next) current.Favorite = true
+					else delete current.Favorite
+					star.toggleClass('is-on', next)
+					star.setAttr('aria-pressed', next ? 'true' : 'false')
 				})
 			})
 		}

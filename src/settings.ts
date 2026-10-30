@@ -408,7 +408,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 						name: tr("settings.nftImport"),
 						render: (row) => {
 							row.addButton((button) =>
-								button.setButtonText(tr("settings.nftImport")).setCta().onClick(() => void this.plugin.nftImport(true)),
+								button.setButtonText(tr("settings.nftImport")).setCta().setDisabled(!Platform.isDesktopApp).onClick(() => void this.plugin.nftImport(true)),
 							);
 						},
 					},
