@@ -181,7 +181,7 @@ export function topLabel(top: IStatsTop, categories: ICategory[]): string {
 	if (top.kind === 'property') {
 		switch (top.key.toLowerCase()) {
 			case 'genre': return tr('stats.topGenres')
-			case 'creator': return tr('stats.topCreators')
+			case 'creator': return tr('stats.topDirectors')
 			case 'cast': return tr('stats.topCast')
 			default: return tr('stats.topNamed', { name: top.key })
 		}
