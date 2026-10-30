@@ -191,6 +191,18 @@ export class LibrarySettingTab extends PluginSettingTab {
 		categories.push({ page: "categories", group: true, rows: [{ name: tr("settings.addCategory"), render: (row) => this.addCategory(row) }] });
 
 		const statsRows: Row[] = [
+			{
+				name: tr("settings.showStats.name"),
+				desc: tr("settings.showStats.desc"),
+				render: (row) => {
+					row.addToggle((toggle) =>
+						toggle.setValue(settings.showStats).onChange(async (value) => {
+							settings.showStats = value;
+							await this.plugin.saveSettings();
+						}),
+					);
+				},
+			},
 			note(tr("settings.stats.desc")),
 			{
 				name: tr("stats.watchTime"),

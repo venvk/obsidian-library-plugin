@@ -289,6 +289,7 @@ export class LibraryRenderer {
 	}
 
 	renderStats(root: HTMLElement, cards?: CardData[]): HTMLElement | null {
+		if (!this.plugin.settings.showStats) return null
 		const stats = this.collectStats()
 		const columns = stats.columns.filter(column => column.items.length > 0)
 		const showTime = this.plugin.settings.stats.watchTime
@@ -551,15 +552,16 @@ export class LibraryRenderer {
 	private renderVotes(info: HTMLElement, fm: Record<string, unknown>): void {
 		const row = info.createDiv({ cls: 'card-rating card-votes' })
 		const reaction = toStr(fm.Reaction)
-		const part = (icon: string, field: string, cls = ''): void => {
-			const span = row.createSpan({ cls: `card-vote${cls}` })
+		const part = (line: HTMLElement, icon: string, field: string, cls = ''): void => {
+			const span = line.createSpan({ cls: `card-vote${cls}` })
 			setIcon(span.createSpan({ cls: 'card-vote-icon' }), icon)
 			const value = Number(fm[field])
 			if (fm[field] !== undefined && Number.isFinite(value)) span.createSpan({ text: compactNumber(value) })
 		}
-		part('thumbs-up', 'Likes', reaction === 'like' ? ' is-like' : '')
-		part('thumbs-down', 'Dislikes', reaction === 'dislike' ? ' is-dislike' : '')
-		if (Number(fm.Views) > 0) part('eye', 'Views')
+		part(row, 'thumbs-up', 'Likes', reaction === 'like' ? ' is-like' : '')
+		part(row, 'thumbs-down', 'Dislikes', reaction === 'dislike' ? ' is-dislike' : '')
+		// views on a line of their own: three counts overflow a narrow card
+		if (Number(fm.Views) > 0) part(info.createDiv({ cls: 'card-year card-votes' }), 'eye', 'Views')
 	}
 
 	renderCard(grid: HTMLElement, card: CardData): void {

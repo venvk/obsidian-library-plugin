@@ -4665,6 +4665,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.traktLastImport !== 'number') this.settings.traktLastImport = 0
 		if (typeof this.settings.comingSoonCollapsed !== 'boolean') this.settings.comingSoonCollapsed = false
 		if (typeof this.settings.showDiary !== 'boolean') this.settings.showDiary = true
+		if (typeof this.settings.showStats !== 'boolean') this.settings.showStats = true
 		if (typeof this.settings.showProfile !== 'boolean') this.settings.showProfile = true
 		if (!this.settings.airing || typeof this.settings.airing !== 'object' || Object.values(this.settings.airing).some(value => !Array.isArray(value))) {
 			this.settings.airing = {}
