@@ -2087,3 +2087,22 @@ sort trigger, the chosen one in the accent colour. */
 	width: 18px;
 	height: 18px;
 }
+
+.library-wallet-list {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: var(--size-4-2);
+}
+
+.library-wallet-line {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.library-wallet-line input {
+	width: 26em;
+	max-width: 100%;
+	font-family: var(--font-monospace);
+}

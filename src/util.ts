@@ -440,6 +440,16 @@ export function imageExtension(contentType: string): string | null {
 	return known[type] ?? null
 }
 
+// Image servers that answer application/octet-stream: the first bytes tell the format.
+export function sniffImage(data: ArrayBuffer): string | null {
+	const b = new Uint8Array(data.slice(0, 12))
+	if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png'
+	if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg'
+	if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'gif'
+	if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp'
+	return null
+}
+
 export function coverSrc(app: App, raw: unknown): string | null {
 	const value = toStr(raw).trim()
 	if (!value) return null

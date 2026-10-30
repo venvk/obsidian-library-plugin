@@ -131,7 +131,8 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `returnyoutubedislikeapi.com` | YouTube connector: like and estimated dislike counts, as YouTube shows no dislikes | Video id |
 | `eth.blockscout.com`, `optimism.blockscout.com`, `base.blockscout.com`, `arbitrum.blockscout.com`, `polygon.blockscout.com`, `gnosis.blockscout.com`, `celo.blockscout.com`, `zksync.blockscout.com`, `scroll.blockscout.com`, `explorer.inkonchain.com`, `soneium.blockscout.com`, `unichain.blockscout.com`, `explorer.mode.network`, `arbitrum-nova.blockscout.com`, `shapescan.xyz`, `tonapi.io`, `api-mainnet.magiceden.dev` | NFT connector | Your wallet addresses |
 | `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
-| `ipfs.io`, `arweave.net`, and the hosts a token's metadata names | NFT images and metadata | Token id or file path |
+| `ethereum-rpc.publicnode.com`, `mainnet.optimism.io`, `mainnet.base.org`, `arb1.arbitrum.io`, `polygon-bor-rpc.publicnode.com`, `rpc.gnosischain.com` | NFT pictures the explorer lacks | Token contract and id |
+| `ipfs.filebase.io`, `arweave.net`, and the hosts a token's metadata names | NFT images and metadata | Token id or file path |
 | `tonviewer.com`, `solscan.io`, `bscscan.com`, `taikoscan.io` | Links in NFT notes, opened only when you click them | Nothing until you click |
 | `api.trakt.tv`, `auth.trakt.tv` | Trakt connector | Sign-in code; history, ratings and watchlist are read, scores, watched and unwatched episodes, watchlist titles and removals of deleted notes are sent |
 | `id.twitch.tv`, `api.igdb.com` | Game trailers, with Twitch keys | Twitch id and secret, game |

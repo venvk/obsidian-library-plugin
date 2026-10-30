@@ -55,10 +55,11 @@ export function parseWallets(text: string): Wallet[] {
 }
 
 // ipfs:// and ar:// through public gateways; anything else must be public https.
+// ipfs.io and dweb.link time out on most files, so links to them move to Filebase too.
 export function mediaUrl(value: unknown): string {
 	const raw = typeof value === 'string' ? value.trim() : ''
-	const ipfs = /^ipfs:\/\/(?:ipfs\/)?(.+)$/i.exec(raw)?.[1]
-	if (ipfs) return publicHttpsUrl(`https://ipfs.io/ipfs/${ipfs.replace(/^\/+/, '')}`) ?? ''
+	const ipfs = /^(?:ipfs:\/\/|https:\/\/(?:ipfs\.io|dweb\.link)\/ipfs\/)(?:ipfs\/)?(.+)$/i.exec(raw)?.[1]
+	if (ipfs) return publicHttpsUrl(`https://ipfs.filebase.io/ipfs/${ipfs.replace(/^\/+/, '')}`) ?? ''
 	const ar = /^ar:\/\/(.+)$/i.exec(raw)?.[1]
 	if (ar) return publicHttpsUrl(`https://arweave.net/${ar.replace(/^\/+/, '')}`) ?? ''
 	return publicHttpsUrl(raw) ?? ''
@@ -161,6 +162,15 @@ async function explorerJson(url: string): Promise<unknown> {
 	}
 }
 
+const PUBLIC_RPC: Record<string, string> = {
+	Ethereum: 'https://ethereum-rpc.publicnode.com',
+	Optimism: 'https://mainnet.optimism.io',
+	Base: 'https://mainnet.base.org',
+	Arbitrum: 'https://arb1.arbitrum.io/rpc',
+	Polygon: 'https://polygon-bor-rpc.publicnode.com',
+	Gnosis: 'https://rpc.gnosischain.com',
+}
+
 async function blockscoutHeld(chain: string, host: string, address: string): Promise<NftRead> {
 	const held: HeldNft[] = []
 	let next = ''
@@ -168,7 +178,16 @@ async function blockscoutHeld(chain: string, host: string, address: string): Pro
 		const data = await explorerJson(`https://${host}/api/v2/addresses/${address}/nft?type=ERC-721,ERC-1155${next}`) as { items?: BlockscoutItem[]; next_page_params?: Record<string, unknown> | null } | null
 		if (!data || !Array.isArray(data.items)) return { held, chains: [] }
 		held.push(...blockscoutTokens(chain, host, data.items))
-		if (!data.next_page_params) return { held, chains: [chain] }
+		if (!data.next_page_params) {
+			// a token the explorer has no picture for: its tokenURI, read from the chain (spam is not worth the requests)
+			const rpc = PUBLIC_RPC[chain]
+			for (const token of held) {
+				const where = /\/token\/(0x[0-9a-fA-F]{40})\/instance\/(\d+)$/.exec(token.url)
+				if (!rpc || token.image || token.spam || !where) continue
+				token.image = await tokenImage(rpc, where[1] ?? '', where[2] ?? '')
+			}
+			return { held, chains: [chain] }
+		}
 		next = '&' + new URLSearchParams(Object.entries(data.next_page_params).map(([k, v]) => [k, String(v)])).toString()
 	}
 	return { held, chains: [] }
@@ -225,18 +244,33 @@ export function idHex(id: string): string {
 	return (hex || '0').padStart(64, '0')
 }
 
+async function rpcCall(rpc: string, method: string, params: unknown[]): Promise<unknown> {
+	const answer = await requestUrl({ url: rpc, method: 'POST', contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }), throw: false })
+	const json = answer.json as { result?: unknown; error?: unknown }
+	if (answer.status !== 200 || json.error !== undefined) throw new Error(`${method} failed`)
+	return json.result
+}
+
+// An ABI-encoded string returned by eth_call.
+function abiString(result: string): string {
+	if (result.length <= 130) return ''
+	const length = parseInt(result.slice(66, 130), 16)
+	const bytes = result.slice(130, 130 + length * 2).match(/../g) ?? []
+	try {
+		return decodeURIComponent(bytes.map(b => `%${b}`).join(''))
+	} catch {
+		return ''
+	}
+}
+
 // tokenURI(uint256), or uri(uint256) for ERC-1155, read from the chain itself.
 async function tokenImage(rpc: string, contract: string, id: string): Promise<string> {
 	const hex = idHex(id)
 	if (!hex) return ''
 	for (const selector of ['0xc87b56dd', '0x0e89341c']) {
 		try {
-			const answer = await requestUrl({ url: rpc, method: 'POST', contentType: 'application/json', body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: contract, data: selector + hex }, 'latest'] }), throw: false })
-			const result = (answer.json as { result?: string }).result ?? ''
-			if (result.length <= 130) continue
-			const length = parseInt(result.slice(66, 130), 16)
-			const bytes = result.slice(130, 130 + length * 2).match(/../g) ?? []
-			const uri = decodeURIComponent(bytes.map(b => `%${b}`).join('')).replace('{id}', hex)
+			const uri = abiString(String(await rpcCall(rpc, 'eth_call', [{ to: contract, data: selector + hex }, 'latest']))).replace('{id}', hex)
+			if (!uri) continue
 			const metadata = await tokenMetadata(uri)
 			if (metadata) return mediaUrl(metadata.image)
 		} catch {
@@ -285,6 +319,63 @@ async function etherscanHeld(chain: string, address: string, key: string): Promi
 			count: token.count,
 			spam: looksLikeSpam(token.collection, token.collection), oat: isOat(token.collection, token.collection),
 		})
+	}
+	return { held, chains: [chain] }
+}
+
+// Runs inside the explorer's NFT transfers page: its table, 100 rows a page, every page.
+const TRANSFERS_PAGE = "(async () => {\n\tconst sleep = (ms) => new Promise((r) => setTimeout(r, ms))\n\tconst ready = () => window.jQuery && jQuery.fn.dataTable && jQuery.fn.dataTable.isDataTable('#datatable') && document.querySelector('#datatable tbody tr a[href*=\"/nft/\"]')\n\tfor (let i = 0; i < 60 && !ready(); i++) await sleep(500)\n\tif (!ready()) return ''\n\tconst dt = jQuery('#datatable').DataTable()\n\tconst rows = []\n\tconst grab = () => {\n\t\tfor (const tr of document.querySelectorAll('#datatable tbody tr')) {\n\t\t\tconst link = [...tr.querySelectorAll('a[href*=\"/nft/\"]')].pop()\n\t\t\tconst m = link && /\\/nft\\/(0x[0-9a-fA-F]{40})\\/(\\d+)/.exec(link.getAttribute('href') || '')\n\t\t\tif (!m) continue\n\t\t\tconst cells = [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim())\n\t\t\trows.push({ contract: m[1].toLowerCase(), id: m[2], dir: cells.find((t) => /^(IN|OUT|SELF)$/.test(t)) || '', link: link.innerText.trim() })\n\t\t}\n\t}\n\tconst page = (fn) => new Promise((resolve) => { dt.one('draw', () => resolve()); fn(); setTimeout(resolve, 20000) })\n\tawait page(() => dt.page.len(100).draw('page'))\n\tconst pages = dt.page.info().pages\n\tfor (let p = 0; p < pages && p < 40; p++) {\n\t\tif (p > 0) await page(() => dt.page(p).draw('page'))\n\t\tgrab()\n\t}\n\treturn JSON.stringify(pages <= 40 ? rows : null)\n})()"
+
+interface PageTransfer {
+	contract?: string
+	id?: string
+	dir?: string
+	link?: string
+}
+
+// The transfers page's rows replayed: what came in and did not go out again.
+export function pageHeld(chain: string, site: string, rows: PageTransfer[]): Array<HeldNft & { contract: string; id: string }> {
+	const net = new Map<string, { contract: string; id: string; count: number; link: string }>()
+	for (const row of rows) {
+		if (!row.contract || !row.id || (row.dir !== 'IN' && row.dir !== 'OUT')) continue
+		const key = `${row.contract}:${row.id}`
+		const entry = net.get(key) ?? { contract: row.contract, id: row.id, count: 0, link: row.link ?? '' }
+		entry.count += row.dir === 'IN' ? 1 : -1
+		net.set(key, entry)
+	}
+	const out: Array<HeldNft & { contract: string; id: string }> = []
+	for (const { contract, id, count, link } of net.values()) {
+		if (count <= 0) continue
+		const [first = '', second = ''] = link.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code))).split('\n').map(line => line.trim())
+		const collection = second.replace(/^NFT:\s*/, '') || first || contract
+		const name = first && first.indexOf(id) >= 0 ? first : `${first || collection} #${id}`
+		out.push({ key: nftKey(chain, contract, name), chain, collection, name, image: '', url: `https://${site}/nft/${contract}/${id}`, count, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), contract, id })
+	}
+	return out
+}
+
+// Without a key: the explorer's own transfers page, read in the sign-in browser. Pictures come from
+// tokenURI, a few dozen per import: tokens that already have one are skipped, the rest follow on later imports.
+async function pageScanHeld(chain: string, address: string, hasCover: (key: string) => boolean): Promise<NftRead> {
+	const info = ETHERSCAN_CHAINS[chain]
+	if (!info) return { held: [], chains: [] }
+	let rows: PageTransfer[] | null = null
+	try {
+		rows = JSON.parse(await readPage(`https://${info.site}/nft-transfers?a=${address}`, TRANSFERS_PAGE, 90000) || 'null') as PageTransfer[] | null
+	} catch {
+		rows = null
+	}
+	if (!Array.isArray(rows)) return { held: [], chains: [] }
+	const held = pageHeld(chain, info.site, rows)
+	// a collection whose metadata server is gone (Galxe, SecondLive) is dropped after three misses
+	let budget = 60
+	const misses = new Map<string, number>()
+	for (const token of held.sort((a, b) => Number(a.spam || a.oat) - Number(b.spam || b.oat))) {
+		if (budget <= 0) break
+		if (token.spam || hasCover(token.key) || (misses.get(token.contract) ?? 0) >= 3) continue
+		budget--
+		token.image = await tokenImage(info.rpc, token.contract, token.id)
+		if (!token.image) misses.set(token.contract, (misses.get(token.contract) ?? 0) + 1)
 	}
 	return { held, chains: [chain] }
 }
@@ -366,14 +457,14 @@ async function solanaHeld(address: string): Promise<NftRead> {
 
 // The networks a wallet list can name; "EVM" stands for every EVM network at once.
 export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko', 'Gnosis', 'Celo', 'zkSync', 'Scroll', 'Ink', 'Soneium', 'Unichain', 'Mode', 'Arbitrum Nova', 'Shape']
-export const WALLET_FIELDS = ['EVM', ...EVM_NETWORKS, 'TON', 'Solana']
+export const WALLET_FIELDS = ['EVM', 'TON', 'Solana']
 
 export interface WalletPair {
 	chain: string
 	address: string
 }
 
-// Per network, the addresses its own field lists, plus for EVM networks those of the "EVM" field.
+// The "EVM" field's addresses on every EVM network, TON and Solana on their own.
 export function walletPairs(fields: Record<string, string>): WalletPair[] {
 	const out: WalletPair[] = []
 	const add = (chain: string, text: string | undefined, kind: WalletKind): void => {
@@ -383,7 +474,6 @@ export function walletPairs(fields: Record<string, string>): WalletPair[] {
 	}
 	for (const chain of EVM_NETWORKS) {
 		add(chain, fields.EVM, 'evm')
-		add(chain, fields[chain], 'evm')
 	}
 	add('TON', fields.TON, 'ton')
 	add('Solana', fields.Solana, 'solana')
@@ -392,7 +482,7 @@ export function walletPairs(fields: Record<string, string>): WalletPair[] {
 
 // Every wallet's tokens, grouped. A network counts as read only when all its wallets read in full:
 // only then may a token missing from it be taken as gone. BNB and Taiko need the Etherscan key.
-export async function nftHoldings(pairs: WalletPair[], etherscanKey: string): Promise<NftRead> {
+export async function nftHoldings(pairs: WalletPair[], etherscanKey: string, hasCover: (key: string) => boolean = () => false): Promise<NftRead> {
 	const held: HeldNft[] = []
 	const done = new Map<string, number>()
 	const wanted = new Map<string, number>()
@@ -400,7 +490,7 @@ export async function nftHoldings(pairs: WalletPair[], etherscanKey: string): Pr
 		const host = BLOCKSCOUT[chain]
 		let read: NftRead | null = null
 		if (host) read = await blockscoutHeld(chain, host, address)
-		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : null
+		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : await pageScanHeld(chain, address, hasCover)
 		else if (chain === 'TON') read = await tonHeld(address)
 		else if (chain === 'Solana') read = await solanaHeld(address)
 		if (!read) continue

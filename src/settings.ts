@@ -391,18 +391,9 @@ export class LibrarySettingTab extends PluginSettingTab {
 				rows: [
 					note(tr("settings.nft.desc")),
 					...WALLET_FIELDS.map((field): Row => ({
-						name: field === "EVM" ? tr("settings.wallets.evm") : field === "BNB" ? "BNB Chain" : field,
+						name: field,
 						desc: field === "EVM" ? tr("settings.wallets.evm.desc") : tr("settings.nftWallets.desc"),
-						render: (row) => {
-							row.addTextArea((area) => {
-								area.inputEl.rows = 2;
-								area.setValue(settings.nftWallets[field] ?? "").onChange(async (value) => {
-									if (value.trim()) settings.nftWallets[field] = value;
-									else delete settings.nftWallets[field];
-									await this.plugin.saveSettings();
-								});
-							});
-						},
+						render: (row) => this.walletList(row, field),
 					})),
 					{
 						name: tr("settings.nftImport"),
@@ -534,6 +525,45 @@ export class LibrarySettingTab extends PluginSettingTab {
 	}
 
 	// A key field, and from 1.11.4 a pick from Obsidian's Keychain: a picked secret is read from there, the field stays off.
+	// One line per address, a cross to drop it, and a button for the next one.
+	private walletList(row: Setting, field: string): void {
+		const settings = this.plugin.settings;
+		const lines = (settings.nftWallets[field] ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
+		const list = row.controlEl.createDiv({ cls: "library-wallet-list" });
+		const save = async (): Promise<void> => {
+			const value = lines.map((line) => line.trim()).filter(Boolean).join("\n");
+			if (value) settings.nftWallets[field] = value;
+			else delete settings.nftWallets[field];
+			await this.plugin.saveSettings();
+		};
+		const draw = (focus = false): void => {
+			list.empty();
+			if (lines.length === 0) lines.push("");
+			lines.forEach((value, i) => {
+				const line = list.createDiv({ cls: "library-wallet-line" });
+				const input = line.createEl("input", { type: "text", value, attr: { spellcheck: "false" } });
+				input.addEventListener("input", () => {
+					lines[i] = input.value;
+					void save();
+				});
+				if (focus && i === lines.length - 1) window.setTimeout(() => input.focus(), 0);
+				const drop = line.createEl("button", { cls: "clickable-icon", attr: { "aria-label": tr("dup.remove") } });
+				setIcon(drop, "x");
+				drop.addEventListener("click", () => {
+					lines.splice(i, 1);
+					void save();
+					draw();
+				});
+			});
+			const add = list.createEl("button", { text: tr("settings.wallets.add") });
+			add.addEventListener("click", () => {
+				lines.push("");
+				draw(true);
+			});
+		};
+		draw();
+	}
+
 	private keyRow(prefix: string, key: ApiKeyName, placeholder: string): Row {
 		return {
 			name: tr(`${prefix}.name`),

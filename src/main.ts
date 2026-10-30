@@ -41,7 +41,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, WALLET_FIELDS, nftHoldings, parseWallets, walletPairs } from './nft'
+import { NFT_SOURCE, NFT_TYPE, nftHoldings, parseWallets, walletPairs } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -112,6 +112,7 @@ import {
 	toLinks,
 	coverKey,
 	imageExtension,
+	sniffImage,
 	publicHttpsUrl,
 	plainCopy
 } from './util'
@@ -1703,7 +1704,12 @@ export default class LibraryPlugin extends Plugin {
 		this.nftImporting = true
 		try {
 			if (loud) new Notice(tr('notice.site.importing', { site: 'NFT' }))
-			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'))
+			const covered = new Set<string>()
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (fm && toStr(fm.Source) === NFT_SOURCE && toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
+			}
+			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'), key => covered.has(key))
 			if (read.chains.length === 0 && read.held.length === 0) {
 				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
 				return
@@ -1723,8 +1729,16 @@ export default class LibraryPlugin extends Plugin {
 				const existing = notes.get(token.key)
 				try {
 					if (existing) {
-						if (Number(this.app.metadataCache.getFileCache(existing)?.frontmatter?.Count) === token.count) continue
-						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => { current.Count = token.count })
+						// a picture that never loaded (none, or a remote one other than the explorer's) is replaced
+						const known = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						const cover = toStr(known?.Cover)
+						const recover = !!token.image && (!cover || (/^https?:\/\//i.test(cover) && cover !== token.image))
+						if (Number(known?.Count) === token.count && !recover) continue
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+							current.Count = token.count
+							if (recover) current.Cover = token.image
+						})
+						if (recover) this.queueCover(existing)
 						updated++
 						continue
 					}
@@ -3704,7 +3718,7 @@ export default class LibraryPlugin extends Plugin {
 		try {
 			const resp = await requestUrl({ url, throw: false })
 			const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
-			const ext = imageExtension(type ? resp.headers[type] ?? '' : '')
+			const ext = imageExtension(type ? resp.headers[type] ?? '' : '') ?? sniffImage(resp.arrayBuffer)
 			if (resp.status !== 200 || !ext || resp.arrayBuffer.byteLength === 0) {
 				this.coverFailed.add(url)
 				return
@@ -4861,19 +4875,15 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
-		// the first build kept one list of addresses; each goes to the field of its kind
+		// earlier builds kept one list, then a field per network; each address goes to the field of its kind
 		const savedWallets = this.settings.nftWallets as unknown
+		const savedText = typeof savedWallets === 'string' ? savedWallets
+			: savedWallets && typeof savedWallets === 'object' ? Object.keys(savedWallets).map(k => toStr((savedWallets as Record<string, unknown>)[k])).join('\n') : ''
 		this.settings.nftWallets = {}
-		if (typeof savedWallets === 'string') {
-			for (const wallet of parseWallets(savedWallets)) {
-				const field = wallet.kind === 'evm' ? 'EVM' : wallet.kind === 'ton' ? 'TON' : 'Solana'
-				this.settings.nftWallets[field] = [this.settings.nftWallets[field], wallet.address].filter(Boolean).join('\n')
-			}
-		} else if (savedWallets && typeof savedWallets === 'object') {
-			for (const field of WALLET_FIELDS) {
-				const value = (savedWallets as Record<string, unknown>)[field]
-				if (typeof value === 'string' && value.trim()) this.settings.nftWallets[field] = value
-			}
+		for (const wallet of parseWallets(savedText)) {
+			const field = wallet.kind === 'evm' ? 'EVM' : wallet.kind === 'ton' ? 'TON' : 'Solana'
+			const known = (this.settings.nftWallets[field] ?? '').split('\n')
+			if (known.indexOf(wallet.address) < 0) this.settings.nftWallets[field] = known.concat(wallet.address).filter(Boolean).join('\n')
 		}
 		if (typeof this.settings.etherscanApiKey !== 'string') this.settings.etherscanApiKey = ''
 		if (typeof this.settings.nftLastImport !== 'number') this.settings.nftLastImport = 0
