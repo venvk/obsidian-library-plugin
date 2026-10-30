@@ -27,6 +27,7 @@ import {
 	runtimeMinutes,
 	formatRuntime,
 	spentTime,
+	spentParts,
 	spentMinutes,
 	exactHours,
 	runtimeParts,
@@ -254,24 +255,35 @@ export class LibraryRenderer {
 			stops.push(`${slice.color} ${from}% ${(consumed / total) * 100}%`)
 		}
 		chart.setCssStyles({ background: `conic-gradient(${stops.join(', ')})` })
-		// Split: a long total breaks only between hours and minutes.
-		const totalEl = chart.createDiv({ cls: 'library-time-hole' }).createDiv({ cls: 'library-time-total' })
-		runtimeParts(total).forEach((part, i) => {
-			if (i > 0) totalEl.appendText(' ')
-			totalEl.createSpan({ text: part })
-		})
-
+		// The total switches between hours and days, months, years; the legend follows. Remembered.
+		const stats = this.plugin.settings.stats
+		const totalEl = chart.createDiv({ cls: 'library-time-hole' }).createEl('button', { cls: 'library-time-total' })
 		const legend = col.createDiv({ cls: 'library-time-legend' })
+		const values: Array<{ el: HTMLElement; minutes: number; share: number }> = []
 		for (const slice of slices) {
 			const row = legend.createDiv({ cls: 'library-time-item' })
 			row.createSpan({ cls: 'library-time-dot' }).setCssStyles({ backgroundColor: slice.color })
 			row.createSpan({ cls: 'library-time-name', text: slice.name })
-			const share = Math.round((slice.minutes / total) * 100)
-			row.createSpan({
-				cls: 'library-time-value',
-				text: formatRuntime(slice.minutes) + ' · ' + String(share) + '%'
-			})
+			values.push({ el: row.createSpan({ cls: 'library-time-value' }), minutes: slice.minutes, share: Math.round((slice.minutes / total) * 100) })
 		}
+		const show = (): void => {
+			const calendar = stats.calendarTime === true
+			// Split: a long total breaks only between its units.
+			totalEl.empty()
+			const parts = calendar ? spentParts(total) : runtimeParts(total)
+			parts.forEach((part, i) => {
+				if (i > 0) totalEl.appendText(' ')
+				totalEl.createSpan({ text: part })
+			})
+			totalEl.setAttribute('aria-label', tr(calendar ? 'stats.showHours' : 'stats.showCalendar'))
+			for (const value of values) value.el.setText(`${calendar ? spentTime(value.minutes) : formatRuntime(value.minutes)} · ${String(value.share)}%`)
+		}
+		show()
+		totalEl.addEventListener('click', () => {
+			stats.calendarTime = stats.calendarTime !== true
+			show()
+			void this.plugin.persistSettings()
+		})
 
 		if (undated > 0) {
 			col.createEl('p', {

@@ -78,7 +78,7 @@ Your taste shows your average score and how it compares with other viewers (IMDb
 
 Each top, platform, and the diary take one cell of the panel, your taste takes three, and time spent sits on the right. A new column goes into an empty cell before it starts a new row.
 
-Time spent shows the hours you spent on movies, series, anime, games, and videos, per category, and below it one comparison a day, such as how many times Apollo 11 could have flown to the Moon and back. Turn it off with the Time spent switch.
+Time spent shows the hours you spent on movies, series, anime, games, and videos, per category (click the total in the middle of the chart to see it in days, months, and years, and again for hours), and below it one comparison a day, such as how many times Apollo 11 could have flown to the Moon and back. Turn it off with the Time spent switch.
 
 Time for movies, series, and anime multiplies `Runtime` by the episodes you watched; a finished title counts in full. A note without `Runtime` isn't counted and shows up as "without runtime". Games count their `Playtime`. A video counts its `Runtime` by the share you watched, once more for each rewatch.
 

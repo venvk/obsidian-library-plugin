@@ -297,7 +297,8 @@ export function spentMinutes(fm: Record<string, unknown>, kind?: ContentType): n
 	return watchedRuntimeMinutes(fm, kind)
 }
 
-export function spentTime(totalMinutes: number): string {
+// Time in the two largest calendar units it fills: "6 mo 2 d", "87 d 1 h".
+export function spentParts(totalMinutes: number): string[] {
 	const minutes = Math.round(totalMinutes)
 	const HOUR = 60
 	const DAY = 24 * HOUR
@@ -305,13 +306,17 @@ export function spentTime(totalMinutes: number): string {
 	const YEAR = 365.25 * DAY
 	const unit = (count: number, name: string): string =>
 		formatNumber(count, { style: 'unit', unit: name, unitDisplay: 'short' })
-	const pair = (big: number, bigName: string, small: number, smallName: string): string =>
-		small > 0 ? `${unit(big, bigName)} ${unit(small, smallName)}` : unit(big, bigName)
-	if (minutes < HOUR) return unit(minutes, 'minute')
+	const pair = (big: number, bigName: string, small: number, smallName: string): string[] =>
+		small > 0 ? [unit(big, bigName), unit(small, smallName)] : [unit(big, bigName)]
+	if (minutes < HOUR) return [unit(minutes, 'minute')]
 	if (minutes < DAY) return pair(Math.floor(minutes / HOUR), 'hour', minutes % HOUR, 'minute')
 	if (minutes < 100 * DAY) return pair(Math.floor(minutes / DAY), 'day', Math.floor((minutes % DAY) / HOUR), 'hour')
 	if (minutes < YEAR) return pair(Math.floor(minutes / MONTH), 'month', Math.floor((minutes % MONTH) / DAY), 'day')
 	return pair(Math.floor(minutes / YEAR), 'year', Math.floor((minutes % YEAR) / MONTH), 'month')
+}
+
+export function spentTime(totalMinutes: number): string {
+	return spentParts(totalMinutes).join(' ')
 }
 
 export function runtimeParts(totalMinutes: number): string[] {

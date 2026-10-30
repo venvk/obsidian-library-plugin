@@ -982,6 +982,17 @@ sort trigger, the chosen one in the accent colour. */
 	font-size: 0.78em;
 	font-weight: 600;
 	line-height: 1.15;
+	height: auto;
+	padding: 0;
+	background: none;
+	box-shadow: none;
+	color: inherit;
+	cursor: pointer;
+	white-space: normal;
+}
+
+.library-time-total:hover {
+	color: var(--text-accent);
 }
 
 .library-time-total span {

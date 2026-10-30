@@ -4809,6 +4809,7 @@ export default class LibraryPlugin extends Plugin {
 			// once: games and videos get the creator tops their creators left the shared one for
 			if (raw.creatorsSplit !== true) for (const cat of this.settings.categories) addCreatorTop(stats.tops, cat)
 			stats.creatorsSplit = true
+			if (raw.calendarTime === true) stats.calendarTime = true
 			return stats
 		}
 		// builds before the list: the chosen properties, then every category whose best-rated switch was on
