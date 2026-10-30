@@ -41,6 +41,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
+import { NFT_SOURCE, NFT_TYPE, nftHoldings, parseWallets } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -194,6 +195,7 @@ export default class LibraryPlugin extends Plugin {
 	private watchImporting = false
 	// YouTube's older months and missing counts, running apart from the imports
 	private youtubeBackfilling = false
+	private nftImporting = false
 	// Notes an import just found or made, before the metadata cache knows the new ones
 	private watchNotes = new Map<string, TFile>()
 	// shows whose note got its Netflix ID in this import: their viewings tick, nothing to undo yet
@@ -1692,6 +1694,91 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// NFTs of the wallets in the settings, a note per token group in the NFT category made on first use.
+	// A known note only follows the count and whether it is still owned; a token gone from a chain read in full is marked, not deleted.
+	async nftImport(loud: boolean): Promise<void> {
+		if (this.nftImporting || !Platform.isDesktopApp) return
+		const wallets = parseWallets(this.settings.nftWallets)
+		if (wallets.length === 0) return
+		this.nftImporting = true
+		try {
+			if (loud) new Notice(tr('notice.site.importing', { site: 'NFT' }))
+			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'))
+			if (read.chains.length === 0 && read.held.length === 0) {
+				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
+				return
+			}
+			const notes = new Map<string, TFile>()
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (fm && toStr(fm.Source) === NFT_SOURCE && !isTemplateFile(file.path)) notes.set(toStr(fm['Source ID']), file)
+			}
+			let category = this.settings.categories.find(c => c.typeValue === NFT_TYPE)
+			let created = 0
+			let updated = 0
+			const seen = new Set<string>()
+			for (const token of read.held) {
+				if (this.unloaded) return
+				seen.add(token.key)
+				const existing = notes.get(token.key)
+				try {
+					if (existing) {
+						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						if (Number(fm?.Count) === token.count && fm?.Owned !== false) continue
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+							current.Count = token.count
+							current.Owned = true
+						})
+						updated++
+						continue
+					}
+					if (!category) category = await this.nftCategory()
+					const meta: NormalizedMetadata = {
+						fields: { Name: token.name, Creator: [token.collection], ...(token.image ? { Cover: token.image } : {}), URL: token.url },
+						progressTotal: null,
+						imdbId: null,
+					}
+					const file = await this.newNote(category, NFT_SOURCE, token.key, token.name, meta, { Platforms: [token.chain], Count: token.count, Owned: true })
+					// a collectible is held, not watched: no progress, no Complete
+					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+						delete current.Progress
+						delete current.Complete
+					})
+					notes.set(token.key, file)
+					created++
+				} catch (e) {
+					console.error('Library: NFT import error', token.key, e)
+				}
+			}
+			for (const [key, file] of notes) {
+				const chain = key.split(':')[0] ?? ''
+				if (seen.has(key) || read.chains.indexOf(chain) < 0) continue
+				if (this.app.metadataCache.getFileCache(file)?.frontmatter?.Owned === false) continue
+				await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current.Owned = false })
+				updated++
+			}
+			this.settings.nftLastImport = Date.now()
+			await this.saveSettings()
+			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'NFT', created, updated }))
+		} finally {
+			this.nftImporting = false
+		}
+	}
+
+	private async nftCategory(): Promise<ICategory> {
+		const category: ICategory = { name: NFT_TYPE, typeValue: NFT_TYPE, contentType: 'manual', folder: joinFolder(this.settings.libraryFolder, 'NFT') }
+		this.settings.categories.push(category)
+		addCategoryTop(this.settings, category.typeValue)
+		await this.saveSettings()
+		new Notice(tr('notice.categoryCreated', { name: category.name }))
+		return category
+	}
+
+	private async nftSyncIfDue(): Promise<void> {
+		if (!this.settings.nftWallets.trim() || Date.now() - this.settings.nftLastImport < 24 * 3600000) return
+		await this.nftImport(false)
+	}
+
 	private async youtubeCategory(): Promise<ICategory> {
 		const category: ICategory = { name: tr('settings.default.video'), typeValue: YOUTUBE_TYPE, contentType: 'manual', folder: joinFolder(this.settings.libraryFolder, 'Video') }
 		this.settings.categories.push(category)
@@ -2555,7 +2642,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first — a third-party signing service carries the requests
@@ -3384,6 +3471,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.steamId.trim()) await this.steamImport(true)
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
 		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
+		if (this.settings.nftWallets.trim()) await this.nftImport(true)
 	}
 
 	private pruneEcho(): void {
@@ -4203,7 +4291,14 @@ export default class LibraryPlugin extends Plugin {
 			})
 		}
 
-		addNames(tr('header.creator'), creators)
+		const nft = toStr(fm.Source) === NFT_SOURCE
+		addNames(tr(nft ? 'header.collection' : 'header.creator'), creators)
+		if (nft) {
+			const chains = toStrArray(fm.Platforms)
+			if (chains.length > 0) addRow(tr('header.chain'), chains.join(', '))
+			if (Number(fm.Count) > 1) addRow(tr('header.owned'), String(Number(fm.Count)))
+			if (fm.Owned === false) infoSide.createDiv({ cls: 'note-header-row', text: tr('header.notOwned') })
+		}
 		// the channel: its canvas by name, the channel itself on YouTube, and the subscription
 		if (video && infoSide.lastElementChild && creators.length > 0) {
 			const row = infoSide.lastElementChild as HTMLElement
@@ -4269,7 +4364,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
-		if (trackingOf(kind) !== 'progress') {
+		if (trackingOf(kind) !== 'progress' && toStr(fm.Source) !== NFT_SOURCE) {
 			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
@@ -4751,6 +4846,9 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
+		if (typeof this.settings.nftWallets !== 'string') this.settings.nftWallets = ''
+		if (typeof this.settings.etherscanApiKey !== 'string') this.settings.etherscanApiKey = ''
+		if (typeof this.settings.nftLastImport !== 'number') this.settings.nftLastImport = 0
 		const secrets = (this.settings.keySecrets && typeof this.settings.keySecrets === 'object' ? this.settings.keySecrets : {}) as Record<string, unknown>
 		this.settings.keySecrets = {}
 		for (const name of API_KEY_NAMES) {

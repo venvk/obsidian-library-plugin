@@ -18,16 +18,24 @@ export const MEDIA: ContentType[] = ['movie', 'series', 'book', 'comic', 'game',
 // the video connectors' category (YouTube): fixed like the built-in ones
 export const VIDEO_CATEGORY = 'Video'
 
+// the NFT connector's category, fixed the same way
+export const NFT_CATEGORY = 'NFT'
+
 function isVideo(cat: ICategory): boolean {
 	return cat.contentType === 'manual' && cat.typeValue === VIDEO_CATEGORY
 }
 
+export function isNftCategory(cat: ICategory): boolean {
+	return cat.contentType === 'manual' && cat.typeValue === NFT_CATEGORY
+}
+
 export function isBuiltInCategory(cat: ICategory): boolean {
-	return isVideo(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
+	return isVideo(cat) || isNftCategory(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
 }
 
 export function categoryLabel(cat: ICategory): string {
 	if (isVideo(cat)) return tr('settings.default.video')
+	if (isNftCategory(cat)) return NFT_CATEGORY
 	return isBuiltInCategory(cat) ? tr(`settings.default.${cat.contentType}`) : cat.name
 }
 
@@ -93,7 +101,7 @@ export function addCategoryTop(settings: ILibrarySettings, typeValue: string): v
 
 // Games' and videos' creators are developers and channels: kept out of the shared creator top.
 export function ownCreators(cat: ICategory): boolean {
-	return cat.contentType === 'game' || isVideo(cat)
+	return cat.contentType === 'game' || isVideo(cat) || isNftCategory(cat)
 }
 
 // Such a category gets its own creator top, while the shared one is listed.

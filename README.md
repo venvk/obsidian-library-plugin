@@ -129,6 +129,10 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `www.netflix.com` | Netflix connector | Sign-in; viewing activity and thumbs are read, scores are sent as thumbs; unticked or deleted titles are hidden from the history, unstarted series go to My List |
 | `accounts.google.com`, `www.youtube.com` | YouTube connector | Sign-in; the watch history is read (the last 7 days, then one older month a day) with each video's length and watched share; per video, its description, publish date, your like and whether you're subscribed; the like and subscribe buttons in a note send them back |
 | `returnyoutubedislikeapi.com` | YouTube connector: like and estimated dislike counts, as YouTube shows no dislikes | Video id |
+| `eth.blockscout.com`, `optimism.blockscout.com`, `base.blockscout.com`, `arbitrum.blockscout.com`, `polygon.blockscout.com`, `tonapi.io`, `api-mainnet.magiceden.dev` | NFT connector | Your wallet addresses |
+| `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
+| `ipfs.io`, `arweave.net`, and the hosts a token's metadata names | NFT images and metadata | Token id or file path |
+| `tonviewer.com`, `solscan.io`, `bscscan.com`, `taikoscan.io` | Links in NFT notes, opened only when you click them | Nothing until you click |
 | `api.trakt.tv`, `auth.trakt.tv` | Trakt connector | Sign-in code; history, ratings and watchlist are read, scores, watched and unwatched episodes, watchlist titles and removals of deleted notes are sent |
 | `id.twitch.tv`, `api.igdb.com` | Game trailers, with Twitch keys | Twitch id and secret, game |
 | `api.deezer.com`, `cdn-images.dzcdn.net` | Music search, covers, tracks, similar albums | Album or artist |

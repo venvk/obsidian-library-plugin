@@ -161,6 +161,17 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'header.progress': 'Progress',
 		'header.complete': 'Complete',
 		'header.markComplete': 'Mark complete',
+		'settings.nft.desc': 'NFTs held by your wallets arrive in the NFT category: Ethereum, Optimism, Base, Arbitrum and Polygon, TON and Solana; with an Etherscan key, BNB and Taiko too. Desktop only.',
+		'settings.nftWallets.name': 'Wallet addresses',
+		'settings.nftWallets.desc': 'Public addresses, separated by commas or lines: 0x… for Ethereum and its networks, TON and Solana addresses as they are. Only read, never signed.',
+		'settings.nftImport': 'Import now',
+		'settings.etherscan.name': 'Etherscan API key',
+		'settings.etherscan.desc': 'Free at etherscan.io; adds NFTs on BNB Chain and Taiko.',
+		'stats.topCollections': 'Top collections',
+		'header.collection': 'Collection',
+		'header.chain': 'Network',
+		'header.owned': 'Owned',
+		'header.notOwned': 'No longer in your wallets',
 		'notice.canvasOff': 'Turn on the core Canvas plugin in Settings > Core plugins to open canvases.',
 		'stats.showCalendar': 'Show in days, months and years',
 		'stats.showHours': 'Show in hours',
@@ -34710,8 +34721,8 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 }
 
 // The settings that hold an API key, a client id or a secret.
-export type ApiKeyName = 'omdbApiKey' | 'tmdbApiKey' | 'googleBooksApiKey' | 'rawgApiKey' | 'twitchClientId' | 'twitchClientSecret' | 'comicVineApiKey'
-export const API_KEY_NAMES: ApiKeyName[] = ['omdbApiKey', 'tmdbApiKey', 'googleBooksApiKey', 'rawgApiKey', 'twitchClientId', 'twitchClientSecret', 'comicVineApiKey']
+export type ApiKeyName = 'omdbApiKey' | 'tmdbApiKey' | 'googleBooksApiKey' | 'rawgApiKey' | 'twitchClientId' | 'twitchClientSecret' | 'comicVineApiKey' | 'etherscanApiKey'
+export const API_KEY_NAMES: ApiKeyName[] = ['omdbApiKey', 'tmdbApiKey', 'googleBooksApiKey', 'rawgApiKey', 'twitchClientId', 'twitchClientSecret', 'comicVineApiKey', 'etherscanApiKey']
 
 export interface ICategory {
 	name: string
@@ -34752,6 +34763,10 @@ export interface ILibrarySettings {
 	// Parent of each category's English subfolder (Library/Movies); '' = vault root.
 	libraryFolder: string
 	omdbApiKey: string
+	// NFT wallets, any chain, separated by commas or lines; Etherscan's key adds BNB and Taiko
+	nftWallets: string
+	etherscanApiKey: string
+	nftLastImport: number
 	// API keys taken from Obsidian's Keychain instead of these fields: the secret's id per key
 	keySecrets: Partial<Record<ApiKeyName, string>>
 	googleBooksApiKey: string
@@ -34841,6 +34856,9 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	categories: [],
 	libraryFolder: 'Library',
 	omdbApiKey: '',
+	nftWallets: '',
+	etherscanApiKey: '',
+	nftLastImport: 0,
 	keySecrets: {},
 	googleBooksApiKey: '',
 	rawgApiKey: '',

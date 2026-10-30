@@ -1,7 +1,7 @@
 import { App, normalizePath } from 'obsidian'
 import { progressPattern, dmyDatePattern, type ICategory, type IStatsTop, type TitleLanguage } from './constants'
 import { formatNumber, tr } from './i18n'
-import { categoryLabel } from './categories'
+import { categoryLabel, NFT_CATEGORY } from './categories'
 import { normalizeSeasons } from './trailer'
 import type { ContentType } from './providers/types'
 
@@ -175,6 +175,7 @@ export function topLabel(top: IStatsTop, categories: ICategory[]): string {
 	if (top.kind === 'property' && top.scope) {
 		const scope = categories.find(c => c.typeValue === top.scope)
 		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'game') return tr('stats.topDevelopers')
+		if (top.key.toLowerCase() === 'creator' && scope?.typeValue === NFT_CATEGORY) return tr('stats.topCollections')
 		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'manual') return tr('stats.topChannels')
 		return tr('stats.topNamed', { name: `${top.key} · ${scope ? categoryLabel(scope) : top.scope}` })
 	}

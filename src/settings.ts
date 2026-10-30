@@ -40,7 +40,8 @@ type TextKey =
 	| "coverProperty"
 	| "skipFields"
 	| "twitchClientId"
-	| "twitchClientSecret";
+	| "twitchClientSecret"
+	| "etherscanApiKey";
 
 // One row; getSettingDefinitions() (1.13+) and display() render the same rows.
 interface Row {
@@ -370,6 +371,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					this.keyRow("settings.twitchId", "twitchClientId", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.twitchSecret", "twitchClientSecret", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.comicvine", "comicVineApiKey", tr("settings.comicvine.placeholder")),
+					this.keyRow("settings.etherscan", "etherscanApiKey", tr("settings.rawg.placeholder")),
 				],
 			},
 			{
@@ -379,6 +381,29 @@ export class LibrarySettingTab extends PluginSettingTab {
 					{ name: "IMDb", desc: tr("settings.imdb.desc"), render: (row) => this.siteAccount(row, "imdb") },
 					{ name: "Netflix", desc: tr("settings.netflix.desc"), render: (row) => this.siteAccount(row, "netflix") },
 					{ name: "Trakt", desc: tr("settings.trakt.desc"), render: (row) => this.traktAccount(row) },
+				],
+			},
+			{
+				page: "connectors",
+				heading: "NFT",
+				rows: [
+					note(tr("settings.nft.desc")),
+					{
+						name: tr("settings.nftWallets.name"),
+						desc: tr("settings.nftWallets.desc"),
+						render: (row) => {
+							row.addTextArea((area) => {
+								area.inputEl.rows = 3;
+								area.setValue(settings.nftWallets).onChange(async (value) => {
+									settings.nftWallets = value;
+									await this.plugin.saveSettings();
+								});
+							});
+							row.addButton((button) =>
+								button.setButtonText(tr("settings.nftImport")).onClick(() => void this.plugin.nftImport(true)),
+							);
+						},
+					},
 				],
 			},
 			{
