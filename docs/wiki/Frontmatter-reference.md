@@ -73,7 +73,7 @@ Source ID: steam:1245620
 | Property | Meaning |
 | --- | --- |
 | `Type` | The category the note belongs to. It must equal the category's Type value. |
-| `Progress` | `done/total`: episodes, chapters, pages, tracks, or issues; for games, the share of trophies or achievements as `n/100`. Movies have none; see [[Progress and statistics|Progress-and-statistics]]. |
+| `Progress` | `done/total`: episodes, chapters, pages, tracks, or issues; for games, the share of trophies or achievements, and for videos, the share you watched, as `n/100`. Movies have none; see [[Progress and statistics|Progress-and-statistics]]. |
 | `Complete` | `true` once you finish a movie, an album, a comic, or a game. Series, anime, and books have none: they are done when their progress is full. |
 | `My Rating` | Your score from 1 to 10. With rated episodes, seasons, or chapters, their average. |
 | `Log` | The [[diary|Progress-and-statistics#diary]]: one line per episode, season, or chapter you ticked and per title you finished, such as `2026-10-18 S2E5`. |
@@ -100,7 +100,7 @@ Renaming or removing one of these breaks refresh, statistics, or sync for that n
 | `Rating IMDB`, `Rating RT` | IMDb rating; Rotten Tomatoes score in % | movies, series |
 | `Rating RAWG`, `Rating MC` | RAWG rating; Metacritic score on a 10-point scale | games |
 | `Rating AniList`, `Rating MAL` | AniList score; MyAnimeList score for notes added from MyAnimeList | anime |
-| `Runtime` | Minutes; for series and anime, one episode; for an album, all of it | movies, series, anime, music |
+| `Runtime` | Minutes; for series and anime, one episode; for an album or a video, all of it | movies, series, anime, music, videos |
 | `Season` | The number of seasons | series |
 | `Seasons` | Seasons and their episodes, as in the example. A season's `rating` is the source's score; `watched` and `my_rating` are yours | series, anime |
 | `Chapters` | Chapters, with the same `title`, `watched`, and `my_rating` | books |
@@ -109,13 +109,13 @@ Renaming or removing one of these breaks refresh, statistics, or sync for that n
 | `Trailer` | A trailer link | movies, series, anime, games |
 | `Gallery` | Still images or screenshots | movies, series, anime, games |
 
-Settings → Library → Skip properties keeps any of these out of notes; see [[Templates and skipped properties|Templates-and-skipped-properties]].
+Settings → Library → General → Skip properties keeps any of these out of notes; see [[Templates and skipped properties|Templates-and-skipped-properties]].
 
 ## Properties from connected accounts
 
 | Property | Content | Written by |
 | --- | --- | --- |
-| `Platforms` | Where you have the title: `PS5`, `PS4`, `Steam`, `Switch`, `Netflix` | PlayStation, Steam, Nintendo, Netflix |
+| `Platforms` | Where you have the title: `PS5`, `PS4`, `Steam`, `Switch`, `Netflix`, `YouTube` | PlayStation, Steam, Nintendo, Netflix, YouTube |
 | `Playtime PS5`, `Playtime Steam`, `Playtime Switch`, … | Hours played on that platform | PlayStation, Steam, Nintendo |
 | `Playtime` | Hours played on all platforms together | PlayStation, Steam, Nintendo |
 | `Last Played` | The day you last played, as `dd.mm.yyyy` | PlayStation, Steam |
@@ -124,6 +124,13 @@ Settings → Library → Skip properties keeps any of these out of notes; see [[
 | `PSN ID` | The game's PlayStation id | PlayStation |
 | `Nintendo ID` | The game's Nintendo id | Nintendo |
 | `Netflix ID` | The title's Netflix id; scores go back to it as thumbs | Netflix |
+| `Channel URL`, `Channel ID` | The video's channel on YouTube | YouTube |
+| `Published` | The day the video came out, as `dd.mm.yyyy` | YouTube |
+| `Last Watched` | The day you last watched the video, once you rewatch it | YouTube |
+| `Rewatched` | How many times you watched the video again | YouTube |
+| `Views`, `Likes`, `Dislikes` | The video's counts; dislikes are an estimate from Return YouTube Dislike | YouTube |
+| `Reaction` | Your `like` or `dislike` on YouTube | YouTube |
+| `Subscribed` | Whether you are subscribed to the channel | YouTube |
 
 These can't be skipped. See [[Connected accounts|Connected-accounts]] for what each service changes.
 
@@ -137,6 +144,7 @@ These can't be skipped. See [[Connected accounts|Connected-accounts]] for what e
 | Comics | `comics` | A Wikidata item, `manga:` and an AniList id, or a Comic Vine id |
 | Anime | `anilist` | The AniList id, or `mal:` and the MyAnimeList id |
 | Music | `deezer` | The Deezer album id |
+| Video | `youtube` | The YouTube video id, such as `dQw4w9WgXcQ` |
 
 Notes from older versions can have another `Source`, such as `rawg` or `steam`. They still refresh, because Library tells sources apart by the shape of `Source ID`.
 
@@ -146,9 +154,9 @@ Notes from older versions can have another `Source`, such as `rawg` or `steam`. 
 
 ## Cover
 
-Settings → Library → Cover property renames the cover field, for example to `image` if you already use that name. Notes keep working after a rename, because Library also reads `Cover` and `Image`. A cover can be an image address, or an image in your vault written as a path or an internal link.
+Settings → Library → General → Cover property renames the cover field, for example to `image` if you already use that name. Notes keep working after a rename, because Library also reads `Cover` and `Image`. A cover can be an image address, or an image in your vault written as a path or an internal link.
 
-Turn on Settings → Library → Keep covers in the vault to keep covers offline. Library downloads each note's cover, one at a time in the background, into a Covers folder in your library folder, and points the cover property at the file, such as `[[Library/Covers/Dune.jpg]]`. New notes get theirs right away. A cover that can't be downloaded stays an address. Turning the setting off leaves the downloaded files and links as they are.
+Turn on Settings → Library → General → Keep covers in the vault to keep covers offline. Library downloads each note's cover, one at a time in the background, into a Covers folder in your library folder, and points the cover property at the file, such as `[[Library/Covers/Dune.jpg]]`. New notes get theirs right away. A cover that can't be downloaded stays an address. Turning the setting off leaves the downloaded files and links as they are.
 
 ## Refresh
 

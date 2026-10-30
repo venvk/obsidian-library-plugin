@@ -30,6 +30,115 @@
 	aspect-ratio: 1 / 1;
 }
 
+.library-card.is-wide .card-image {
+	aspect-ratio: 16 / 9;
+}
+
+.card-vote.is-like .card-vote-icon svg,
+.note-header-reaction.is-like.is-on svg {
+	color: #2ea043;
+	fill: currentColor;
+}
+
+.card-vote.is-dislike .card-vote-icon svg,
+.note-header-reaction.is-dislike.is-on svg {
+	color: #e5484d;
+	fill: currentColor;
+}
+
+.card-votes {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px;
+}
+
+.card-vote {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+}
+
+.card-vote-icon {
+	display: inline-flex;
+}
+
+.card-vote-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+.note-header-reaction {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	font-size: var(--font-ui-smaller);
+	vertical-align: middle;
+	margin-left: 6px;
+	padding: 4px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.note-header-badges .note-header-reaction {
+	margin-left: -8px;
+}
+
+.note-header-reaction svg {
+	width: 18px;
+	height: 18px;
+}
+
+.note-header-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: 8px;
+	padding: 2px 10px;
+	height: auto;
+	border-radius: 999px;
+	font-size: var(--font-ui-smaller);
+	vertical-align: middle;
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	text-decoration: none;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.note-header-pill svg {
+	width: 14px;
+	height: 14px;
+}
+
+.note-header-pill.is-subscribe {
+	background: #ff0000;
+	color: #ffffff;
+}
+
+.note-header-pill.is-subscribe.is-on {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.note-header-youtube {
+	display: inline-flex;
+	vertical-align: middle;
+	margin-left: 6px;
+	color: var(--text-muted);
+}
+
+.note-header-youtube:hover {
+	color: #ff0000;
+}
+
+.note-header-youtube svg {
+	width: 16px;
+	height: 16px;
+}
+
 .library-card .card-image img {
 	width: 100%;
 	height: 100%;
@@ -561,42 +670,6 @@ sort trigger, the chosen one in the accent colour. */
 	width: auto;
 }
 
-.library-view .library-page-header {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	margin-bottom: 24px;
-	flex-wrap: wrap;
-}
-
-.library-actions {
-	display: flex;
-	gap: 6px;
-	margin-left: auto;
-}
-
-.library-icon-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 38px;
-	height: 38px;
-	border-radius: 6px;
-	cursor: pointer;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-}
-
-.library-icon-btn:hover {
-	background: var(--background-modifier-hover);
-}
-
-.library-icon-btn .svg-icon {
-	width: 22px;
-	height: 22px;
-}
-
 .library-view .library-section {
 	margin-bottom: 36px;
 }
@@ -673,12 +746,6 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-view .library-toolbar {
 	margin-bottom: 14px;
-}
-
-.library-page-header {
-	display: flex;
-	gap: 8px;
-	margin-bottom: 16px;
 }
 
 .library-prompt-input {
@@ -1333,32 +1400,6 @@ sort trigger, the chosen one in the accent colour. */
 	height: 12px;
 }
 
-/* + and search in the statistics header: compact, the accent colour. */
-.library-stats-header .library-actions {
-	margin-left: 4px;
-	gap: 4px;
-}
-
-.library-stats-header .library-icon-btn {
-	width: 28px;
-	height: 28px;
-	padding: 0;
-}
-
-.library-stats-header .library-icon-btn .svg-icon {
-	width: 16px;
-	height: 16px;
-}
-
-.library-view .library-icon-btn {
-	color: var(--text-accent);
-}
-
-.library-view .library-icon-btn:hover {
-	color: var(--text-accent-hover, var(--text-accent));
-	background-color: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-secondary));
-}
-
 /* A sign-in page inside Obsidian. */
 .library-psn-modal, .library-auth-modal {
 	width: min(560px, 92vw);
@@ -1513,6 +1554,10 @@ sort trigger, the chosen one in the accent colour. */
 	background-color: #e60012;
 }
 
+.library-platform-label.is-youtube {
+	background-color: #ff0000;
+}
+
 .library-platform-label.is-netflix {
 	background-color: #000000;
 	color: #e50914;
@@ -1572,6 +1617,11 @@ sort trigger, the chosen one in the accent colour. */
 .library-platform-row-icon.is-netflix {
 	background-color: #000000;
 	color: #e50914;
+}
+
+.library-platform-row-icon.is-youtube {
+	background-color: #ff0000;
+	color: #ffffff;
 }
 
 .library-platform-row-icon svg {
@@ -1931,4 +1981,34 @@ sort trigger, the chosen one in the accent colour. */
 .library-name-link:focus-visible {
 	color: var(--text-accent);
 	text-decoration: underline;
+}
+
+/* Settings: the pages as a tab strip, the open one's settings under it */
+.library-settings-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	margin-bottom: 16px;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.library-settings-tabs button {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	border-radius: var(--radius-s) var(--radius-s) 0 0;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-normal);
+}
+
+.library-settings-tabs button svg {
+	width: 14px;
+	height: 14px;
+}
+
+.library-settings-tabs button.is-active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
 }

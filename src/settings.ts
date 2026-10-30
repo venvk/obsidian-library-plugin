@@ -15,7 +15,7 @@ import type { ICategory, IStatsTop, TitleLanguage } from "./constants";
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
 import type { WatchSite } from "./watchSites";
-import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory } from "./categories";
+import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory, ownCreators } from "./categories";
 import { tr } from "./i18n";
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, tokenFromInput } from "./anilistSync";
 import { codeFromInput, exchangeCode, makeVerifier, malAuthUrl, malClientPair } from "./malSync";
@@ -50,8 +50,14 @@ interface Row {
 	searchable?: boolean;
 }
 
+// The tabs of the settings, each with its sections under the strip.
+type Page = "general" | "categories" | "connectors" | "keys" | "stats";
+const PAGES: Page[] = ["general", "categories", "connectors", "keys", "stats"];
+const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", keys: "key-round", stats: "bar-chart-3" };
+
 // A group of rows; a group scopes row names — each category is its own (each has "Type value").
 interface Section {
+	page: Page;
 	heading?: string;
 	group?: boolean;
 	rows: Row[];
@@ -72,6 +78,8 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private plugin: LibraryPlugin;
 	private expanded = new Set<ICategory>();
 	private dragging: ICategory | null = null;
+	// the tab open
+	private page: Page = "general";
 	// Edits in progress, by starting value: notes move on blur/tab close, not per keystroke.
 	private libraryFrom: string | null = null;
 	private folderFrom = new Map<ICategory, string>();
@@ -81,15 +89,37 @@ export class LibrarySettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// 1.13+: renders these and indexes them for the settings search; no vault scans (called per refresh).
+	// 1.13+: a tab strip, then every section, shown while its tab is open; all of them indexed for the settings search.
 	getSettingDefinitions(): SettingDefinitionItem[] {
-		const items: SettingDefinitionItem[] = [];
+		const items: SettingDefinitionItem[] = [{ name: "", searchable: false, render: (row) => this.tabStrip(row.settingEl, () => this.refreshVisibility()) }];
 		for (const section of this.sections()) {
-			const definitions = section.rows.map((row) => this.definition(row));
-			if (section.heading || section.group) items.push({ type: "group", heading: section.heading, items: definitions });
-			else items.push(...definitions);
+			const page = section.page;
+			items.push({ type: "group", heading: section.heading, visible: () => this.page === page, items: section.rows.map((row) => this.definition(row)) });
 		}
 		return items;
+	}
+
+	// The strip replaces the row it is drawn in.
+	private tabStrip(el: HTMLElement, open: () => void): void {
+		el.empty();
+		el.className = "library-settings-tabs";
+		for (const page of PAGES) {
+			const tab = el.createEl("button", { cls: page === this.page ? "is-active" : "" });
+			setIcon(tab.createSpan(), PAGE_ICONS[page]);
+			tab.createSpan({ text: this.pageName(page) });
+			tab.addEventListener("click", () => {
+				this.page = page;
+				for (const other of Array.from(el.children)) other.toggleClass("is-active", other === tab);
+				open();
+			});
+		}
+	}
+
+	private pageName(page: Page): string {
+		if (page === "categories") return tr("settings.section.categories");
+		if (page === "keys") return tr("settings.section.keys");
+		if (page === "stats") return tr("stats.title");
+		return tr(`settings.page.${page}`);
 	}
 
 	// Before 1.13: the same rows, drawn by hand.
@@ -125,7 +155,9 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private draw(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		this.tabStrip(containerEl.createDiv(), () => this.draw());
 		for (const section of this.sections()) {
+			if (section.page !== this.page) continue;
 			if (section.heading) new Setting(containerEl).setName(section.heading).setHeading();
 			for (const row of section.rows) {
 				if (row.visible && !row.visible()) continue;
@@ -151,14 +183,26 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private sections(): Section[] {
 		const settings = this.plugin.settings;
 		const categories: Section[] = [
-			{ heading: tr("settings.section.categories"), rows: [note(tr("settings.categories.desc")), this.libraryFolderRow()] },
+			{ page: "categories", heading: tr("settings.section.categories"), rows: [note(tr("settings.categories.desc")), this.libraryFolderRow()] },
 		];
 		settings.categories.forEach((cat, index) => {
-			categories.push({ group: true, rows: this.categoryRows(cat, index) });
+			categories.push({ page: "categories", group: true, rows: this.categoryRows(cat, index) });
 		});
-		categories.push({ group: true, rows: [{ name: tr("settings.addCategory"), render: (row) => this.addCategory(row) }] });
+		categories.push({ page: "categories", group: true, rows: [{ name: tr("settings.addCategory"), render: (row) => this.addCategory(row) }] });
 
 		const statsRows: Row[] = [
+			{
+				name: tr("settings.showStats.name"),
+				desc: tr("settings.showStats.desc"),
+				render: (row) => {
+					row.addToggle((toggle) =>
+						toggle.setValue(settings.showStats).onChange(async (value) => {
+							settings.showStats = value;
+							await this.plugin.saveSettings();
+						}),
+					);
+				},
+			},
 			note(tr("settings.stats.desc")),
 			{
 				name: tr("stats.watchTime"),
@@ -219,6 +263,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 
 		return [
 			{
+				page: "general",
 				rows: [
 					note(tr("settings.intro")),
 					this.textRow("settings.coverProperty", "coverProperty", "Cover"),
@@ -299,6 +344,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "keys",
 				heading: tr("settings.section.keys"),
 				rows: [
 					this.textRow("settings.omdb", "omdbApiKey", tr("settings.omdb.placeholder")),
@@ -311,6 +357,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "connectors",
 				heading: `${tr("settings.default.movie")} · ${tr("settings.default.series")}`,
 				rows: [
 					{ name: "IMDb", desc: tr("settings.imdb.desc"), render: (row) => this.siteAccount(row, "imdb") },
@@ -319,6 +366,12 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "connectors",
+				heading: "YouTube",
+				rows: [{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") }],
+			},
+			{
+				page: "connectors",
 				heading: tr("settings.section.anime"),
 				rows: [
 					{ name: tr("anilist.name"), desc: tr("settings.anilist.desc"), render: (row) => this.anilistAccount(row) },
@@ -352,6 +405,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "connectors",
 				heading: tr("settings.section.games"),
 				rows: [
 					{ name: "PlayStation", desc: tr("settings.psn.desc"), render: (row) => this.psnAccount(row) },
@@ -360,8 +414,9 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			...categories,
-			{ heading: tr("stats.title"), rows: statsRows },
+			{ page: "stats", heading: tr("stats.title"), rows: statsRows },
 			{
+				page: "general",
 				heading: tr("settings.section.example"),
 				rows: [
 					{
@@ -817,7 +872,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					this.folderFrom.delete(cat);
 					if (!settings.categories.some((c) => c.typeValue === cat.typeValue)) {
 						settings.stats.tops = settings.stats.tops.filter(
-							(top) => !(top.kind === "category" && top.key === cat.typeValue),
+							(top) => !(top.kind === "category" && top.key === cat.typeValue) && top.scope !== cat.typeValue,
 						);
 					}
 					await this.plugin.saveSettings();
@@ -934,16 +989,18 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private retypeCategory(cat: ICategory, typeValue: string): void {
 		for (const top of this.plugin.settings.stats.tops) {
 			if (top.kind === "category" && top.key === cat.typeValue) top.key = typeValue;
+			if (top.scope === cat.typeValue) top.scope = typeValue;
 		}
 		cat.typeValue = typeValue;
 	}
 
 	private topCandidates(): Array<{ group: string; label: string; top: IStatsTop }> {
 		const listed = new Set<string>();
-		for (const top of this.plugin.settings.stats.tops) listed.add(`${top.kind}:${top.key.toLowerCase()}`);
+		const idOf = (top: IStatsTop): string => `${top.kind}:${top.key.toLowerCase()}:${top.scope ?? ""}`;
+		for (const top of this.plugin.settings.stats.tops) listed.add(idOf(top));
 		const list: Array<{ group: string; label: string; top: IStatsTop }> = [];
 		const offer = (group: string, label: string, top: IStatsTop): void => {
-			const id = `${top.kind}:${top.key.toLowerCase()}`;
+			const id = idOf(top);
 			if (!top.key || listed.has(id)) return;
 			listed.add(id);
 			list.push({ group, label, top });
@@ -957,6 +1014,11 @@ export class LibrarySettingTab extends PluginSettingTab {
 		if (this.plugin.settings.nintendoStats) offer(tr("settings.stats.groupPlatforms"), tr("stats.nintendo"), { kind: "platform", key: "nintendo" });
 		for (const property of rankableProperties(this.libraryFrontmatter(), this.plugin.settings.coverProperty)) {
 			offer(tr("settings.stats.groupProperties"), property, { kind: "property", key: property });
+		}
+		for (const cat of this.plugin.settings.categories) {
+			if (!ownCreators(cat)) continue;
+			const top: IStatsTop = { kind: "property", key: "Creator", scope: cat.typeValue };
+			offer(tr("settings.stats.groupProperties"), topLabel(top, this.plugin.settings.categories), top);
 		}
 		return list;
 	}

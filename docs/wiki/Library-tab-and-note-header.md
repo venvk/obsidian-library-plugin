@@ -2,14 +2,14 @@
 
 Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, Soon, one section per category in the order you set in Settings → Library → Categories, and Up next.
 
-The buttons at the top add a title (+) and search your whole library.
+The buttons in the tab's header add a title (+), search your whole library, run every import now (Update), build the [[library map|Library-blocks-and-map]], and open the plugin's settings.
 
 ### A section
 
 The title row of a section holds:
 
 - the fold arrow. A folded section shows one row of cards that scrolls sideways. The fold is remembered.
-- the number of titles, and, for movies, series, anime, music, and games, the time you spent on them. Hover over the time to see the exact hours.
+- the number of titles, and, for movies, series, anime, music, games, and videos, the time you spent on them. Hover over the time to see the exact hours.
 - Filter, when at least two titles differ in it: year, genre, the artist for music, country, or platform. Each list shows how many titles have that value, and the button shows how many filters are on. Clear filters turns them all off.
 - the sort menu on the right.
 
@@ -30,9 +30,9 @@ Pick the same sort again to reverse it. Sort and filters are remembered per sect
 
 ### A card
 
-A card shows the cover (square for music, as album covers are), title, creator, year, and ratings (IMDb, Rotten Tomatoes 🍅, RAWG, Metacritic, and your score). Depending on the note it also has:
+A card shows the cover (square for music, as album covers are, wide for videos), title, creator, year, and ratings (IMDb, Rotten Tomatoes 🍅, RAWG, Metacritic, and your score). A [[YouTube]] video shows the day it came out instead of the year, and its likes and dislikes, then its views, instead of ratings; your own like or dislike is filled in green or red. Depending on the note it also has:
 
-- platform marks on the cover for games and for titles from Netflix;
+- platform marks on the cover for games and for titles from Netflix and YouTube;
 - trophy counts for PlayStation games;
 - a progress bar while the title is unfinished;
 - an eye on the cover for a title you haven't started; see [[Up next|Progress-and-statistics#up-next]].
@@ -41,7 +41,7 @@ Click a card, or focus it with Tab and press Enter or Space, to open the note.
 
 ### Soon and Up next
 
-Soon lists the next episodes of the series and anime you are watching, with their air dates. Up next gathers the titles you haven't started from every category. Both are explained in [[Progress and statistics|Progress-and-statistics]], and both can be turned off in Settings → Library.
+Soon lists the next episodes of the series and anime you are watching, with their air dates. Up next gathers the titles you haven't started from every category. Both are explained in [[Progress and statistics|Progress-and-statistics]], and both can be turned off in Settings → Library → General.
 
 ## The note header
 
@@ -52,17 +52,18 @@ Depending on the note it also has:
 - a trailer: Watch trailer plays it inside Obsidian;
 - a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close;
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
-- for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected.
+- for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected;
+- for a YouTube video, the video itself, the like and dislike buttons, the channel's link and Subscribe button, the publish date, the views, and the rewatches; see [[YouTube]].
 
 ## Recommendations
 
 Movie, series, anime, game, book, and music notes show a row of similar titles you don't have yet: from AniList for anime, from TMDB or Cinemeta for movies and series, from RAWG or Wikidata for games, from Open Library for books, and from Deezer for music, an album by each related artist. They load when you open the note. Click a cover, or press Enter on it, to add the title.
 
-Settings → Library → Show recommendations hides the row and stops those requests.
+Settings → Library → General → Show recommendations hides the row and stops those requests.
 
 ## Share
 
-The share button in the header, or the `Share current note` command, draws a card image with the cover, title, year, genres, cast, ratings, and your score.
+The share button in the header, or the `Share current note` command, draws a card image with the cover (wide for a video), title, year, genres, cast, ratings, and your score.
 
 - Pick a network: the image goes to the clipboard and the network opens with a caption, ready for you to paste the image. X, Telegram, WhatsApp, Reddit, Facebook, LinkedIn, VK, Bluesky, and Pinterest are offered.
 - Where the system has a share sheet, as on mobile, Share… opens it with the image.

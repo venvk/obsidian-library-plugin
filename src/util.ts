@@ -1,6 +1,7 @@
 import { App, normalizePath } from 'obsidian'
 import { progressPattern, dmyDatePattern, type ICategory, type IStatsTop, type TitleLanguage } from './constants'
 import { formatNumber, tr } from './i18n'
+import { categoryLabel } from './categories'
 import { normalizeSeasons } from './trailer'
 import type { ContentType } from './providers/types'
 
@@ -171,10 +172,16 @@ const MEDIUM_TOPS: Partial<Record<ContentType, string>> = {
 // Medium word only when unambiguous; else "Top: <name>".
 export function topLabel(top: IStatsTop, categories: ICategory[]): string {
 	if (top.kind === 'platform') return tr('stats.psn')
+	if (top.kind === 'property' && top.scope) {
+		const scope = categories.find(c => c.typeValue === top.scope)
+		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'game') return tr('stats.topDevelopers')
+		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'manual') return tr('stats.topChannels')
+		return tr('stats.topNamed', { name: `${top.key} · ${scope ? categoryLabel(scope) : top.scope}` })
+	}
 	if (top.kind === 'property') {
 		switch (top.key.toLowerCase()) {
 			case 'genre': return tr('stats.topGenres')
-			case 'creator': return tr('stats.topCreators')
+			case 'creator': return tr('stats.topDirectors')
 			case 'cast': return tr('stats.topCast')
 			default: return tr('stats.topNamed', { name: top.key })
 		}
@@ -259,7 +266,12 @@ export function notStarted(fm: Record<string, unknown>, kind?: ContentType): boo
 export function totalRuntimeMinutes(fm: Record<string, unknown>, perEpisode: number, kind?: ContentType): number {
 	if (perEpisode <= 0) return 0
 	const { total } = progressEpisodes(fm)
-	return total > 1 && kind !== 'music' ? perEpisode * total : perEpisode
+	return total > 1 && kind !== 'music' && !isVideo(fm) ? perEpisode * total : perEpisode
+}
+
+// A YouTube note: Runtime is the whole video and Progress the watched share, as for an album.
+function isVideo(fm: Record<string, unknown>): boolean {
+	return fm.Source === 'youtube'
 }
 
 export function watchedRuntimeMinutes(fm: Record<string, unknown>, kind?: ContentType): number {
@@ -267,9 +279,11 @@ export function watchedRuntimeMinutes(fm: Record<string, unknown>, kind?: Conten
 	if (perEpisode === null) return 0
 	const { watched, total } = progressEpisodes(fm)
 	// Album Runtime is the whole album: the played track share counts.
-	if (kind === 'music') {
-		if (isFinished(fm, kind)) return perEpisode
-		return total > 0 ? Math.round(perEpisode * Math.min(1, watched / total)) : 0
+	if (kind === 'music' || isVideo(fm)) {
+		// a rewatched video counts once more for each rewatch
+		const times = isVideo(fm) ? 1 + Math.max(0, Number(fm.Rewatched) || 0) : 1
+		if (isFinished(fm, kind)) return perEpisode * times
+		return total > 0 ? Math.round(perEpisode * Math.min(1, watched / total) * times) : 0
 	}
 	if (isFinished(fm, kind)) return perEpisode * (total > 0 ? total : 1)
 	return perEpisode * watched

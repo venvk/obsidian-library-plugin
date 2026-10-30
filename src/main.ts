@@ -12,7 +12,7 @@ import {
 	type CachedMetadata,
 } from 'obsidian'
 import { progressPattern, RATING_RT_ICON, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
-import { formatNumber, tr, trCount } from './i18n'
+import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
 import { OmdbProvider } from './providers/omdb'
@@ -40,7 +40,8 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
 import { PromptModal } from './ui/promptModal'
@@ -48,7 +49,7 @@ import { DuplicateRemovalModal, type DuplicateGroup } from './ui/duplicateModal'
 import { ShareModal, shareTargetFromFile } from './ui/shareModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
-import { SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
+import { SITE_NAME, SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
 import { earnedAchievements, gameAchievements, ownedGames, playtimeHours, steamAuthUrl, steamIdFromRedirect, steamLanguage, steamSession, type SteamSession } from './steamLibrary'
 import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRedirect, deleteMalEntry, exchangeCode, fetchMalList, isExpired, makeVerifier, mangaIds, malAuthUrl, malClientPair, malIdsFor, malMangaIdsFor, malStatus, pushMalEntry, refreshTokens, type MalEntry } from './malSync'
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
@@ -190,10 +191,14 @@ export default class LibraryPlugin extends Plugin {
 	private lookingUp = false
 	private psnImporting = false
 	private watchImporting = false
+	// YouTube's older months and missing counts, running apart from the imports
+	private youtubeBackfilling = false
 	// Notes an import just found or made, before the metadata cache knows the new ones
 	private watchNotes = new Map<string, TFile>()
 	// shows whose note got its Netflix ID in this import: their viewings tick, nothing to undo yet
 	private netflixFresh = new Set<number>()
+	// video notes already read afresh this session
+	private youtubeFresh = new Set<string>()
 	// per show, in this import: a first pass over a note that had the ID before (unticked = unticked by hand)
 	private netflixSeeding = new Map<number, boolean>()
 	private malImporting = false
@@ -286,6 +291,7 @@ export default class LibraryPlugin extends Plugin {
 			banner()
 			if (file instanceof TFile && file.extension === 'canvas') void this.fillLinkCanvas(file)
 			else if (file instanceof TFile) {
+				void this.youtubeRefresh(file)
 				const existing = this.linkTimers.get(file.path)
 				if (existing) window.clearTimeout(existing)
 				this.linkTimers.set(file.path, window.setTimeout(() => {
@@ -1321,10 +1327,10 @@ export default class LibraryPlugin extends Plugin {
 		})
 	}
 
-	// IMDb, Netflix: the window keeps the session the import later reads the site with
+	// IMDb, Netflix, YouTube: the window keeps the session the import later reads the site with
 	connectSite(site: WatchSite): Promise<boolean> {
 		if (!Platform.isDesktopApp) {
-			new Notice(tr('notice.site.desktopOnly', { site: site === 'imdb' ? 'IMDb' : 'Netflix' }))
+			new Notice(tr('notice.site.desktopOnly', { site: SITE_NAME[site] }))
 			return Promise.resolve(false)
 		}
 		return new Promise<boolean>((resolve) => {
@@ -1344,9 +1350,15 @@ export default class LibraryPlugin extends Plugin {
 	// IMDb ratings, watchlist and episode scores; Netflix viewing history and thumbs into Movies and Series.
 	// A note found by its IMDb id, Netflix id or name only gains what it lacks; a wrong Netflix id is replaced, your edits win.
 	async watchImport(site: WatchSite, loud: boolean): Promise<void> {
-		if (this.watchImporting || !Platform.isDesktopApp || !this.settings.watchSites[site].connected) return
+		if (!Platform.isDesktopApp || !this.settings.watchSites[site].connected) return
+		// one import at a time; a press while one runs says so instead of doing nothing
+		if (this.watchImporting) {
+			if (loud) new Notice(tr('notice.site.importing', { site: SITE_NAME[site] }))
+			return
+		}
+		if (site === 'youtube') return this.youtubeImport(loud)
 		this.watchImporting = true
-		const name = site === 'imdb' ? 'IMDb' : 'Netflix'
+		const name = SITE_NAME[site]
 		try {
 			if (loud) new Notice(tr('notice.site.importing', { site: name }))
 			const titles = site === 'imdb' ? await imdbHistory() : await netflixHistory()
@@ -1412,6 +1424,269 @@ export default class LibraryPlugin extends Plugin {
 			this.netflixSeeding.clear()
 		}
 		void (site === 'imdb' ? this.imdbBackfill() : this.netflixBackfill().then(() => this.netflixUnwatchAll()))
+	}
+
+	// YouTube: a note per video, Shorts left out, in the Video category made on first use. The first import brings
+	// the last 7 days, later ones every day since the last; a video seen again on a later day counts a rewatch.
+	// Then one older month a day, back to the start of the history, so years of it never land at once.
+	private async youtubeImport(loud: boolean): Promise<void> {
+		this.watchImporting = true
+		try {
+			if (loud) new Notice(tr('notice.site.importing', { site: 'YouTube' }))
+			const notes = this.youtubeNotes()
+			const last = this.settings.watchSites.youtube.lastImport
+			const days = last > 0 ? Math.max(7, daysSince(last) + 1) : 7
+			const fresh: WatchedVideo[] = []
+			const seen = new Set<string>()
+			let token = ''
+			for (let batch = 0; batch < 20; batch++) {
+				const page = await youtubePage(token)
+				if (page === 'signed-out') {
+					this.settings.watchSites.youtube.connected = false
+					await this.saveSettings()
+					new Notice(tr('notice.site.signedOut', { site: 'YouTube' }))
+					return
+				}
+				if (!page) { if (loud) new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+				const { videos, lastDay } = pageVideos(page, new Date(), days)
+				for (const video of videos) if (!seen.has(video.id)) { seen.add(video.id); fresh.push(video) }
+				const windowStart = isoDay(new Date(Date.now() - (days - 1) * 86400000))
+				if (!page.next || !lastDay || lastDay <= windowStart || videos.length === 0) break
+				token = page.next
+			}
+			const { created, updated } = await this.youtubeSave(fresh, notes, true)
+			// older months start below the first import's week
+			if (!this.settings.youtubeBackfill.before) this.settings.youtubeBackfill = { token: '', before: isoDay(new Date(Date.now() - 6 * 86400000)), done: false }
+			this.settings.watchSites.youtube.lastImport = Date.now()
+			await this.saveSettings()
+			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated }))
+		} finally {
+			this.watchImporting = false
+		}
+		void this.youtubeBackground()
+	}
+
+	// Older months and missing counts take long: they run apart, so a press of Update is never held up by them.
+	// Their days are older than any import's, so the two never make the same note.
+	private async youtubeBackground(): Promise<void> {
+		if (this.youtubeBackfilling) return
+		this.youtubeBackfilling = true
+		try {
+			const notes = this.youtubeNotes()
+			await this.youtubeBackfill(notes)
+			await this.youtubeFill(notes)
+		} finally {
+			this.youtubeBackfilling = false
+		}
+	}
+
+	// Notes without counts yet (made before they were read, or while signed out) get them, a few hundred a run.
+	async youtubeFill(notes = this.youtubeNotes(), limit = 300): Promise<number> {
+		const bare = [...notes.values()].filter(file => !('Views' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))).slice(0, limit)
+		let filled = 0
+		for (let i = 0; i < bare.length && !this.unloaded; i += 40) {
+			const batch = bare.slice(i, i + 40)
+			const ids = batch.map(file => toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.['Source ID']))
+			const details = await videoDetails(ids)
+			if (details === 'signed-out') break
+			for (const file of batch) {
+				const found = details.get(toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.['Source ID']))
+				if (!found) continue
+				await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => this.youtubeDetails(current, found))
+				if (found.description) await this.addDescription(file, found.description)
+				filled++
+			}
+		}
+		return filled
+	}
+
+	private youtubeNotes(): Map<string, TFile> {
+		const byId = new Map<string, TFile>()
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (fm && toStr(fm.Source) === YOUTUBE_SOURCE && !isTemplateFile(file.path)) byId.set(toStr(fm['Source ID']), file)
+		}
+		return byId
+	}
+
+	// One older month of the history: from where the last run stopped back to that month's first day.
+	private async youtubeBackfill(notes: Map<string, TFile>): Promise<void> {
+		const state = this.settings.youtubeBackfill
+		if (state.done || !state.before) return
+		const before = new Date(`${state.before}T12:00:00`)
+		const monthStart = isoDay(new Date(before.getFullYear(), before.getMonth() - (before.getDate() === 1 ? 1 : 0), 1))
+		const found: WatchedVideo[] = []
+		let token = state.token
+		let reached = false
+		for (let batch = 0; batch < 40 && !reached; batch++) {
+			const page = await youtubePage(token)
+			// a stale continuation: the next run walks from the top again
+			if (!page || page === 'signed-out') { state.token = ''; await this.saveSettings(); return }
+			const { videos, lastDay } = pageVideos(page)
+			for (const video of videos) if (video.day < state.before && video.day >= monthStart && !notes.has(video.id)) found.push(video)
+			if (lastDay && lastDay < monthStart) {
+				// the page holds the month's end: read again next time
+				reached = true
+			} else if (!page.next) {
+				state.done = true
+				reached = true
+			} else {
+				token = page.next
+			}
+		}
+		const { created } = await this.youtubeSave(found, notes, false)
+		// a month longer than the run's batches goes on from where it stopped
+		state.token = token
+		if (reached && !state.done) state.before = monthStart
+		await this.saveSettings()
+		if (created > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated: 0 }))
+	}
+
+	// New videos become notes; on `rewatch`, a known one seen on a later day counts a rewatch, and its progress only grows.
+	private async youtubeSave(videos: WatchedVideo[], notes: Map<string, TFile>, rewatch: boolean): Promise<{ created: number; updated: number }> {
+		let created = 0
+		let updated = 0
+		const lastSeen = (file: TFile): string => {
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			const dmy = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(toStr(fm?.['Last Watched']) || toStr(fm?.Date))
+			return dmy ? `${dmy[3] ?? ''}-${dmy[2] ?? ''}-${dmy[1] ?? ''}` : ''
+		}
+		// notes of the first builds have no details yet
+		const bare = (file: TFile): boolean => !('Views' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))
+		const wanted = videos.filter(video => {
+			const file = notes.get(video.id)
+			return !file || (rewatch && (video.day > lastSeen(file) || bare(file)))
+		})
+		const details = new Map<string, VideoDetails>()
+		for (let i = 0; i < wanted.length && !this.unloaded; i += 40) {
+			const batch = await videoDetails(wanted.slice(i, i + 40).map(video => video.id))
+			if (batch === 'signed-out') break
+			for (const [id, found] of batch) details.set(id, found)
+		}
+		let category = this.settings.categories.find(c => c.typeValue === YOUTUBE_TYPE)
+		for (const video of videos) {
+			if (this.unloaded) break
+			try {
+				// Runtime is the whole video, Progress the watched share in percent
+				const length = video.seconds > 0 ? Math.max(1, Math.round(video.seconds / 60)) : 0
+				const done = video.percent >= 95
+				const found = details.get(video.id)
+				const existing = notes.get(video.id)
+				if (existing) {
+					if (!rewatch) continue
+					const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+					const had = /^(\d+)\/100$/.exec(toStr(fm?.Progress))
+					const again = video.day > lastSeen(existing)
+					const fill = !!found && bare(existing)
+					// progress never moves backwards
+					if (!again && !fill && had && video.percent <= Number(had[1])) continue
+					await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+						if (length > 0) current.Runtime = length
+						if (!had || video.percent > Number(had[1])) current.Progress = `${String(video.percent)}/100`
+						// notes of the first build held minutes watched and always Complete
+						if (!had) current.Complete = done
+						else if (done) current.Complete = true
+						if (again) {
+							current.Rewatched = (Number(current.Rewatched) || 0) + 1
+							current['Last Watched'] = dmyOf(`${video.day}T12:00:00`)
+						}
+						if (found) this.youtubeDetails(current, found)
+					})
+					if (fill && found?.description) await this.addDescription(existing, found.description)
+					updated++
+					continue
+				}
+				if (!category) category = await this.youtubeCategory()
+				const url = videoUrl(video.id)
+				const meta: NormalizedMetadata = {
+					fields: { Name: video.title, Creator: [video.channel], Cover: videoCover(video.id), URL: url, ...(length > 0 ? { Runtime: length } : {}) },
+					progressTotal: null,
+					imdbId: null,
+				}
+				const extra: Record<string, unknown> = { Platforms: ['YouTube'], Progress: `${String(video.percent)}/100`, Complete: done, Date: dmyOf(`${video.day}T12:00:00`) }
+				const channel = found?.channelUrl || video.channelUrl
+				if (channel) extra['Channel URL'] = channel
+				if (found) this.youtubeDetails(extra, found)
+				const file = await this.newNote(category, YOUTUBE_SOURCE, video.id, video.title, meta, extra)
+				if (found?.description) await this.addDescription(file, found.description)
+				notes.set(video.id, file)
+				created++
+			} catch (e) {
+				console.error('Library: YouTube import error', video.id, e)
+			}
+		}
+		return { created, updated }
+	}
+
+	private async addDescription(file: TFile, description: string): Promise<void> {
+		const callout = descriptionCallout(description)
+		await this.app.vault.process(file, text => text.indexOf(callout) >= 0 ? text : `${text.replace(/\s*$/, '')}\n\n${callout}\n`)
+	}
+
+	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
+		if (found.reaction) fm.Reaction = found.reaction
+		else delete fm.Reaction
+		if (found.subscribed !== null) fm.Subscribed = found.subscribed
+		if (found.channelUrl) fm['Channel URL'] = found.channelUrl
+		if (found.channelId) fm['Channel ID'] = found.channelId
+		if (found.views !== null) fm.Views = found.views
+		if (found.likes !== null) fm.Likes = found.likes
+		if (found.dislikes !== null) fm.Dislikes = found.dislikes
+		if (found.published) {
+			fm.Published = dmyOf(`${found.published}T12:00:00`)
+			fm.Year = Number(found.published.slice(0, 4))
+		}
+	}
+
+	// An opened video note reads its like, subscription and date afresh, once a session.
+	private async youtubeRefresh(file: TFile): Promise<void> {
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const id = toStr(fm?.['Source ID'])
+		if (!fm || toStr(fm.Source) !== YOUTUBE_SOURCE || this.youtubeFresh.has(id) || !this.settings.watchSites.youtube.connected || !Platform.isDesktopApp) return
+		this.youtubeFresh.add(id)
+		const details = await videoDetails([id])
+		// the session is gone: say so once, as the import would
+		if (details === 'signed-out') {
+			this.settings.watchSites.youtube.connected = false
+			await this.saveSettings()
+			new Notice(tr('notice.site.signedOut', { site: 'YouTube' }))
+			return
+		}
+		const found = details.get(id)
+		if (!found || this.unloaded) return
+		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => this.youtubeDetails(current, found))
+		if (found.description) await this.addDescription(file, found.description)
+	}
+
+	// The note's like or channel subscription, sent to YouTube; the notes follow once it took.
+	private async youtubeToggle(file: TFile, action: YoutubeAction): Promise<void> {
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const id = toStr(fm?.['Source ID'])
+		if (!fm || !this.settings.watchSites.youtube.connected) { new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+		if (!await youtubeAct(id, action)) { new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+		if (action === 'like' || action === 'dislike' || action === 'removelike') {
+			await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+				if (action === 'removelike') delete current.Reaction
+				else current.Reaction = action
+			})
+			return
+		}
+		// every note of the channel
+		const channel = toStr(fm['Channel ID']) || toStr(fm['Channel URL'])
+		for (const other of this.youtubeNotes().values()) {
+			const theirs = this.app.metadataCache.getFileCache(other)?.frontmatter
+			if (other !== file && (!channel || (toStr(theirs?.['Channel ID']) || toStr(theirs?.['Channel URL'])) !== channel)) continue
+			await this.app.fileManager.processFrontMatter(other, (current: Record<string, unknown>) => { current.Subscribed = action === 'subscribe' })
+		}
+	}
+
+	private async youtubeCategory(): Promise<ICategory> {
+		const category: ICategory = { name: tr('settings.default.video'), typeValue: YOUTUBE_TYPE, contentType: 'manual', folder: joinFolder(this.settings.libraryFolder, 'Video') }
+		this.settings.categories.push(category)
+		addCategoryTop(this.settings, category.typeValue)
+		await this.saveSettings()
+		new Notice(tr('notice.categoryCreated', { name: category.name }))
+		return category
 	}
 
 	// A rated episode ticks and scores the matching episode in its series note, made if missing.
@@ -2268,7 +2543,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first — a third-party signing service carries the requests
@@ -3096,7 +3371,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.psnTokens) await this.psnImport(true)
 		if (this.settings.steamId.trim()) await this.steamImport(true)
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
-		for (const site of ['imdb', 'netflix'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
+		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
 	}
 
 	private pruneEcho(): void {
@@ -3861,11 +4136,28 @@ export default class LibraryPlugin extends Plugin {
 			e.preventDefault()
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
+		const video = toStr(fm.Source) === YOUTUBE_SOURCE
 		titleEl.appendChild(shareBtn)
 		infoSide.appendChild(titleEl)
 		const badges = createDiv({ cls: 'note-header-badges' })
 		renderPlatformLabels(badges, fm)
 		renderTrophies(badges, fm, 'note-header-trophies')
+		// your like and dislike sit by the YouTube plate
+		if (video) {
+			const reaction = toStr(fm.Reaction)
+			for (const kind of ['like', 'dislike'] as const) {
+				const on = reaction === kind
+				const button = badges.createEl('button', { cls: `note-header-reaction is-${kind}${on ? ' is-on' : ''}`, attr: { 'aria-label': tr(kind === 'like' ? 'header.liked' : 'header.disliked'), 'aria-pressed': on ? 'true' : 'false' } })
+				setIcon(button, kind === 'like' ? 'thumbs-up' : 'thumbs-down')
+				const total = Number(fm[kind === 'like' ? 'Likes' : 'Dislikes'])
+				if (fm[kind === 'like' ? 'Likes' : 'Dislikes'] !== undefined && Number.isFinite(total)) button.createSpan({ text: compactNumber(total) })
+				button.addEventListener('click', (e) => {
+					e.preventDefault()
+					button.disabled = true
+					void this.youtubeToggle(file, on ? 'removelike' : kind).then(() => { button.disabled = false })
+				})
+			}
+		}
 		if (badges.childElementCount > 0) infoSide.appendChild(badges)
 
 		const addRow = (label: string, value: string, separator = ': ', title = ''): void => {
@@ -3892,9 +4184,30 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		addNames(tr('header.creator'), creators)
+		// the channel: its canvas by name, the channel itself on YouTube, and the subscription
+		if (video && infoSide.lastElementChild && creators.length > 0) {
+			const row = infoSide.lastElementChild as HTMLElement
+			const channel = safeUrl(fm['Channel URL'])
+			if (channel) {
+				const go = row.createEl('a', { cls: 'note-header-youtube', href: channel, attr: { 'aria-label': tr('header.openYoutube'), target: '_blank', rel: 'noopener noreferrer' } })
+				setIcon(go, 'external-link')
+			}
+			const subscribed = fm.Subscribed === true
+			const sub = row.createEl('button', { cls: `note-header-pill is-subscribe${subscribed ? ' is-on' : ''}`, attr: { 'aria-pressed': subscribed ? 'true' : 'false' } })
+			setIcon(sub.createSpan(), subscribed ? 'bell-ring' : 'bell-plus')
+			sub.createSpan({ text: tr(subscribed ? 'header.subscribed' : 'header.subscribe') })
+			sub.addEventListener('click', (e) => {
+				e.preventDefault()
+				sub.disabled = true
+				void this.youtubeToggle(file, subscribed ? 'unsubscribe' : 'subscribe').then(() => { sub.disabled = false })
+			})
+		}
+		if (video && toStr(fm.Published)) addRow(tr('header.published'), toStr(fm.Published))
+		if (video && Number(fm.Views) > 0) addRow(tr('header.views'), formatNumber(Number(fm.Views)))
+		if (video && Number(fm.Rewatched) > 0) addRow(tr('header.rewatched'), String(Number(fm.Rewatched)))
 		addNames(tr('header.cast'), cast)
 		const yearsStr = year + (endYear ? '–' + endYear : '')
-		if (yearsStr) addRow(tr('header.years'), yearsStr)
+		if (yearsStr && !video) addRow(tr('header.years'), yearsStr)
 		if (season) addRow(tr('header.seasons'), season)
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
@@ -4021,7 +4334,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private buildMediaBlock(wrap: HTMLElement, fm: Record<string, unknown>, name: string): void {
-		const trailer = toStr(fm.Trailer).trim()
+		// a video note plays the video itself
+		const trailer = toStr(fm.Trailer).trim() || (toStr(fm.Source) === YOUTUBE_SOURCE ? toStr(fm.URL).trim() : '')
 		const gallery = toStrArray(fm.Gallery)
 			.map(value => safeUrl(value))
 			.filter((value): value is string => value !== null)
@@ -4403,6 +4717,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.traktLastImport !== 'number') this.settings.traktLastImport = 0
 		if (typeof this.settings.comingSoonCollapsed !== 'boolean') this.settings.comingSoonCollapsed = false
 		if (typeof this.settings.showDiary !== 'boolean') this.settings.showDiary = true
+		if (typeof this.settings.showStats !== 'boolean') this.settings.showStats = true
 		if (typeof this.settings.showProfile !== 'boolean') this.settings.showProfile = true
 		if (!this.settings.airing || typeof this.settings.airing !== 'object' || Object.values(this.settings.airing).some(value => !Array.isArray(value))) {
 			this.settings.airing = {}
@@ -4411,13 +4726,15 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
+		const backfill = (this.settings.youtubeBackfill && typeof this.settings.youtubeBackfill === 'object' ? this.settings.youtubeBackfill : {}) as Partial<ILibrarySettings['youtubeBackfill']>
+		this.settings.youtubeBackfill = { token: typeof backfill.token === 'string' ? backfill.token : '', before: typeof backfill.before === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(backfill.before) ? backfill.before : '', done: backfill.done === true }
 		if (!this.settings.nintendoTokens || typeof this.settings.nintendoTokens !== 'object') this.settings.nintendoTokens = null
 		if (typeof this.settings.nintendoLastImport !== 'number') this.settings.nintendoLastImport = 0
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
 		if (!this.settings.netflixEcho || typeof this.settings.netflixEcho !== 'object') this.settings.netflixEcho = {}
 		const sites = (this.settings.watchSites && typeof this.settings.watchSites === 'object' ? this.settings.watchSites : {}) as Partial<ILibrarySettings['watchSites']>
-		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 } }
-		for (const site of ['imdb', 'netflix'] as const) {
+		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 } }
+		for (const site of ['imdb', 'netflix', 'youtube'] as const) {
 			const saved = sites[site]
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}
@@ -4457,17 +4774,21 @@ export default class LibraryPlugin extends Plugin {
 			watchTime: typeof raw.watchTime === 'boolean' ? raw.watchTime : defaults.watchTime,
 			tops: []
 		}
-		const add = (kind: IStatsTop['kind'], key: unknown): void => {
+		const add = (kind: IStatsTop['kind'], key: unknown, scope?: unknown): void => {
 			if (typeof key !== 'string' || !key.trim()) return
 			const name = key.trim()
-			if (stats.tops.some(top => top.kind === kind && top.key.toLowerCase() === name.toLowerCase())) return
-			stats.tops.push({ kind, key: name })
+			const within = kind === 'property' && typeof scope === 'string' && scope ? scope : undefined
+			if (stats.tops.some(top => top.kind === kind && top.key.toLowerCase() === name.toLowerCase() && top.scope === within)) return
+			stats.tops.push(within ? { kind, key: name, scope: within } : { kind, key: name })
 		}
 		if (Array.isArray(raw.tops)) {
 			for (const top of raw.tops) {
 				const entry = (top && typeof top === 'object' ? top : {}) as Record<string, unknown>
-				if (entry.kind === 'category' || entry.kind === 'property' || entry.kind === 'platform') add(entry.kind, entry.key)
+				if (entry.kind === 'category' || entry.kind === 'property' || entry.kind === 'platform') add(entry.kind, entry.key, entry.scope)
 			}
+			// once: games and videos get the creator tops their creators left the shared one for
+			if (raw.creatorsSplit !== true) for (const cat of this.settings.categories) addCreatorTop(stats.tops, cat)
+			stats.creatorsSplit = true
 			return stats
 		}
 		// builds before the list: the chosen properties, then every category whose best-rated switch was on

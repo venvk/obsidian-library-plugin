@@ -41,7 +41,7 @@ These have nothing to tick. Edit `Progress` in the note's properties, or turn on
 
 An eye on a card marks a title you haven't started: not done, no progress yet (the first number of `Progress` is 0), no playtime, and no score of yours. Up next, at the end of the Library tab, gathers these titles from every category, newest first, and folds and sorts like a category. With titles from several categories, the chips above it show one category at a time.
 
-In Settings → Library, turn off Up next block to hide it. With Not started in categories turned off, these titles show only in Up next. A category can also put them first with the Not started sort.
+In Settings → Library → General, turn off Up next block to hide it. With Not started in categories turned off, these titles show only in Up next. A category can also put them first with the Not started sort.
 
 ## Soon
 
@@ -49,7 +49,7 @@ Soon, near the top of the Library tab, lists the next episodes of the series and
 
 A title counts as watching when you have ticked at least one episode, and, for a series, while it has no `End Year`. Air dates come from Cinemeta for series and from AniList or MyAnimeList for anime, and are checked twice a day.
 
-The arrow next to the title folds it into one row that scrolls sideways. Settings → Library → Soon hides it.
+The arrow next to the title folds it into one row that scrolls sideways. Settings → Library → General → Soon hides it.
 
 ## Diary
 
@@ -67,18 +67,19 @@ The statistics panel shows your three latest diary lines, newest first. Settings
 
 ## Statistics panel
 
-The panel at the top of the Library tab shows the columns you pick in Settings → Library → Statistics. Add top offers:
+The panel at the top of the Library tab shows the columns you pick in Settings → Library → Statistics. Show statistics, at the top of that tab, hides the whole panel. Add top offers:
 
 - a category: its three highest-rated titles, by your score, or by the IMDb rating while you haven't scored them;
-- a property: the three most common values of any property your notes use, such as genres, creators, actors, or a `Shelf` from your [[template|Templates-and-skipped-properties]];
+- a property: the three most common values of any property your notes use, such as genres, directors, actors, or a `Shelf` from your [[template|Templates-and-skipped-properties]];
+- Top developers and Top channels: the creators of your games and of your [[YouTube]] videos. They have their own columns, so Top directors counts only movies, series, anime, and the other kinds. Both are added for you while Top directors is listed;
 - a platform you connected: PlayStation (games, time played, trophy level, and trophies by grade), MyAnimeList (anime and manga on your lists), and Nintendo Switch (games and time played).
 
 Your taste shows your average score and how it compares with other viewers (IMDb, or RAWG and Metacritic for games), a chart of how often you gave each score, your favourite genres (the highest average over at least three titles), and the decade most of your titles come from. It appears once you have scored five titles. Settings → Library → Statistics → Your taste hides it.
 
 Each top, platform, and the diary take one cell of the panel, your taste takes three, and time spent sits on the right. A new column goes into an empty cell before it starts a new row.
 
-Time spent shows the hours you spent on movies, series, anime, and games, per category, and below it one comparison a day, such as how many times Apollo 11 could have flown to the Moon and back. Turn it off with the Time spent switch.
+Time spent shows the hours you spent on movies, series, anime, games, and videos, per category, and below it one comparison a day, such as how many times Apollo 11 could have flown to the Moon and back. Turn it off with the Time spent switch.
 
-Time for movies, series, and anime multiplies `Runtime` by the episodes you watched; a finished title counts in full. A note without `Runtime` isn't counted and shows up as "without runtime". Games count their `Playtime`.
+Time for movies, series, and anime multiplies `Runtime` by the episodes you watched; a finished title counts in full. A note without `Runtime` isn't counted and shows up as "without runtime". Games count their `Playtime`. A video counts its `Runtime` by the share you watched, once more for each rewatch.
 
 The title row of each section shows the same time for its own titles, music included: an album's `Runtime` counts by the share of tracks you played.

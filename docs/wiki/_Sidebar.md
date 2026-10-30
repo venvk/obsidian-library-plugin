@@ -4,6 +4,7 @@
 - [[Connected accounts|Connected-accounts]]
   - [[Anime and manga sync|Anime-sync]]
   - [[IMDb and Netflix|IMDb-and-Netflix]]
+  - [[YouTube]]
   - [[Trakt]]
   - [[Game libraries|Game-libraries]]
 - [[The Library tab and the note header|Library-tab-and-note-header]]

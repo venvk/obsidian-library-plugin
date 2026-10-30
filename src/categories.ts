@@ -1,4 +1,4 @@
-import { I18N, type ICategory, type ILibrarySettings } from './constants'
+import { I18N, type ICategory, type ILibrarySettings, type IStatsTop } from './constants'
 import { tr } from './i18n'
 import type { ContentType } from './providers/types'
 
@@ -15,11 +15,19 @@ export const TYPE_DEFAULTS: Record<string, string> = {
 
 export const MEDIA: ContentType[] = ['movie', 'series', 'book', 'comic', 'game', 'music', 'anime', 'manual']
 
+// the video connectors' category (YouTube): fixed like the built-in ones
+export const VIDEO_CATEGORY = 'Video'
+
+function isVideo(cat: ICategory): boolean {
+	return cat.contentType === 'manual' && cat.typeValue === VIDEO_CATEGORY
+}
+
 export function isBuiltInCategory(cat: ICategory): boolean {
-	return cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType]
+	return isVideo(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
 }
 
 export function categoryLabel(cat: ICategory): string {
+	if (isVideo(cat)) return tr('settings.default.video')
 	return isBuiltInCategory(cat) ? tr(`settings.default.${cat.contentType}`) : cat.name
 }
 
@@ -79,4 +87,17 @@ export function newCategory(contentType: ContentType, settings: ILibrarySettings
 export function addCategoryTop(settings: ILibrarySettings, typeValue: string): void {
 	const tops = settings.stats.tops
 	if (!tops.some(top => top.kind === 'category' && top.key === typeValue)) tops.push({ kind: 'category', key: typeValue })
+	const cat = settings.categories.find(c => c.typeValue === typeValue)
+	if (cat) addCreatorTop(tops, cat)
+}
+
+// Games' and videos' creators are developers and channels: kept out of the shared creator top.
+export function ownCreators(cat: ICategory): boolean {
+	return cat.contentType === 'game' || isVideo(cat)
+}
+
+// Such a category gets its own creator top, while the shared one is listed.
+export function addCreatorTop(tops: IStatsTop[], cat: ICategory): void {
+	if (!ownCreators(cat) || !tops.some(top => top.kind === 'property' && !top.scope && top.key.toLowerCase() === 'creator')) return
+	if (!tops.some(top => top.kind === 'property' && top.scope === cat.typeValue && top.key.toLowerCase() === 'creator')) tops.push({ kind: 'property', key: 'Creator', scope: cat.typeValue })
 }

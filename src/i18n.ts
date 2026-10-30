@@ -66,6 +66,11 @@ export function relativeDay(iso: string, today: string): string {
 }
 
 // Reader's grouping/decimal mark (12 345, 0,9), but Latin digits everywhere (-u-nu-latn).
+// 1,2 млн, 77 тыс.
+export function compactNumber(value: number): string {
+	return formatNumber(value, { notation: 'compact', maximumFractionDigits: 1 })
+}
+
 export function formatNumber(value: number, options?: Intl.NumberFormatOptions): string {
 	try {
 		return value.toLocaleString(getLanguage() + '-u-nu-latn', options)

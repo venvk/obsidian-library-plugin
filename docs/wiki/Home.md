@@ -1,4 +1,4 @@
-Library keeps your movies, series, anime and manga, books, games, comics, and music as plain Markdown notes in your vault and shows them as a gallery of covers. Search a title, pick it, and the note fills itself in. Connect AniList, MyAnimeList, Kitsu, IMDb, Netflix, Trakt, PlayStation, Steam, or Nintendo, and your lists and play history arrive as notes too.
+Library keeps your movies, series, anime and manga, books, games, comics, music, and the videos you watch as plain Markdown notes in your vault and shows them as a gallery of covers. Search a title, pick it, and the note fills itself in. Connect AniList, MyAnimeList, Kitsu, IMDb, Netflix, YouTube, Trakt, PlayStation, Steam, or Nintendo, and your lists and play history arrive as notes too.
 
 The [README](https://github.com/venvk/obsidian-library-plugin#readme) is the short tour. This wiki has the setup steps and the reference.
 
@@ -9,6 +9,7 @@ The [README](https://github.com/venvk/obsidian-library-plugin#readme) is the sho
 - [[Connected accounts|Connected-accounts]]: what each service brings in and sends back, when it syncs, and where sign-ins are kept.
   - [[Anime and manga sync|Anime-sync]]: AniList, MyAnimeList, and Kitsu.
   - [[IMDb and Netflix|IMDb-and-Netflix]]: ratings, watchlist, viewing history.
+  - [[YouTube]]: watch history, time spent, likes, and subscriptions.
   - [[Trakt]]: watch history, ratings, and watchlist, both ways.
   - [[Game libraries|Game-libraries]]: PlayStation, Steam, and Nintendo Switch, with playtime, trophies, and achievements.
 

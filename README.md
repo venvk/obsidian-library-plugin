@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  Your movies, series, anime and manga, books, games, comics and music as plain Markdown notes,<br>
+  Your movies, series, anime and manga, books, games, comics, music and YouTube videos as plain Markdown notes,<br>
   shown as a gallery of covers. Search a title, pick it, and the note fills itself in.
   <br><br>
   <a href="https://community.obsidian.md/plugins/library">Install</a> · <a href="https://github.com/venvk/obsidian-library-plugin/wiki">Wiki</a> · <a href="https://github.com/venvk/obsidian-library-plugin/issues/new/choose">Report a bug</a>
@@ -26,7 +26,7 @@
 - **One note per title.** The note keeps the cover, year, genres, creators, cast, ratings and trailer. All of it sits in the note's properties (frontmatter), so Bases, Dataview and other plugins can read it.
 - **Progress you can tick.** Episode and chapter lists live at the top of the note. Tick them off as you go, rate them, and see when the next episode airs.
 - **A library view.** One section per kind of media, with filters and sorting by rating, date or progress, an "Up next" shelf, and a "Soon" list with the air dates of new episodes.
-- **Statistics.** How many titles you have, how many hours of watching or reading that is, and fun comparisons like "in that time you could have watched every Bond film". It also shows your taste (how your scores compare with other viewers, your favourite genres and decade) and your latest diary entries.
+- **Statistics.** How many titles you have, top directors, developers and channels, how many hours of watching or reading that is, and fun comparisons like "in that time you could have watched every Bond film". It also shows your taste (how your scores compare with other viewers, your favourite genres and decade) and your latest diary entries.
 - **A diary.** Tick an episode or a chapter, or mark a title complete, and the day goes into the note's `Log` property.
 - **Library blocks.** A `library` code block in any note shows cards picked by category, genre, year or score, what you are in the middle of, the Soon list or the statistics.
 - **A library map.** One command draws your library as a canvas, with posters grouped around the actors and creators they share.
@@ -37,7 +37,7 @@
 ## Getting started
 
 1. In Obsidian open **Settings**, then **Community plugins**, search for **Library**, install and enable it.
-2. Click the Library icon on the left sidebar and press **+**.
+2. Click the Library icon on the left sidebar and press **+** in the tab's header.
 3. Pick a kind, search, choose a result. Each kind gets its own category and folder, created with its first title.
 
 Same name, different films? Add the year: `dune 1984`.
@@ -51,12 +51,13 @@ Connect an account in the plugin settings. Your lists arrive as notes, and anime
 - <img src="assets/connectors/kitsu.svg" width="18" height="18" alt=""> **Kitsu**: anime list, progress and ratings; changes go back on save
 - <img src="assets/connectors/imdb.svg" width="18" height="18" alt=""> **IMDb**: ratings, episode ratings and watchlist; scores and new watchlist titles go back
 - <img src="assets/connectors/netflix.svg" width="18" height="18" alt=""> **Netflix**: viewing history and thumbs, anime into the anime category; scores go back as thumbs, unticked episodes leave the history, and series you haven't started go to My List
+- <img src="assets/connectors/youtube.svg" width="18" height="18" alt=""> **YouTube**: one note per video, in the Video category, with the time you spent, rewatches, publish date, views, likes and estimated dislikes, and the description; like, dislike and subscribe from the note; the last 7 days first, then one older month a day back to the start of the history; Shorts are left out
 - <img src="assets/connectors/trakt.svg" width="18" height="18" alt=""> **Trakt**: watch history, ratings and watchlist; scores, ticked and unticked episodes and new watchlist titles go back
 - <img src="assets/connectors/playstation.svg" width="18" height="18" alt=""> **PlayStation**: played games, playtime and trophies
 - <img src="assets/connectors/steam.svg" width="18" height="18" alt=""> **Steam**: library, playtime and achievements
 - <img src="assets/connectors/nintendo.svg" width="18" height="18" alt=""> **Nintendo Switch**: played games and playtime
 
-Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, PlayStation, Steam and Nintendo work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
+Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam and Nintendo work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
 
 ## Sources
 
@@ -126,6 +127,8 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `store.steampowered.com`, `steamcommunity.com`, `api.steampowered.com`, `cdn.cloudflare.steamstatic.com`, `video.akamai.steamstatic.com`, `shared.akamai.steamstatic.com`, `shared.fastly.steamstatic.com` | Games, trailers, Steam import, achievements | Title or app id; sign-in, library and achievements on import |
 | `www.imdb.com`, `api.graphql.imdb.com` | IMDb connector | Sign-in; ratings and watchlist are read, scores and new titles are sent, removals of deleted notes |
 | `www.netflix.com` | Netflix connector | Sign-in; viewing activity and thumbs are read, scores are sent as thumbs; unticked or deleted titles are hidden from the history, unstarted series go to My List |
+| `accounts.google.com`, `www.youtube.com` | YouTube connector | Sign-in; the watch history is read (the last 7 days, then one older month a day) with each video's length and watched share; per video, its description, publish date, your like and whether you're subscribed; the like and subscribe buttons in a note send them back |
+| `returnyoutubedislikeapi.com` | YouTube connector: like and estimated dislike counts, as YouTube shows no dislikes | Video id |
 | `api.trakt.tv`, `auth.trakt.tv` | Trakt connector | Sign-in code; history, ratings and watchlist are read, scores, watched and unwatched episodes, watchlist titles and removals of deleted notes are sent |
 | `id.twitch.tv`, `api.igdb.com` | Game trailers, with Twitch keys | Twitch id and secret, game |
 | `api.deezer.com`, `cdn-images.dzcdn.net` | Music search, covers, tracks, similar albums | Album or artist |

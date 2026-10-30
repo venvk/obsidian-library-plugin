@@ -1,4 +1,4 @@
-IMDb and Netflix connect in Settings → Library → Movies · Series, and only in Obsidian on desktop. Neither has an API for your own history, so Library reads the site the way you would, through the session of the sign-in window.
+IMDb and Netflix connect in Settings → Library → Connectors → Movies · Series, and only in Obsidian on desktop. Neither has an API for your own history, so Library reads the site the way you would, through the session of the sign-in window.
 
 General rules for connected accounts, such as where sign-ins are kept and what Disconnect does, are on [[Connected accounts|Connected-accounts]].
 

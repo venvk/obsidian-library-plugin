@@ -1,15 +1,16 @@
 import { App, ItemView, WorkspaceLeaf, TFile, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
-import { categoryLabel } from './categories'
+import { categoryLabel, ownCreators } from './categories'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
-import { formatNumber, relativeDay, tr, trCount } from './i18n'
+import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
 import { comparisonOfTheDay, comparisonText } from './facts'
 import { renderTrophies } from './ui/trophyIcons'
 import { tasteOf } from './taste'
 import { logOf, todayIso } from './diary'
 import { renderPlatforms } from './ui/platformIcons'
+import { YOUTUBE_TYPE } from './youtube'
 import {
 	toStr,
 	toStrArray,
@@ -61,7 +62,13 @@ const TIME_COLORS: Record<string, string> = {
 	movie: 'var(--interactive-accent)',
 	series: 'color-mix(in srgb, var(--interactive-accent) 60%, var(--background-primary))',
 	anime: 'color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary))',
-	game: 'color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal))'
+	game: 'color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal))',
+	video: 'color-mix(in srgb, #ff0000 70%, var(--background-primary))'
+}
+
+// the video category is a manual one, counted by its minutes watched
+function timeColor(cat: ICategory): string | undefined {
+	return TIME_COLORS[cat.typeValue === YOUTUBE_TYPE ? 'video' : cat.contentType]
 }
 
 type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress'
@@ -138,7 +145,7 @@ export class LibraryRenderer {
 
 	collectStats(): { columns: StatsColumn[]; time: TimeSlice[]; undated: number } {
 		const tops = this.plugin.settings.stats.tops
-		const properties = tops.filter(top => top.kind === 'property').map(top => top.key)
+		const properties = tops.filter(top => top.kind === 'property')
 		const counts = properties.map(() => new Map<string, { label: string; count: number }>())
 		const rated = new Map<ICategory, CardData[]>()
 		const timeMinutes = new Map<string, number>()
@@ -152,11 +159,12 @@ export class LibraryRenderer {
 			const cat = this.plugin.settings.categories.find(c => c.typeValue === fm.Type)
 			if (!cat) continue
 
-			properties.forEach((property, i) => {
+			properties.forEach((top, i) => {
 				const tally = counts[i]
-				if (!tally) return
+				// a scoped top counts its category alone; the shared creator top leaves out games and videos
+				if (!tally || (top.scope ? cat.typeValue !== top.scope : top.key.toLowerCase() === 'creator' && ownCreators(cat))) return
 				const seen = new Set<string>()
-				for (const value of propertyValues(fm, property)) {
+				for (const value of propertyValues(fm, top.key)) {
 					const key = value.toLowerCase()
 					if (!key || seen.has(key)) continue
 					seen.add(key)
@@ -178,7 +186,7 @@ export class LibraryRenderer {
 			})
 			rated.set(cat, list)
 
-			if (TIME_COLORS[cat.contentType]) {
+			if (timeColor(cat)) {
 				const minutes = spentMinutes(fm, cat.contentType)
 				if (minutes > 0) {
 					timeMinutes.set(cat.name, (timeMinutes.get(cat.name) || 0) + minutes)
@@ -196,7 +204,7 @@ export class LibraryRenderer {
 				continue
 			}
 			if (top.kind === 'property') {
-				const tally = counts[properties.indexOf(top.key)]
+				const tally = counts[properties.indexOf(top)]
 				columns.push({
 					top,
 					kind: 'property',
@@ -218,7 +226,7 @@ export class LibraryRenderer {
 
 		const time: TimeSlice[] = []
 		for (const cat of this.plugin.settings.categories) {
-			const color = TIME_COLORS[cat.contentType]
+			const color = timeColor(cat)
 			if (!color) continue
 			const minutes = timeMinutes.get(cat.name) || 0
 			if (minutes > 0) time.push({ name: categoryLabel(cat), minutes, color })
@@ -282,10 +290,11 @@ export class LibraryRenderer {
 	}
 
 	renderStats(root: HTMLElement, cards?: CardData[]): HTMLElement | null {
+		if (!this.plugin.settings.showStats) return null
 		const stats = this.collectStats()
 		const columns = stats.columns.filter(column => column.items.length > 0)
 		const showTime = this.plugin.settings.stats.watchTime
-			&& this.plugin.settings.categories.some(c => TIME_COLORS[c.contentType])
+			&& this.plugin.settings.categories.some(c => timeColor(c) !== undefined)
 		const psn = this.plugin.settings.psnStats
 		const mal = this.plugin.settings.malStats
 		const nintendo = this.plugin.settings.nintendoStats
@@ -541,11 +550,26 @@ export class LibraryRenderer {
 		if (settings.comingSoonCollapsed) applyCollapsed(true)
 	}
 
+	private renderVotes(info: HTMLElement, fm: Record<string, unknown>): void {
+		const row = info.createDiv({ cls: 'card-rating card-votes' })
+		const reaction = toStr(fm.Reaction)
+		const part = (line: HTMLElement, icon: string, field: string, cls = ''): void => {
+			const span = line.createSpan({ cls: `card-vote${cls}` })
+			setIcon(span.createSpan({ cls: 'card-vote-icon' }), icon)
+			const value = Number(fm[field])
+			if (fm[field] !== undefined && Number.isFinite(value)) span.createSpan({ text: compactNumber(value) })
+		}
+		part(row, 'thumbs-up', 'Likes', reaction === 'like' ? ' is-like' : '')
+		part(row, 'thumbs-down', 'Dislikes', reaction === 'dislike' ? ' is-dislike' : '')
+		// views on a line of their own: three counts overflow a narrow card
+		if (Number(fm.Views) > 0) part(info.createDiv({ cls: 'card-year card-votes' }), 'eye', 'Views')
+	}
+
 	renderCard(grid: HTMLElement, card: CardData): void {
 		const { file, fm } = card
-		// album covers are square
+		// album covers are square, video thumbnails wide
 		const cardEl = grid.createDiv({
-			cls: card.kind === 'music' ? 'library-card is-square' : 'library-card',
+			cls: card.kind === 'music' ? 'library-card is-square' : toStr(fm.Source) === 'youtube' ? 'library-card is-wide' : 'library-card',
 			attr: {
 				'role': 'button',
 				'tabindex': '0',
@@ -587,19 +611,26 @@ export class LibraryRenderer {
 			setIcon(badge, 'eye')
 		}
 
+		const video = toStr(fm.Source) === 'youtube'
+
 		const info = cardEl.createDiv({ cls: 'card-info' })
 		info.createDiv({ cls: 'card-title', text: card.name })
 
 		const author = toStrArray(fm.Author || fm.Creator || fm.Director || fm.Artist).map(linkLabel).join(', ')
 		if (author) info.createDiv({ cls: 'card-author', text: author })
-		if (fm.Year) info.createDiv({ cls: 'card-year', text: toStr(fm.Year) })
+		// a video shows the day it came out
+		const year = video && toStr(fm.Published) ? toStr(fm.Published) : toStr(fm.Year)
+		if (year) info.createDiv({ cls: 'card-year', text: year })
+
+		// a video: likes, dislikes and views where a score would be; your own like or dislike filled
+		if (video) this.renderVotes(info, fm)
 
 		const myRating = fm['My Rating'] ?? fm.Rating
 		const imdb = fm['Rating IMDB']
 		const rt = fm['Rating RT']
 		const rawg = fm['Rating RAWG']
 		const mc = fm['Rating MC']
-		if (imdb || rt || rawg || mc || myRating) {
+		if (!video && (imdb || rt || rawg || mc || myRating)) {
 			const parts: string[] = []
 			if (imdb) parts.push('IMDb ' + toStr(imdb))
 			if (rt) parts.push(RATING_RT_ICON + ' ' + toStr(rt) + '%')
@@ -663,6 +694,18 @@ export class LibraryView extends ItemView {
 		this.registerDomEvent(activeDocument, 'click', () => {
 			this.contentEl.querySelectorAll('.library-sort-menu.open').forEach(m => m.removeClass('open'))
 		})
+		// in the tab's header, right to left: each new action goes in front
+		this.addAction('settings', tr('cmd.openSettings'), () => {
+			const setting = (this.app as unknown as { setting: { open(): void; openTabById(id: string): void } }).setting
+			setting.open()
+			setting.openTabById(this.plugin.manifest.id)
+		})
+		// the map has its own command; this is the same thing one press away
+		this.addAction('network', tr('cmd.libraryMap'), () => void this.plugin.buildLibraryMap())
+		// one press, every platform: forces what would otherwise wait for the daily timers
+		this.addAction('refresh-cw', tr('cmd.updateAll'), () => void this.plugin.updateAll())
+		this.addAction('search', tr('cmd.searchLibrary'), () => this.plugin.openLibrarySearch())
+		this.addAction('plus', tr('cmd.addContent'), () => this.plugin.openAddContent())
 		this.render()
 	}
 
@@ -702,43 +745,7 @@ export class LibraryView extends ItemView {
 			for (const card of cards) this.shown.add(card.file.path)
 		}
 
-		const actions = createDiv({ cls: 'library-actions' })
-
-		const addBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.addContent') }
-		})
-		setIcon(addBtn, 'plus')
-		addBtn.addEventListener('click', () => this.plugin.openAddContent())
-
-		const searchBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.searchLibrary') }
-		})
-		setIcon(searchBtn, 'search')
-		searchBtn.addEventListener('click', () => this.plugin.openLibrarySearch())
-
-		// One press, every platform: forces what would otherwise wait for the daily timers.
-		const updateBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.updateAll') }
-		})
-		setIcon(updateBtn, 'refresh-cw')
-		updateBtn.addEventListener('click', () => void this.plugin.updateAll())
-
-		// The map has its own command; this is the same thing one press away.
-		const mapBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.libraryMap') }
-		})
-		setIcon(mapBtn, 'network')
-		mapBtn.addEventListener('click', () => void this.plugin.buildLibraryMap())
-
-		const pageHeader = (): void => {
-			root.createDiv({ cls: 'library-page-header' }).appendChild(actions)
-		}
 		if (sections.length === 0) {
-			pageHeader()
 			root.createEl('p', { text: tr('view.empty') })
 			return
 		}
@@ -746,9 +753,7 @@ export class LibraryView extends ItemView {
 		// Not-started may live in Up next alone only while that block is on.
 		const settings = this.plugin.settings
 		const everything = sections.reduce((all, section) => all.concat(section.cards), [] as CardData[])
-		const statsHeader = this.r.renderStats(root, everything)
-		if (statsHeader) statsHeader.appendChild(actions)
-		else pageHeader()
+		this.r.renderStats(root, everything)
 
 		if (settings.showComingSoon) this.r.renderComingSoon(root, everything)
 		const upNextOnly = settings.showUpNext && !settings.upNextInCategories
@@ -900,7 +905,7 @@ export class LibraryView extends ItemView {
 			text: count,
 			attr: { 'aria-label': `${count} ${trCount('stats.works', cards.length)}` }
 		})
-		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game') return
+		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game' && kind !== 'manual') return
 		let minutes = 0
 		for (const card of cards) minutes += spentMinutes(card.fm, card.kind)
 		if (minutes <= 0) return
