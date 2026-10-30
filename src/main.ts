@@ -1419,7 +1419,7 @@ export default class LibraryPlugin extends Plugin {
 		void (site === 'imdb' ? this.imdbBackfill() : this.netflixBackfill().then(() => this.netflixUnwatchAll()))
 	}
 
-	// YouTube: a note per video, Shorts left out, in a YouTube category made on first use. The first import brings
+	// YouTube: a note per video, Shorts left out, in the Video category made on first use. The first import brings
 	// the last 7 days, later ones every day since the last; a video seen again on a later day counts a rewatch.
 	// Then one older month a day, back to the start of the history, so years of it never land at once.
 	private async youtubeImport(loud: boolean): Promise<void> {
@@ -1560,7 +1560,7 @@ export default class LibraryPlugin extends Plugin {
 					progressTotal: null,
 					imdbId: null,
 				}
-				const extra: Record<string, unknown> = { Progress: `${String(video.percent)}/100`, Complete: done, Date: dmyOf(`${video.day}T12:00:00`) }
+				const extra: Record<string, unknown> = { Platforms: ['YouTube'], Progress: `${String(video.percent)}/100`, Complete: done, Date: dmyOf(`${video.day}T12:00:00`) }
 				const channel = found?.channelUrl || video.channelUrl
 				if (channel) extra['Channel URL'] = channel
 				if (found) this.youtubeDetails(extra, found)
@@ -1630,7 +1630,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async youtubeCategory(): Promise<ICategory> {
-		const category: ICategory = { name: 'YouTube', typeValue: YOUTUBE_TYPE, contentType: 'manual', folder: joinFolder(this.settings.libraryFolder, 'YouTube') }
+		const category: ICategory = { name: tr('settings.default.video'), typeValue: YOUTUBE_TYPE, contentType: 'manual', folder: joinFolder(this.settings.libraryFolder, 'Video') }
 		this.settings.categories.push(category)
 		addCategoryTop(this.settings, category.typeValue)
 		await this.saveSettings()

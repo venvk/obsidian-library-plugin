@@ -1550,6 +1550,10 @@ sort trigger, the chosen one in the accent colour. */
 	background-color: #e60012;
 }
 
+.library-platform-label.is-youtube {
+	background-color: #ff0000;
+}
+
 .library-platform-label.is-netflix {
 	background-color: #000000;
 	color: #e50914;

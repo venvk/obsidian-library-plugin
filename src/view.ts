@@ -63,12 +63,12 @@ const TIME_COLORS: Record<string, string> = {
 	series: 'color-mix(in srgb, var(--interactive-accent) 60%, var(--background-primary))',
 	anime: 'color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary))',
 	game: 'color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal))',
-	youtube: 'color-mix(in srgb, #ff0000 70%, var(--background-primary))'
+	video: 'color-mix(in srgb, #ff0000 70%, var(--background-primary))'
 }
 
-// the YouTube connector's category is a manual one, counted by its minutes watched
+// the video category is a manual one, counted by its minutes watched
 function timeColor(cat: ICategory): string | undefined {
-	return TIME_COLORS[cat.typeValue === YOUTUBE_TYPE ? 'youtube' : cat.contentType]
+	return TIME_COLORS[cat.typeValue === YOUTUBE_TYPE ? 'video' : cat.contentType]
 }
 
 type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress'

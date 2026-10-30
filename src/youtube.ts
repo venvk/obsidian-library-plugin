@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian'
-import { YOUTUBE_CATEGORY } from './categories'
+import { VIDEO_CATEGORY } from './categories'
 import { tr } from './i18n'
 import { readPage } from './watchSites'
 
@@ -64,7 +64,7 @@ const CHANNEL_ID = /^UC[\w-]{22}$/
 const CHANNEL_PATH = /^\/(@[^/?#\s]+|channel\/UC[\w-]+)$/
 
 // the category and Source of the connector's notes
-export const YOUTUBE_TYPE = YOUTUBE_CATEGORY
+export const YOUTUBE_TYPE = VIDEO_CATEGORY
 export const YOUTUBE_SOURCE = 'youtube'
 
 // dated headings reach back this far

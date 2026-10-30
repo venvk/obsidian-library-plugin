@@ -62,6 +62,7 @@ export function platformFamily(value: string): string | null {
 	if (v.includes('xbox')) return 'xbox'
 	if (v.includes('switch') || v.includes('nintendo')) return 'nintendo'
 	if (v.includes('netflix')) return 'netflix'
+	if (v.includes('youtube')) return 'youtube'
 	return null
 }
 
