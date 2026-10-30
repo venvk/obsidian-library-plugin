@@ -178,6 +178,12 @@
 	font-weight: bold;
 	font-size: 0.95em;
 	line-height: 1.2;
+	/* token names like "Pandra: PixelProwler#123144" have no space to break at */
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
 }
 
 .library-card .card-title a {

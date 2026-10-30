@@ -346,8 +346,9 @@ export function pageHeld(chain: string, site: string, rows: PageTransfer[]): Arr
 	const out: Array<HeldNft & { contract: string; id: string }> = []
 	for (const { contract, id, count, link } of net.values()) {
 		if (count <= 0) continue
-		const [first = '', second = ''] = link.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code))).split('\n').map(line => line.trim())
-		const collection = second.replace(/^NFT:\s*/, '') || first || contract
+		// the explorer's "NFT:" label is not part of the name
+		const [first = '', second = ''] = link.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code))).split('\n').map(line => line.trim().replace(/^NFT:\s*/, ''))
+		const collection = second || first || contract
 		const name = first && first.indexOf(id) >= 0 ? first : `${first || collection} #${id}`
 		out.push({ key: nftKey(chain, contract, name), chain, collection, name, image: '', url: `https://${site}/nft/${contract}/${id}`, count, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), contract, id })
 	}
