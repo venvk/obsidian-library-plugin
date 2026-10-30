@@ -335,12 +335,16 @@ export function withDescription(text: string, callout: string): string {
 	}
 	const kept: string[] = []
 	const lines = text.split('\n')
+	let found = 0
 	for (let i = 0; i < lines.length; i++) {
 		if (!ours(lines[i] ?? '')) { kept.push(lines[i] ?? ''); continue }
+		found++
 		while (i + 1 < lines.length && (lines[i + 1] ?? '').startsWith('>')) i++
 		// the blank line that set the block apart goes with it
-		if (lines[i + 1] === '') i++
+		if ((lines[i + 1] ?? 'x').trim() === '') i++
 	}
+	// the same description, once: the note is left as it is, not written again
+	if (found === 1 && text.indexOf(callout) >= 0) return text
 	return `${kept.join('\n').replace(/\s*$/, '')}\n\n${callout}\n`
 }
 

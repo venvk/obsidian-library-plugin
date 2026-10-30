@@ -23,7 +23,7 @@ A book is done when its progress is full, and then hides it; there is no `Comple
 
 ## Movies
 
-A movie is watched or not: turn on `Complete` in the note's properties when you have seen it. Movies have no progress. A movie you rate on IMDb or watch on Netflix is marked for you; see [[IMDb and Netflix|IMDb-and-Netflix]].
+A movie is watched or not: press Mark complete in the note's header, or turn on `Complete` in its properties, when you have seen it. Movies have no progress. A movie you rate on IMDb or watch on Netflix is marked for you; see [[IMDb and Netflix|IMDb-and-Netflix]].
 
 ## Games
 
@@ -31,7 +31,7 @@ A game from PlayStation or Steam gets its progress from your trophies or achieve
 
 ## Albums and comics
 
-These have nothing to tick. Edit `Progress` in the note's properties, or turn on `Complete` when you finish. An album counts its tracks, and a comic its issues, volumes, or chapters.
+These have nothing to tick. Edit `Progress` in the note's properties, or press Mark complete in the header when you finish. An album counts its tracks, and a comic its issues, volumes, or chapters.
 
 ## Your score
 

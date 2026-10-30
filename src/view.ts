@@ -275,7 +275,8 @@ export class LibraryRenderer {
 				if (i > 0) totalEl.appendText(' ')
 				totalEl.createSpan({ text: part })
 			})
-			totalEl.setAttribute('aria-label', tr(calendar ? 'stats.showHours' : 'stats.showCalendar'))
+			// the value first: a screen reader names the button by its label
+			totalEl.setAttribute('aria-label', `${parts.join(' ')} · ${tr(calendar ? 'stats.showHours' : 'stats.showCalendar')}`)
 			for (const value of values) value.el.setText(`${calendar ? spentTime(value.minutes) : formatRuntime(value.minutes)} · ${String(value.share)}%`)
 		}
 		show()

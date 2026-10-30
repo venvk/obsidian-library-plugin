@@ -49,6 +49,7 @@ A library note shows a header above its text: the cover, creator, cast, years, s
 
 Depending on the note it also has:
 
+- Mark complete, for movies, videos, games, albums, comics, and manual notes: it turns `Complete` on, and pressed again, off. It works with the note's properties hidden;
 - a trailer: Watch trailer plays it inside Obsidian;
 - a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close;
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
