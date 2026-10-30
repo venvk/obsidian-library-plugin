@@ -3,7 +3,7 @@ import type LibraryPlugin from './main'
 import { LibraryRenderer, type CardData } from './view'
 import { categoryLabel } from './categories'
 import { tr } from './i18n'
-import { isFinished, linkLabel, notStarted, toStr, toStrArray } from './util'
+import { isCollectible, isFinished, linkLabel, notStarted, toStr, toStrArray } from './util'
 
 export interface BlockQuery {
 	show: 'cards' | 'now' | 'soon' | 'stats'
@@ -40,7 +40,7 @@ export function parseBlock(source: string): BlockQuery {
 
 export function pickCards(cards: CardData[], query: BlockQuery): CardData[] {
 	const chosen = cards.filter(card => {
-		if (query.show === 'now' && (notStarted(card.fm, card.kind) || isFinished(card.fm, card.kind))) return false
+		if (query.show === 'now' && (isCollectible(card.fm) || notStarted(card.fm, card.kind) || isFinished(card.fm, card.kind))) return false
 		if (query.genre && !toStrArray(card.fm.Genre).some(genre => linkLabel(genre).toLowerCase() === query.genre)) return false
 		if (query.year && card.year !== query.year) return false
 		return !query.rating || card.rating >= query.rating

@@ -256,7 +256,13 @@ export function shownProgress(fm: Record<string, unknown>, kind?: ContentType): 
 }
 
 // A rated title counts as seen, ticked or not.
+// A collectible (an NFT) is held, not watched or read: never started, never in progress.
+export function isCollectible(fm: Record<string, unknown>): boolean {
+	return fm.Source === 'nft'
+}
+
 export function notStarted(fm: Record<string, unknown>, kind?: ContentType): boolean {
+	if (isCollectible(fm)) return false
 	if (isFinished(fm, kind) || parseWatched(fm.Progress) > 0) return false
 	if (Number(fm.Playtime) > 0) return false
 	const rating = fm['My Rating'] ?? fm.Rating
