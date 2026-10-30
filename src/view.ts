@@ -4,7 +4,7 @@ import type LibraryPlugin from './main'
 import { categoryLabel } from './categories'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
-import { formatNumber, relativeDay, tr, trCount } from './i18n'
+import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
 import { comparisonOfTheDay, comparisonText } from './facts'
 import { renderTrophies } from './ui/trophyIcons'
 import { tasteOf } from './taste'
@@ -548,6 +548,20 @@ export class LibraryRenderer {
 		if (settings.comingSoonCollapsed) applyCollapsed(true)
 	}
 
+	private renderVotes(info: HTMLElement, fm: Record<string, unknown>): void {
+		const row = info.createDiv({ cls: 'card-rating card-votes' })
+		const reaction = toStr(fm.Reaction)
+		const part = (icon: string, field: string, cls = ''): void => {
+			const span = row.createSpan({ cls: `card-vote${cls}` })
+			setIcon(span.createSpan({ cls: 'card-vote-icon' }), icon)
+			const value = Number(fm[field])
+			if (fm[field] !== undefined && Number.isFinite(value)) span.createSpan({ text: compactNumber(value) })
+		}
+		part('thumbs-up', 'Likes', reaction === 'like' ? ' is-like' : '')
+		part('thumbs-down', 'Dislikes', reaction === 'dislike' ? ' is-dislike' : '')
+		if (Number(fm.Views) > 0) part('eye', 'Views')
+	}
+
 	renderCard(grid: HTMLElement, card: CardData): void {
 		const { file, fm } = card
 		// album covers are square, video thumbnails wide
@@ -594,16 +608,7 @@ export class LibraryRenderer {
 			setIcon(badge, 'eye')
 		}
 
-		// a video: your like or dislike on YouTube, an outline when neither
 		const video = toStr(fm.Source) === 'youtube'
-		if (video) {
-			const reaction = toStr(fm.Reaction)
-			const mark = imgDiv.createSpan({
-				cls: `card-reaction${reaction === 'like' || reaction === 'dislike' ? ` is-${reaction}` : ''}`,
-				attr: { 'role': 'img', 'aria-label': reaction === 'dislike' ? tr('header.disliked') : tr('header.liked') }
-			})
-			setIcon(mark, reaction === 'dislike' ? 'thumbs-down' : 'thumbs-up')
-		}
 
 		const info = cardEl.createDiv({ cls: 'card-info' })
 		info.createDiv({ cls: 'card-title', text: card.name })
@@ -614,12 +619,15 @@ export class LibraryRenderer {
 		const year = video && toStr(fm.Published) ? toStr(fm.Published) : toStr(fm.Year)
 		if (year) info.createDiv({ cls: 'card-year', text: year })
 
+		// a video: likes, dislikes and views where a score would be; your own like or dislike filled
+		if (video) this.renderVotes(info, fm)
+
 		const myRating = fm['My Rating'] ?? fm.Rating
 		const imdb = fm['Rating IMDB']
 		const rt = fm['Rating RT']
 		const rawg = fm['Rating RAWG']
 		const mc = fm['Rating MC']
-		if (imdb || rt || rawg || mc || myRating) {
+		if (!video && (imdb || rt || rawg || mc || myRating)) {
 			const parts: string[] = []
 			if (imdb) parts.push('IMDb ' + toStr(imdb))
 			if (rt) parts.push(RATING_RT_ICON + ' ' + toStr(rt) + '%')

@@ -12,7 +12,7 @@ import {
 	type CachedMetadata,
 } from 'obsidian'
 import { progressPattern, RATING_RT_ICON, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
-import { formatNumber, tr, trCount } from './i18n'
+import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
 import { OmdbProvider } from './providers/omdb'
@@ -1511,7 +1511,7 @@ export default class LibraryPlugin extends Plugin {
 			return dmy ? `${dmy[3] ?? ''}-${dmy[2] ?? ''}-${dmy[1] ?? ''}` : ''
 		}
 		// notes of the first builds have no details yet
-		const bare = (file: TFile): boolean => !('Published' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))
+		const bare = (file: TFile): boolean => !('Views' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))
 		const wanted = videos.filter(video => {
 			const file = notes.get(video.id)
 			return !file || (rewatch && (video.day > lastSeen(file) || bare(file)))
@@ -1556,7 +1556,7 @@ export default class LibraryPlugin extends Plugin {
 				if (!category) category = await this.youtubeCategory()
 				const url = videoUrl(video.id)
 				const meta: NormalizedMetadata = {
-					fields: { Name: video.title, Creator: video.channel, Cover: videoCover(video.id), URL: url, Trailer: url, ...(length > 0 ? { Runtime: length } : {}) },
+					fields: { Name: video.title, Creator: [video.channel], Cover: videoCover(video.id), URL: url, Trailer: url, ...(length > 0 ? { Runtime: length } : {}) },
 					progressTotal: null,
 					imdbId: null,
 				}
@@ -1586,6 +1586,9 @@ export default class LibraryPlugin extends Plugin {
 		if (found.subscribed !== null) fm.Subscribed = found.subscribed
 		if (found.channelUrl) fm['Channel URL'] = found.channelUrl
 		if (found.channelId) fm['Channel ID'] = found.channelId
+		if (found.views !== null) fm.Views = found.views
+		if (found.likes !== null) fm.Likes = found.likes
+		if (found.dislikes !== null) fm.Dislikes = found.dislikes
 		if (found.published) {
 			fm.Published = dmyOf(`${found.published}T12:00:00`)
 			fm.Year = Number(found.published.slice(0, 4))
@@ -4091,6 +4094,8 @@ export default class LibraryPlugin extends Plugin {
 				const on = reaction === kind
 				const button = titleEl.createEl('button', { cls: `note-header-reaction is-${kind}${on ? ' is-on' : ''}`, attr: { 'aria-label': tr(kind === 'like' ? 'header.liked' : 'header.disliked'), 'aria-pressed': on ? 'true' : 'false' } })
 				setIcon(button, kind === 'like' ? 'thumbs-up' : 'thumbs-down')
+				const total = Number(fm[kind === 'like' ? 'Likes' : 'Dislikes'])
+				if (fm[kind === 'like' ? 'Likes' : 'Dislikes'] !== undefined && Number.isFinite(total)) button.createSpan({ text: compactNumber(total) })
 				button.addEventListener('click', (e) => {
 					e.preventDefault()
 					button.disabled = true
@@ -4149,6 +4154,7 @@ export default class LibraryPlugin extends Plugin {
 			})
 		}
 		if (video && toStr(fm.Published)) addRow(tr('header.published'), toStr(fm.Published))
+		if (video && Number(fm.Views) > 0) addRow(tr('header.views'), formatNumber(Number(fm.Views)))
 		if (video && Number(fm.Rewatched) > 0) addRow(tr('header.rewatched'), String(Number(fm.Rewatched)))
 		addNames(tr('header.cast'), cast)
 		const yearsStr = year + (endYear ? '–' + endYear : '')

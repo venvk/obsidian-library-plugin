@@ -503,6 +503,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'header.subscribe': 'Subscribe',
 		'header.channel': 'Channel',
 		'header.published': 'Published',
+		'header.views': 'Views',
 		'header.liked': 'Like',
 		'header.disliked': 'Dislike',
 		'header.rewatched': 'Rewatched',

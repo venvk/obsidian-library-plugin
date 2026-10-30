@@ -1,3 +1,4 @@
+import { requestUrl } from 'obsidian'
 import { YOUTUBE_CATEGORY } from './categories'
 import { tr } from './i18n'
 import { readPage } from './watchSites'
@@ -50,6 +51,10 @@ export interface VideoDetails {
 	channelId: string
 	// ISO date the video came out; '' when unknown
 	published: string
+	// counts; null when unknown. Dislikes are Return YouTube Dislike's estimate: YouTube hides them.
+	views: number | null
+	likes: number | null
+	dislikes: number | null
 }
 
 export type YoutubeAction = 'like' | 'dislike' | 'removelike' | 'subscribe' | 'unsubscribe'
@@ -236,14 +241,14 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 			const player = await ask('player', { videoId: id }).catch(() => null);
 			out[id] = { description: text(secondary?.attributedDescription) || text(secondary?.description), reaction: like === 'LIKE' ? 'like' : like === 'DISLIKE' ? 'dislike' : '',
 				subscribed: typeof subscribed === 'boolean' ? subscribed : null, channelPath: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '',
-				channelId: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.browseId || '', published: player?.microformat?.playerMicroformatRenderer?.publishDate || '' };
+				channelId: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.browseId || '', published: player?.microformat?.playerMicroformatRenderer?.publishDate || '', views: Number(player?.videoDetails?.viewCount) };
 		} catch {}
 		await new Promise(r => setTimeout(r, 300));
 	}
 	return JSON.stringify(out);
 })().catch(() => '')`
 	try {
-		const answer = JSON.parse(await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown; channelId?: unknown; published?: unknown }>
+		const answer = JSON.parse(await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown; channelId?: unknown; published?: unknown; views?: unknown }>
 		for (const id of clean) {
 			const found = answer[id]
 			if (!found) continue
@@ -254,12 +259,35 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 				channelUrl: channelUrl(typeof found.channelPath === 'string' ? found.channelPath : ''),
 				channelId: typeof found.channelId === 'string' && CHANNEL_ID.test(found.channelId) ? found.channelId : '',
 				published: typeof found.published === 'string' ? /^\d{4}-\d{2}-\d{2}/.exec(found.published)?.[0] ?? '' : '',
+				views: count(found.views),
+				likes: null,
+				dislikes: null,
 			})
+		}
+		for (const [id, found] of out) {
+			const vote = await votes(id)
+			found.likes = vote.likes
+			found.dislikes = vote.dislikes
 		}
 	} catch {
 		// no answer: the notes are made without
 	}
 	return out
+}
+
+function count(value: unknown): number | null {
+	return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : null
+}
+
+// Likes and the estimated dislikes, from Return YouTube Dislike: YouTube shows no dislike count since 2021.
+async function votes(id: string): Promise<{ likes: number | null; dislikes: number | null }> {
+	try {
+		const answer = await requestUrl({ url: `https://returnyoutubedislikeapi.com/votes?videoId=${id}`, throw: false })
+		const data = answer.status === 200 ? answer.json as { likes?: unknown; dislikes?: unknown } : {}
+		return { likes: count(data.likes), dislikes: count(data.dislikes) }
+	} catch {
+		return { likes: null, dislikes: null }
+	}
 }
 
 // Like, dislike or clear the video, or subscribe to or leave its channel, as the watch page's buttons do.
