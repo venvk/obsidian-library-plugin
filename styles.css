@@ -469,8 +469,28 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .note-header-wrap .note-header-complete {
+	display: inline-flex;
+	align-self: flex-start;
+	align-items: center;
+	gap: 6px;
 	margin-top: 8px;
+	padding: 4px 12px;
+	border-radius: 999px;
 	font-weight: bold;
+	background: var(--background-modifier-hover);
+	color: var(--text-muted);
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.note-header-wrap .note-header-complete.is-on {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.note-header-wrap .note-header-complete svg {
+	width: 16px;
+	height: 16px;
 }
 
 .note-header-wrap .note-header-progress-bar {

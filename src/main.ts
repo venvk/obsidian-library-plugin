@@ -4248,11 +4248,16 @@ export default class LibraryPlugin extends Plugin {
 			infoSide.appendChild(progRow)
 		}
 
-		if (complete) {
-			const doneRow = createDiv()
-			doneRow.classList.add('note-header-row', 'note-header-complete')
-			doneRow.setText(tr('header.complete'))
-			infoSide.appendChild(doneRow)
+		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
+		if (trackingOf(kind) !== 'progress') {
+			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
+			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
+			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
+			toggle.addEventListener('click', (e) => {
+				e.preventDefault()
+				toggle.disabled = true
+				void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current.Complete = !complete })
+			})
 		}
 
 		header.appendChild(infoSide)
