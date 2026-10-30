@@ -58,7 +58,6 @@ export interface VideoDetails {
 }
 
 export type YoutubeAction = 'like' | 'dislike' | 'removelike' | 'subscribe' | 'unsubscribe'
-const ACTIONS: YoutubeAction[] = ['like', 'dislike', 'removelike', 'subscribe', 'unsubscribe']
 
 const VIDEO_ID = /^[\w-]{11}$/
 const CHANNEL_ID = /^UC[\w-]{22}$/
@@ -163,13 +162,16 @@ const YOUTUBE_ASK = `
 	};
 	const text = (t) => t ? (t.content ?? t.simpleText ?? (t.runs || []).map(r => r.text).join('')) : '';`
 
-// Values go into page code only as literals of checked characters: JSON.stringify is no code escaper.
-const TOKEN = /^[\w%=+/-]*$/
+// The page code is fixed text: what it works on comes in the page address after #, so no value is ever written into code.
+function pageUrl(values: Record<string, string>): string {
+	return `${HISTORY_URL}#${new URLSearchParams(values).toString()}`
+}
+
+const HASH = `const given = new URLSearchParams(location.hash.slice(1));`
 
 // One batch of the history: the page's own, or the continuation `token` names.
-function historyCode(token: string): string {
-	return `(async () => {${YOUTUBE_ASK}
-	const token = '${TOKEN.test(token) ? token : ''}';
+const HISTORY_CODE = `(async () => {${YOUTUBE_ASK}${HASH}
+	const token = given.get('token') || '';
 	let entries;
 	if (token) {
 		const more = await ask('browse', { continuation: token });
@@ -211,14 +213,13 @@ function historyCode(token: string): string {
 	}
 	return JSON.stringify({ lang: document.documentElement.lang || 'en', sections, next });
 })().catch(() => '')`
-}
 
 const HISTORY_URL = 'https://www.youtube.com/feed/history'
 // signed out, the page sends the window to the Google sign-in
 const HISTORY_READY = "!!window.ytInitialData || location.hostname !== 'www.youtube.com'"
 
 export async function youtubePage(token = ''): Promise<HistoryPage | 'signed-out' | null> {
-	const answer = await readPage(HISTORY_URL, historyCode(token), 60000, HISTORY_READY)
+	const answer = await readPage(pageUrl({ token }), HISTORY_CODE, 60000, HISTORY_READY)
 	if (answer === 'signed-out') return answer
 	try {
 		return JSON.parse(answer) as HistoryPage
@@ -232,9 +233,9 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 	const out = new Map<string, VideoDetails>()
 	const clean = ids.filter(id => VIDEO_ID.test(id))
 	if (clean.length === 0) return out
-	const code = `(async () => {${YOUTUBE_ASK}
+	const code = `(async () => {${YOUTUBE_ASK}${HASH}
 	const out = {};
-	for (const id of [${clean.map(id => `'${id}'`).join(',')}]) {
+	for (const id of (given.get('ids') || '').split(',').filter(Boolean)) {
 		try {
 			const watch = await ask('next', { videoId: id });
 			const parts = watch.contents?.twoColumnWatchNextResults?.results?.results?.contents || [];
@@ -251,7 +252,7 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 	}
 	return JSON.stringify(out);
 })().catch(() => '')`
-	const text = await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)
+	const text = await readPage(pageUrl({ ids: clean.join(',') }), code, 60000 + clean.length * 3000, HISTORY_READY)
 	if (text === 'signed-out') return text
 	try {
 		const answer = JSON.parse(text) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown; channelId?: unknown; published?: unknown; views?: unknown }>
@@ -299,9 +300,10 @@ async function votes(id: string): Promise<{ likes: number | null; dislikes: numb
 // Like, dislike or clear the video, or subscribe to or leave its channel, as the watch page's buttons do.
 export async function youtubeAct(videoId: string, action: YoutubeAction): Promise<boolean> {
 	if (!VIDEO_ID.test(videoId)) return false
-	const code = `(async () => {${YOUTUBE_ASK}
-	const id = '${videoId}';
-	const action = '${ACTIONS.indexOf(action) >= 0 ? action : ''}';
+	const code = `(async () => {${YOUTUBE_ASK}${HASH}
+	const id = given.get('id') || '';
+	const action = given.get('action') || '';
+	if (!['like', 'dislike', 'removelike', 'subscribe', 'unsubscribe'].includes(action)) return '';
 	if (action === 'like' || action === 'dislike' || action === 'removelike') {
 		await ask('like/' + action, { target: { videoId: id } });
 		return 'ok';
@@ -313,7 +315,7 @@ export async function youtubeAct(videoId: string, action: YoutubeAction): Promis
 	await ask('subscription/' + action, { channelIds: [channel] });
 	return 'ok';
 })().catch(() => '')`
-	return await readPage(HISTORY_URL, code, 60000, HISTORY_READY) === 'ok'
+	return await readPage(pageUrl({ id: videoId, action }), code, 60000, HISTORY_READY) === 'ok'
 }
 
 // The description as a callout in the note's body, folded, every line quoted.
