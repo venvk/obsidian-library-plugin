@@ -64,6 +64,21 @@ interface Section {
 	rows: Row[];
 }
 
+// A text button shown as an icon; its text, kept as the tooltip, comes back as the icon if the button is relabelled.
+function iconButton(button: HTMLElement, icon: string): void {
+	const swap = (): void => {
+		const label = button.textContent?.trim() ?? "";
+		if (!label) return;
+		button.setAttribute("aria-label", label);
+		button.empty();
+		setIcon(button, icon);
+	};
+	swap();
+	new MutationObserver(() => {
+		if (!button.querySelector("svg")) swap();
+	}).observe(button, { childList: true, characterData: true, subtree: true });
+}
+
 // Rendered via a callback: a declarative row with neither name nor control is skipped.
 function note(text: string): Row {
 	return {
@@ -481,6 +496,9 @@ export class LibrarySettingTab extends PluginSettingTab {
 							await this.plugin.saveSettings();
 						}),
 					);
+					// the picker's "Link…" button as a key icon, its words as the tooltip
+					const button = row.controlEl.querySelector("button");
+					if (button) iconButton(button, "key-round");
 				}
 			},
 		};
