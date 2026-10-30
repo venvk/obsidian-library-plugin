@@ -319,6 +319,10 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				heading: "YouTube",
+				rows: [{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") }],
+			},
+			{
 				heading: tr("settings.section.anime"),
 				rows: [
 					{ name: tr("anilist.name"), desc: tr("settings.anilist.desc"), render: (row) => this.anilistAccount(row) },

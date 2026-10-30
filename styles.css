@@ -30,6 +30,10 @@
 	aspect-ratio: 1 / 1;
 }
 
+.library-card.is-wide .card-image {
+	aspect-ratio: 16 / 9;
+}
+
 .library-card .card-image img {
 	width: 100%;
 	height: 100%;
@@ -1572,6 +1576,11 @@ sort trigger, the chosen one in the accent colour. */
 .library-platform-row-icon.is-netflix {
 	background-color: #000000;
 	color: #e50914;
+}
+
+.library-platform-row-icon.is-youtube {
+	background-color: #ff0000;
+	color: #ffffff;
 }
 
 .library-platform-row-icon svg {

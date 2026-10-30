@@ -40,6 +40,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
+import { youtubeHistory, videoCover, videoUrl } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -48,7 +49,7 @@ import { DuplicateRemovalModal, type DuplicateGroup } from './ui/duplicateModal'
 import { ShareModal, shareTargetFromFile } from './ui/shareModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
-import { SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
+import { SITE_NAME, SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
 import { earnedAchievements, gameAchievements, ownedGames, playtimeHours, steamAuthUrl, steamIdFromRedirect, steamLanguage, steamSession, type SteamSession } from './steamLibrary'
 import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRedirect, deleteMalEntry, exchangeCode, fetchMalList, isExpired, makeVerifier, mangaIds, malAuthUrl, malClientPair, malIdsFor, malMangaIdsFor, malStatus, pushMalEntry, refreshTokens, type MalEntry } from './malSync'
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
@@ -116,6 +117,9 @@ import {
 // Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
 // the name, or to a note of that name when there is one; the graph draws them.
 const LINK_FIELDS = ['Genre', 'Creator', 'Cast']
+// notes of the YouTube connector
+const YOUTUBE_SOURCE = 'youtube'
+const YOUTUBE_TYPE = 'YouTube'
 
 // let the vault settle before the walk starts
 const ENRICH_START_DELAY = 10 * 1000
@@ -1321,10 +1325,10 @@ export default class LibraryPlugin extends Plugin {
 		})
 	}
 
-	// IMDb, Netflix: the window keeps the session the import later reads the site with
+	// IMDb, Netflix, YouTube: the window keeps the session the import later reads the site with
 	connectSite(site: WatchSite): Promise<boolean> {
 		if (!Platform.isDesktopApp) {
-			new Notice(tr('notice.site.desktopOnly', { site: site === 'imdb' ? 'IMDb' : 'Netflix' }))
+			new Notice(tr('notice.site.desktopOnly', { site: SITE_NAME[site] }))
 			return Promise.resolve(false)
 		}
 		return new Promise<boolean>((resolve) => {
@@ -1345,8 +1349,9 @@ export default class LibraryPlugin extends Plugin {
 	// A note found by its IMDb id, Netflix id or name only gains what it lacks; a wrong Netflix id is replaced, your edits win.
 	async watchImport(site: WatchSite, loud: boolean): Promise<void> {
 		if (this.watchImporting || !Platform.isDesktopApp || !this.settings.watchSites[site].connected) return
+		if (site === 'youtube') return this.youtubeImport(loud)
 		this.watchImporting = true
-		const name = site === 'imdb' ? 'IMDb' : 'Netflix'
+		const name = SITE_NAME[site]
 		try {
 			if (loud) new Notice(tr('notice.site.importing', { site: name }))
 			const titles = site === 'imdb' ? await imdbHistory() : await netflixHistory()
@@ -1412,6 +1417,69 @@ export default class LibraryPlugin extends Plugin {
 			this.netflixSeeding.clear()
 		}
 		void (site === 'imdb' ? this.imdbBackfill() : this.netflixBackfill().then(() => this.netflixUnwatchAll()))
+	}
+
+	// YouTube: a note per video watched in the last 7 days, Shorts left out, in a YouTube category made on first use.
+	// Runtime holds the minutes watched; a video watched again only gains the longer time.
+	private async youtubeImport(loud: boolean): Promise<void> {
+		this.watchImporting = true
+		try {
+			if (loud) new Notice(tr('notice.site.importing', { site: 'YouTube' }))
+			const videos = await youtubeHistory()
+			if (videos === 'signed-out') {
+				this.settings.watchSites.youtube.connected = false
+				await this.saveSettings()
+				new Notice(tr('notice.site.signedOut', { site: 'YouTube' }))
+				return
+			}
+			if (!videos) { if (loud) new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+			const byId = new Map<string, TFile>()
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (fm && toStr(fm.Source) === YOUTUBE_SOURCE && !isTemplateFile(file.path)) byId.set(toStr(fm['Source ID']), file)
+			}
+			let created = 0
+			let updated = 0
+			let category = this.settings.categories.find(c => c.typeValue === YOUTUBE_TYPE)
+			for (const video of videos) {
+				if (this.unloaded) return
+				try {
+					const existing = byId.get(video.id)
+					if (existing) {
+						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						if (video.minutes <= (runtimeMinutes(fm?.Runtime) ?? 0)) continue
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => { current.Runtime = video.minutes })
+						updated++
+						continue
+					}
+					if (!category) category = await this.youtubeCategory()
+					const url = videoUrl(video.id)
+					const meta: NormalizedMetadata = {
+						fields: { Name: video.title, Creator: video.channel, Cover: videoCover(video.id), URL: url, Trailer: url, ...(video.minutes > 0 ? { Runtime: video.minutes } : {}) },
+						progressTotal: null,
+						imdbId: null,
+					}
+					byId.set(video.id, await this.newNote(category, YOUTUBE_SOURCE, video.id, video.title, meta, { Complete: true, Date: dmyOf(`${video.day}T12:00:00`) }))
+					created++
+				} catch (e) {
+					console.error('Library: YouTube import error', video.id, e)
+				}
+			}
+			this.settings.watchSites.youtube.lastImport = Date.now()
+			await this.saveSettings()
+			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated }))
+		} finally {
+			this.watchImporting = false
+		}
+	}
+
+	private async youtubeCategory(): Promise<ICategory> {
+		const category: ICategory = { name: 'YouTube', typeValue: YOUTUBE_TYPE, contentType: 'manual', folder: joinFolder(this.settings.libraryFolder, 'YouTube') }
+		this.settings.categories.push(category)
+		addCategoryTop(this.settings, category.typeValue)
+		await this.saveSettings()
+		new Notice(tr('notice.categoryCreated', { name: category.name }))
+		return category
 	}
 
 	// A rated episode ticks and scores the matching episode in its series note, made if missing.
@@ -2268,7 +2336,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first — a third-party signing service carries the requests
@@ -3096,7 +3164,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.psnTokens) await this.psnImport(true)
 		if (this.settings.steamId.trim()) await this.steamImport(true)
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
-		for (const site of ['imdb', 'netflix'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
+		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
 	}
 
 	private pruneEcho(): void {
@@ -4416,8 +4484,8 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
 		if (!this.settings.netflixEcho || typeof this.settings.netflixEcho !== 'object') this.settings.netflixEcho = {}
 		const sites = (this.settings.watchSites && typeof this.settings.watchSites === 'object' ? this.settings.watchSites : {}) as Partial<ILibrarySettings['watchSites']>
-		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 } }
-		for (const site of ['imdb', 'netflix'] as const) {
+		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 } }
+		for (const site of ['imdb', 'netflix', 'youtube'] as const) {
 			const saved = sites[site]
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}

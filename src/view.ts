@@ -543,9 +543,9 @@ export class LibraryRenderer {
 
 	renderCard(grid: HTMLElement, card: CardData): void {
 		const { file, fm } = card
-		// album covers are square
+		// album covers are square, video thumbnails wide
 		const cardEl = grid.createDiv({
-			cls: card.kind === 'music' ? 'library-card is-square' : 'library-card',
+			cls: card.kind === 'music' ? 'library-card is-square' : toStr(fm.Source) === 'youtube' ? 'library-card is-wide' : 'library-card',
 			attr: {
 				'role': 'button',
 				'tabindex': '0',

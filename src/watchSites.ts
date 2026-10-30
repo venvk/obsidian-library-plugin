@@ -1,9 +1,11 @@
-// IMDb and Netflix have no API for a member's own history: the sign-in window
+// IMDb, Netflix and YouTube have no API for a member's own history: the sign-in window
 // keeps the session, and a hidden webview on its partition reads the site as
 // the user did. Settings keep the connected flag, last-import time and score echoes.
 const PARTITION = 'persist:library-auth'
 
-export type WatchSite = 'imdb' | 'netflix'
+export type WatchSite = 'imdb' | 'netflix' | 'youtube'
+
+export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube' }
 
 export interface ImdbEcho {
 	r: number
@@ -14,6 +16,7 @@ export interface ImdbEcho {
 export const SITE_SIGN_IN: Record<WatchSite, string> = {
 	imdb: 'https://www.imdb.com/registration/signin',
 	netflix: 'https://www.netflix.com/login',
+	youtube: 'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fhistory',
 }
 
 // Signed in once the window lands on the site's home: the sign-in pages live on
@@ -27,6 +30,8 @@ export function signedInAt(site: WatchSite, url: string): string | null {
 	}
 	if (parsed.protocol !== 'https:') return null
 	if (site === 'imdb') return parsed.hostname === 'www.imdb.com' && (parsed.pathname === '/' || parsed.pathname === '') ? 'ok' : null
+	// Google signs in on its own host, then hands the window to YouTube
+	if (site === 'youtube') return parsed.hostname === 'www.youtube.com' ? 'ok' : null
 	return parsed.hostname === 'www.netflix.com' && /^\/(browse|[a-z]{2}(-[a-z]{2})?\/browse)(\/|$)/.test(parsed.pathname) ? 'ok' : null
 }
 
