@@ -40,7 +40,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -1620,7 +1620,7 @@ export default class LibraryPlugin extends Plugin {
 
 	private async addDescription(file: TFile, description: string): Promise<void> {
 		const callout = descriptionCallout(description)
-		await this.app.vault.process(file, text => text.indexOf(callout) >= 0 ? text : `${text.replace(/\s*$/, '')}\n\n${callout}\n`)
+		await this.app.vault.process(file, text => withDescription(text, callout))
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
