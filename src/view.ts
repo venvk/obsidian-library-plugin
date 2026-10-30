@@ -1,7 +1,7 @@
 import { App, ItemView, WorkspaceLeaf, TFile, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
-import { categoryLabel } from './categories'
+import { categoryLabel, ownCreators } from './categories'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
 import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
@@ -145,7 +145,7 @@ export class LibraryRenderer {
 
 	collectStats(): { columns: StatsColumn[]; time: TimeSlice[]; undated: number } {
 		const tops = this.plugin.settings.stats.tops
-		const properties = tops.filter(top => top.kind === 'property').map(top => top.key)
+		const properties = tops.filter(top => top.kind === 'property')
 		const counts = properties.map(() => new Map<string, { label: string; count: number }>())
 		const rated = new Map<ICategory, CardData[]>()
 		const timeMinutes = new Map<string, number>()
@@ -159,11 +159,12 @@ export class LibraryRenderer {
 			const cat = this.plugin.settings.categories.find(c => c.typeValue === fm.Type)
 			if (!cat) continue
 
-			properties.forEach((property, i) => {
+			properties.forEach((top, i) => {
 				const tally = counts[i]
-				if (!tally) return
+				// a scoped top counts its category alone; the shared creator top leaves out games and videos
+				if (!tally || (top.scope ? cat.typeValue !== top.scope : top.key.toLowerCase() === 'creator' && ownCreators(cat))) return
 				const seen = new Set<string>()
-				for (const value of propertyValues(fm, property)) {
+				for (const value of propertyValues(fm, top.key)) {
 					const key = value.toLowerCase()
 					if (!key || seen.has(key)) continue
 					seen.add(key)
@@ -203,7 +204,7 @@ export class LibraryRenderer {
 				continue
 			}
 			if (top.kind === 'property') {
-				const tally = counts[properties.indexOf(top.key)]
+				const tally = counts[properties.indexOf(top)]
 				columns.push({
 					top,
 					kind: 'property',

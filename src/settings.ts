@@ -15,7 +15,7 @@ import type { ICategory, IStatsTop, TitleLanguage } from "./constants";
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
 import type { WatchSite } from "./watchSites";
-import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory } from "./categories";
+import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory, ownCreators } from "./categories";
 import { tr } from "./i18n";
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, tokenFromInput } from "./anilistSync";
 import { codeFromInput, exchangeCode, makeVerifier, malAuthUrl, malClientPair } from "./malSync";
@@ -872,7 +872,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					this.folderFrom.delete(cat);
 					if (!settings.categories.some((c) => c.typeValue === cat.typeValue)) {
 						settings.stats.tops = settings.stats.tops.filter(
-							(top) => !(top.kind === "category" && top.key === cat.typeValue),
+							(top) => !(top.kind === "category" && top.key === cat.typeValue) && top.scope !== cat.typeValue,
 						);
 					}
 					await this.plugin.saveSettings();
@@ -989,16 +989,18 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private retypeCategory(cat: ICategory, typeValue: string): void {
 		for (const top of this.plugin.settings.stats.tops) {
 			if (top.kind === "category" && top.key === cat.typeValue) top.key = typeValue;
+			if (top.scope === cat.typeValue) top.scope = typeValue;
 		}
 		cat.typeValue = typeValue;
 	}
 
 	private topCandidates(): Array<{ group: string; label: string; top: IStatsTop }> {
 		const listed = new Set<string>();
-		for (const top of this.plugin.settings.stats.tops) listed.add(`${top.kind}:${top.key.toLowerCase()}`);
+		const idOf = (top: IStatsTop): string => `${top.kind}:${top.key.toLowerCase()}:${top.scope ?? ""}`;
+		for (const top of this.plugin.settings.stats.tops) listed.add(idOf(top));
 		const list: Array<{ group: string; label: string; top: IStatsTop }> = [];
 		const offer = (group: string, label: string, top: IStatsTop): void => {
-			const id = `${top.kind}:${top.key.toLowerCase()}`;
+			const id = idOf(top);
 			if (!top.key || listed.has(id)) return;
 			listed.add(id);
 			list.push({ group, label, top });
@@ -1012,6 +1014,11 @@ export class LibrarySettingTab extends PluginSettingTab {
 		if (this.plugin.settings.nintendoStats) offer(tr("settings.stats.groupPlatforms"), tr("stats.nintendo"), { kind: "platform", key: "nintendo" });
 		for (const property of rankableProperties(this.libraryFrontmatter(), this.plugin.settings.coverProperty)) {
 			offer(tr("settings.stats.groupProperties"), property, { kind: "property", key: property });
+		}
+		for (const cat of this.plugin.settings.categories) {
+			if (!ownCreators(cat)) continue;
+			const top: IStatsTop = { kind: "property", key: "Creator", scope: cat.typeValue };
+			offer(tr("settings.stats.groupProperties"), topLabel(top, this.plugin.settings.categories), top);
 		}
 		return list;
 	}

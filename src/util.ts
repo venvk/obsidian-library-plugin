@@ -1,6 +1,7 @@
 import { App, normalizePath } from 'obsidian'
 import { progressPattern, dmyDatePattern, type ICategory, type IStatsTop, type TitleLanguage } from './constants'
 import { formatNumber, tr } from './i18n'
+import { categoryLabel } from './categories'
 import { normalizeSeasons } from './trailer'
 import type { ContentType } from './providers/types'
 
@@ -171,6 +172,12 @@ const MEDIUM_TOPS: Partial<Record<ContentType, string>> = {
 // Medium word only when unambiguous; else "Top: <name>".
 export function topLabel(top: IStatsTop, categories: ICategory[]): string {
 	if (top.kind === 'platform') return tr('stats.psn')
+	if (top.kind === 'property' && top.scope) {
+		const scope = categories.find(c => c.typeValue === top.scope)
+		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'game') return tr('stats.topDevelopers')
+		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'manual') return tr('stats.topChannels')
+		return tr('stats.topNamed', { name: `${top.key} · ${scope ? categoryLabel(scope) : top.scope}` })
+	}
 	if (top.kind === 'property') {
 		switch (top.key.toLowerCase()) {
 			case 'genre': return tr('stats.topGenres')

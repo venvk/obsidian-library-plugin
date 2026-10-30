@@ -41,7 +41,7 @@ import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } f
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
-import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
+import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
 import { PromptModal } from './ui/promptModal'
@@ -4732,17 +4732,21 @@ export default class LibraryPlugin extends Plugin {
 			watchTime: typeof raw.watchTime === 'boolean' ? raw.watchTime : defaults.watchTime,
 			tops: []
 		}
-		const add = (kind: IStatsTop['kind'], key: unknown): void => {
+		const add = (kind: IStatsTop['kind'], key: unknown, scope?: unknown): void => {
 			if (typeof key !== 'string' || !key.trim()) return
 			const name = key.trim()
-			if (stats.tops.some(top => top.kind === kind && top.key.toLowerCase() === name.toLowerCase())) return
-			stats.tops.push({ kind, key: name })
+			const within = kind === 'property' && typeof scope === 'string' && scope ? scope : undefined
+			if (stats.tops.some(top => top.kind === kind && top.key.toLowerCase() === name.toLowerCase() && top.scope === within)) return
+			stats.tops.push(within ? { kind, key: name, scope: within } : { kind, key: name })
 		}
 		if (Array.isArray(raw.tops)) {
 			for (const top of raw.tops) {
 				const entry = (top && typeof top === 'object' ? top : {}) as Record<string, unknown>
-				if (entry.kind === 'category' || entry.kind === 'property' || entry.kind === 'platform') add(entry.kind, entry.key)
+				if (entry.kind === 'category' || entry.kind === 'property' || entry.kind === 'platform') add(entry.kind, entry.key, entry.scope)
 			}
+			// once: games and videos get the creator tops their creators left the shared one for
+			if (raw.creatorsSplit !== true) for (const cat of this.settings.categories) addCreatorTop(stats.tops, cat)
+			stats.creatorsSplit = true
 			return stats
 		}
 		// builds before the list: the chosen properties, then every category whose best-rated switch was on

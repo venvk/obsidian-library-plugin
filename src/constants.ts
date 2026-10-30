@@ -498,6 +498,8 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.youtube.desc': 'Videos you watch on YouTube arrive in the Video category, with the time you spent on each: the last 7 days first, then one older month a day. Shorts are left out.',
 		'header.description': 'Description',
 		'settings.page.general': 'General',
+		'stats.topChannels': 'Top channels',
+		'stats.topDevelopers': 'Top developers',
 		'settings.default.video': 'Video',
 		'cmd.openSettings': 'Library settings',
 		'settings.showStats.name': 'Show statistics',
@@ -32988,11 +32990,15 @@ export interface IStatsTop {
 	kind: 'category' | 'property' | 'platform'
 	// Top key shapes: category Type value, property name as written, or platform id ('playstation').
 	key: string
+	// a property counted in this category only (its Type value): a game's or a channel's creators
+	scope?: string
 }
 
 export interface IStatsSettings {
 	watchTime: boolean
 	tops: IStatsTop[]
+	// games and videos have their own creator tops (once given on update)
+	creatorsSplit?: boolean
 }
 
 export interface ISortState {
