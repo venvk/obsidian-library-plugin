@@ -1,8 +1,7 @@
 import { readPage } from './watchSites'
 
-// YouTube watch history, read from the history page as the signed-in member: videos of
-// the last seven days, Shorts left out. The page names its days in the account's language
-// ("Today", "Yesterday", weekday names) and dates older ones, which have a digit.
+// YouTube watch history, read from the history page as the signed-in member, Shorts left out.
+// The page names its days in the account's language: "Today", "Yesterday", weekdays, then dates.
 
 export interface HistoryItem {
 	id: string
@@ -28,8 +27,10 @@ export interface WatchedVideo {
 	id: string
 	title: string
 	channel: string
-	// minutes watched: the length times the watched share
-	minutes: number
+	// the video's length; 0 for a live stream
+	seconds: number
+	// the watched share, 0 to 100
+	percent: number
 	// ISO date of the viewing day
 	day: string
 }
@@ -45,49 +46,62 @@ export function lengthSeconds(length: string): number {
 	return length.trim().split(':').reduce((total, part) => total * 60 + Number(part), 0)
 }
 
-function dayName(lang: string, date: Date, offset: number): string {
+// How the page names a day `offset` days back: "today", "yesterday", a weekday within
+// the week, then a short date, with its year before this one.
+function dayName(lang: string, now: Date, offset: number): string {
 	type Relative = new (lang: string, options: { numeric: string }) => { format: (value: number, unit: string) => string }
 	const relative = (Intl as unknown as { RelativeTimeFormat?: Relative }).RelativeTimeFormat
+	const date = dayBack(now, offset)
 	try {
 		if (offset < 2) return relative ? new relative(lang, { numeric: 'auto' }).format(-offset, 'day') : ''
-		return date.toLocaleDateString(lang, { weekday: 'long' })
+		if (offset < 7) return date.toLocaleDateString(lang, { weekday: 'long' })
+		const year = date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' as const }
+		return date.toLocaleDateString(lang, { day: 'numeric', month: 'short', ...year })
 	} catch {
 		return ''
 	}
 }
 
-// Newest first, one entry per video: its latest viewing.
-export function lastWeek(page: HistoryPage, now = new Date()): WatchedVideo[] {
-	const names: string[] = []
-	for (let offset = 0; offset < 7; offset++) {
-		const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset)
-		names.push(dayName(page.lang, date, offset).toLocaleLowerCase())
+// Calendar days from `time` (ms) to today: 0 for today.
+export function daysSince(time: number, now = new Date()): number {
+	const then = new Date(time)
+	return Math.round((dayBack(now, 0).getTime() - dayBack(then, 0).getTime()) / 86400000)
+}
+
+function dayBack(now: Date, offset: number): Date {
+	return new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset)
+}
+
+// Newest first, one entry per video: its latest viewing, from the last `days` days.
+export function newHistory(page: HistoryPage, days: number, now = new Date()): WatchedVideo[] {
+	const offsets = new Map<string, number>()
+	for (let offset = 0; offset < days; offset++) {
+		const name = dayName(page.lang, now, offset).trim().toLocaleLowerCase()
+		if (name && !offsets.has(name)) offsets.set(name, offset)
 	}
 	const out: WatchedVideo[] = []
 	const seen = new Set<string>()
 	let offset = 0
 	for (const section of page.sections) {
-		const title = section.title.trim().toLocaleLowerCase()
-		// a dated day is a week old or more
-		if (/\d/.test(title)) break
-		const named = names.indexOf(title)
+		const named = offsets.get(section.title.trim().toLocaleLowerCase())
 		// an unknown name stays on the day before it: never a later one
-		if (named >= offset) offset = named
-		const date = new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset)
+		if (named !== undefined && named >= offset) offset = named
+		// a day older than wanted has no name in the table
+		if (named === undefined && /\d/.test(section.title)) break
+		const items = section.items.filter(item => VIDEO_ID.test(item.id) && item.title)
+		const date = dayBack(now, offset)
 		const day = `${String(date.getFullYear())}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-		for (const item of section.items) {
-			if (!VIDEO_ID.test(item.id) || !item.title || seen.has(item.id)) continue
+		for (const item of items) {
+			if (seen.has(item.id)) continue
 			seen.add(item.id)
-			const seconds = lengthSeconds(item.length)
-			const share = Math.min(100, Math.max(0, item.percent ?? 100)) / 100
-			out.push({ id: item.id, title: item.title, channel: item.channel, minutes: seconds > 0 ? Math.max(1, Math.round((seconds * share) / 60)) : 0, day })
+			out.push({ id: item.id, title: item.title, channel: item.channel, seconds: lengthSeconds(item.length), percent: Math.round(Math.min(100, Math.max(0, item.percent ?? 100))), day })
 		}
 	}
 	return out
 }
 
 // ponytail: only the page's first batch (about two weeks of an average history); scrolling
-// for more is needed only for a week of several hundred videos.
+// for more is needed only after weeks away or for hundreds of videos a week.
 const YOUTUBE_READ = `(() => {
 	const data = window.ytInitialData;
 	const config = window.ytcfg && window.ytcfg.get ? window.ytcfg.get.bind(window.ytcfg) : null;
@@ -126,12 +140,12 @@ const YOUTUBE_READ = `(() => {
 	return JSON.stringify({ lang: document.documentElement.lang || 'en', sections: out });
 })()`
 
-export async function youtubeHistory(now = new Date()): Promise<WatchedVideo[] | 'signed-out' | null> {
+export async function youtubeHistory(days: number, now = new Date()): Promise<WatchedVideo[] | 'signed-out' | null> {
 	// signed out, the page sends the window to the Google sign-in
 	const answer = await readPage('https://www.youtube.com/feed/history', YOUTUBE_READ, 60000, "!!window.ytInitialData || location.hostname !== 'www.youtube.com'")
 	if (answer === 'signed-out') return answer
 	try {
-		return lastWeek(JSON.parse(answer) as HistoryPage, now)
+		return newHistory(JSON.parse(answer) as HistoryPage, days, now)
 	} catch {
 		return null
 	}
