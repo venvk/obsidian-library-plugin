@@ -82,6 +82,10 @@
 	cursor: pointer;
 }
 
+.note-header-badges .note-header-reaction {
+	margin-left: -8px;
+}
+
 .note-header-reaction svg {
 	width: 18px;
 	height: 18px;

@@ -4096,11 +4096,17 @@ export default class LibraryPlugin extends Plugin {
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
 		const video = toStr(fm.Source) === YOUTUBE_SOURCE
+		titleEl.appendChild(shareBtn)
+		infoSide.appendChild(titleEl)
+		const badges = createDiv({ cls: 'note-header-badges' })
+		renderPlatformLabels(badges, fm)
+		renderTrophies(badges, fm, 'note-header-trophies')
+		// your like and dislike sit by the YouTube plate
 		if (video) {
 			const reaction = toStr(fm.Reaction)
 			for (const kind of ['like', 'dislike'] as const) {
 				const on = reaction === kind
-				const button = titleEl.createEl('button', { cls: `note-header-reaction is-${kind}${on ? ' is-on' : ''}`, attr: { 'aria-label': tr(kind === 'like' ? 'header.liked' : 'header.disliked'), 'aria-pressed': on ? 'true' : 'false' } })
+				const button = badges.createEl('button', { cls: `note-header-reaction is-${kind}${on ? ' is-on' : ''}`, attr: { 'aria-label': tr(kind === 'like' ? 'header.liked' : 'header.disliked'), 'aria-pressed': on ? 'true' : 'false' } })
 				setIcon(button, kind === 'like' ? 'thumbs-up' : 'thumbs-down')
 				const total = Number(fm[kind === 'like' ? 'Likes' : 'Dislikes'])
 				if (fm[kind === 'like' ? 'Likes' : 'Dislikes'] !== undefined && Number.isFinite(total)) button.createSpan({ text: compactNumber(total) })
@@ -4111,11 +4117,6 @@ export default class LibraryPlugin extends Plugin {
 				})
 			}
 		}
-		titleEl.appendChild(shareBtn)
-		infoSide.appendChild(titleEl)
-		const badges = createDiv({ cls: 'note-header-badges' })
-		renderPlatformLabels(badges, fm)
-		renderTrophies(badges, fm, 'note-header-trophies')
 		if (badges.childElementCount > 0) infoSide.appendChild(badges)
 
 		const addRow = (label: string, value: string, separator = ': ', title = ''): void => {
