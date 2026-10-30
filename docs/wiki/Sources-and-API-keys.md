@@ -26,6 +26,8 @@ An optional key adds a service, listed first in search, or extra data:
 
 Keys go in Settings → Library → API keys. They stay in the plugin's settings in your vault and go only to their own service. If you sync or share your `.obsidian` folder, they go with it.
 
+From Obsidian 1.11.4, each key can come from Obsidian's Keychain instead: pick a secret next to the key's field. Library then reads the key from the Keychain each time and keeps only the secret's name in its settings, so the key itself doesn't travel with your `.obsidian` folder. Pick nothing to type the key again.
+
 Accounts need no keys at all: AniList, MyAnimeList, Kitsu, IMDb, Netflix, PlayStation, Steam, and Nintendo connect with a Connect button; see [[Connected accounts|Connected-accounts]].
 
 A note from RAWG, Comic Vine, or Google Books refreshes only while that service's key is set.

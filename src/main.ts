@@ -9,9 +9,10 @@ import {
 	Platform,
 	getLanguage,
 	requestUrl,
+	requireApiVersion,
 	type CachedMetadata,
 } from 'obsidian'
-import { progressPattern, RATING_RT_ICON, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
+import { API_KEY_NAMES, progressPattern, RATING_RT_ICON, type ApiKeyName, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
 import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
@@ -252,24 +253,24 @@ export default class LibraryPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadSettings()
-		const googleBooks = new GoogleBooksProvider(() => this.settings.googleBooksApiKey)
+		const googleBooks = new GoogleBooksProvider(() => this.apiKey('googleBooksApiKey'))
 		const openLibrary = new OpenLibraryProvider()
-		const tmdb = new TmdbEnricher(() => this.settings.tmdbApiKey)
+		const tmdb = new TmdbEnricher(() => this.apiKey('tmdbApiKey'))
 		// Cinemeta is keyless; TMDB runs first and wins where both have data
 		this.registry.register(
-			new OmdbProvider(() => this.settings.omdbApiKey, [tmdb, new CinemetaEnricher(), new RottenTomatoesEnricher()])
+			new OmdbProvider(() => this.apiKey('omdbApiKey'), [tmdb, new CinemetaEnricher(), new RottenTomatoesEnricher()])
 		)
 		this.registry.register(new BookAggregatorProvider(googleBooks, openLibrary))
-		const trailers = new GameTrailerFinder(() => ({ id: this.settings.twitchClientId, secret: this.settings.twitchClientSecret }))
+		const trailers = new GameTrailerFinder(() => ({ id: this.apiKey('twitchClientId'), secret: this.apiKey('twitchClientSecret') }))
 		this.registry.register(new GameAggregatorProvider(
-			new RawgProvider(() => this.settings.rawgApiKey, trailers),
+			new RawgProvider(() => this.apiKey('rawgApiKey'), trailers),
 			new SteamProvider(trailers),
 			new WikidataGameProvider()
 		))
 		this.registry.register(new DeezerProvider())
 		this.registry.register(new AnimeAggregatorProvider(new AnimeProvider(() => this.settings), new MalProvider(() => MAL_CLIENT_ID, () => this.settings), new KitsuProvider(() => this.settings)))
 		this.registry.register(new ComicsAggregatorProvider(
-			new ComicsProvider(() => this.settings.comicVineApiKey),
+			new ComicsProvider(() => this.apiKey('comicVineApiKey')),
 			new WikidataComicProvider(),
 			new MangaProvider(() => this.settings)
 		))
@@ -3886,17 +3887,25 @@ export default class LibraryPlugin extends Plugin {
 		})
 	}
 
+	// A key from Obsidian's Keychain when one is picked for it (1.11.4+), else the one typed in the settings.
+	apiKey(name: ApiKeyName): string {
+		const id = this.settings.keySecrets[name]
+		if (!id) return this.settings[name].trim()
+		if (requireApiVersion('1.11.4')) return (this.app.secretStorage.getSecret(id) ?? '').trim()
+		return this.settings[name].trim()
+	}
+
 	// key signature per content type: only the types a changed key serves re-walk
 	private apiKeySignatures(): Record<string, string> {
-		const s = this.settings
-		const video = `${s.omdbApiKey}|${s.tmdbApiKey}`
+		const k = (name: ApiKeyName): string => this.apiKey(name)
+		const video = `${k('omdbApiKey')}|${k('tmdbApiKey')}`
 		return {
 			movie: video,
 			series: video,
-			book: s.googleBooksApiKey,
-			googlebook: s.googleBooksApiKey,
-			comic: s.comicVineApiKey,
-			game: `${s.rawgApiKey}|${s.twitchClientId}|${s.twitchClientSecret}`
+			book: k('googleBooksApiKey'),
+			googlebook: k('googleBooksApiKey'),
+			comic: k('comicVineApiKey'),
+			game: `${k('rawgApiKey')}|${k('twitchClientId')}|${k('twitchClientSecret')}`
 		}
 	}
 
@@ -4305,8 +4314,8 @@ export default class LibraryPlugin extends Plugin {
 				if (id) known.add(id)
 			}
 			pending = recommendationsFor(source, sourceId, toStr(fm.Name), toStrArray(fm.Genre).map(linkLabel), {
-				tmdb: this.settings.tmdbApiKey.trim(),
-				rawg: this.settings.rawgApiKey.trim()
+				tmdb: this.apiKey('tmdbApiKey'),
+				rawg: this.apiKey('rawgApiKey')
 			}, category?.contentType === 'series', known).catch(() => [] as Recommendation[])
 			this.recommendations.set(key, pending)
 		}
@@ -4731,6 +4740,12 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
+		const secrets = (this.settings.keySecrets && typeof this.settings.keySecrets === 'object' ? this.settings.keySecrets : {}) as Record<string, unknown>
+		this.settings.keySecrets = {}
+		for (const name of API_KEY_NAMES) {
+			const id = secrets[name]
+			if (typeof id === 'string' && id) this.settings.keySecrets[name] = id
+		}
 		const backfill = (this.settings.youtubeBackfill && typeof this.settings.youtubeBackfill === 'object' ? this.settings.youtubeBackfill : {}) as Partial<ILibrarySettings['youtubeBackfill']>
 		this.settings.youtubeBackfill = { token: typeof backfill.token === 'string' ? backfill.token : '', before: typeof backfill.before === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(backfill.before) ? backfill.before : '', done: backfill.done === true }
 		if (!this.settings.nintendoTokens || typeof this.settings.nintendoTokens !== 'object') this.settings.nintendoTokens = null
