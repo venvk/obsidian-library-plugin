@@ -993,6 +993,15 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// With the core Canvas plugin off, Obsidian hands a .canvas to the system, which hands it back to
+	// Obsidian, over and over until the app crashes: the plugin opens no canvas then, and says why.
+	private canvasOff(): boolean {
+		const plugins = (this.app as unknown as { internalPlugins?: { getEnabledPluginById?: (id: string) => unknown } }).internalPlugins
+		const off = typeof plugins?.getEnabledPluginById === 'function' && !plugins.getEnabledPluginById('canvas')
+		if (off) new Notice(tr('notice.canvasOff'))
+		return off
+	}
+
 	// A genre or a person shown in Library opens like its link: its note, or its canvas.
 	linkName(el: HTMLElement, value: string): void {
 		const link = this.toLinks(value)[0]
@@ -1004,6 +1013,7 @@ export default class LibraryPlugin extends Plugin {
 		const open = (event: Event): void => {
 			event.preventDefault()
 			event.stopPropagation()
+			if (target.endsWith('.canvas') && this.canvasOff()) return
 			void this.app.workspace.openLinkText(target, '', false)
 		}
 		el.addEventListener('click', open)
@@ -1012,6 +1022,7 @@ export default class LibraryPlugin extends Plugin {
 
 	// A canvas of the library: titles joined by the people they share.
 	async buildLibraryMap(): Promise<void> {
+		if (this.canvasOff()) return
 		const titles: { path: string; name: string; cover: string; people: string[] }[] = []
 		for (const file of this.app.vault.getMarkdownFiles()) {
 			if (isTemplateFile(file.path)) continue

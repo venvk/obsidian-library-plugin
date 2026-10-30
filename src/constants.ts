@@ -161,6 +161,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'header.progress': 'Progress',
 		'header.complete': 'Complete',
 		'header.markComplete': 'Mark complete',
+		'notice.canvasOff': 'Turn on the core Canvas plugin in Settings → Core plugins to open canvases.',
 		'stats.showCalendar': 'Show in days, months and years',
 		'stats.showHours': 'Show in hours',
 		'settings.keychain': 'Or pick a secret from Obsidian\'s Keychain; it is then read from there and never saved in the plugin\'s settings.',
