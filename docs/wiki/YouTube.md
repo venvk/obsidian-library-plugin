@@ -1,4 +1,4 @@
-YouTube connects in Settings → Library → Connectors → YouTube, and only in Obsidian on desktop. YouTube has no API for your own watch history, so Library reads your history page the way you would, through the session of the sign-in window.
+YouTube connects in Settings > Library > Connectors > YouTube, and only in Obsidian on desktop. YouTube has no API for your own watch history, so Library reads your history page the way you would, through the session of the sign-in window.
 
 General rules for connected accounts, such as where sign-ins are kept and what Disconnect does, are on [[Connected accounts|Connected-accounts]].
 

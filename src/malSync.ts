@@ -47,7 +47,7 @@ export function isStarted(status: string): boolean {
 	return STARTED.has(status as MalStatus)
 }
 
-// 96 bytes → 128 base64url chars, the longest RFC 7636 verifier allows.
+// 96 bytes make 128 base64url chars, the longest RFC 7636 verifier allows.
 export function makeVerifier(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(96))
 	let binary = ''

@@ -11,7 +11,7 @@ Every kind of title is searched in open sources that need no key:
 
 Anime results come from all three sites at once, MyAnimeList's first. A title two sites list shows once.
 
-Settings → Library → Connectors → Anime · Manga decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
+Settings > Library > Connectors > Anime · Manga decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
 
 An optional key adds a service, listed first in search, or extra data:
 
@@ -24,7 +24,7 @@ An optional key adds a service, listed first in search, or extra data:
 | [Twitch](#twitch-for-game-trailers) | Games | A YouTube trailer from IGDB for nearly every game |
 | [Comic Vine](#comic-vine) | Comics | Comic Vine results with covers and issue counts |
 
-Keys go in Settings → Library → API keys. They stay in the plugin's settings in your vault and go only to their own service. If you sync or share your `.obsidian` folder, they go with it.
+Keys go in Settings > Library > API keys. They stay in the plugin's settings in your vault and go only to their own service. If you sync or share your `.obsidian` folder, they go with it.
 
 From Obsidian 1.11.4, each key can come from Obsidian's Keychain instead: pick a secret next to the key's field. Library then reads the key from the Keychain each time and keeps only the secret's name in its settings, so the key itself doesn't travel with your `.obsidian` folder. Pick nothing to type the key again.
 
@@ -40,7 +40,7 @@ A free key allows 1,000 requests a day. When OMDb reports the limit or is down, 
 
 ## TMDB
 
-Create a free account at [themoviedb.org](https://www.themoviedb.org/), then request an API key under [Settings → API](https://www.themoviedb.org/settings/api). Paste the short API Key, not the long Read Access Token, into TMDB API key.
+Create a free account at [themoviedb.org](https://www.themoviedb.org/), then request an API key under [Settings > API](https://www.themoviedb.org/settings/api). Paste the short API Key, not the long Read Access Token, into TMDB API key.
 
 ## Google Books
 

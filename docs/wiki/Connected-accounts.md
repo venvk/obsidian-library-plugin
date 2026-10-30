@@ -1,4 +1,4 @@
-Connect an account in Settings → Library → Connectors. Your list arrives as notes, in the first category of each kind in Settings → Library → Categories, and for some services your changes go back.
+Connect an account in Settings > Library > Connectors. Your list arrives as notes, in the first category of each kind in Settings > Library > Categories, and for some services your changes go back.
 
 | Service | Comes in | Goes back | Details |
 | --- | --- | --- | --- |
@@ -41,7 +41,7 @@ Press Connect next to the service. On desktop, a sign-in window opens inside Obs
 
 ## Deleting a note
 
-When you delete a library note, Library asks whether to remove the title from the services that have it: AniList, MyAnimeList, Kitsu, Trakt, IMDb, and Netflix. Turn off any service you want to keep it on, then press Remove; closing the window keeps everything. A service is left out when another note still holds the title. Settings → Library → General → Offer to remove deleted notes from sites turns the question off.
+When you delete a library note, Library asks whether to remove the title from the services that have it: AniList, MyAnimeList, Kitsu, Trakt, IMDb, and Netflix. Turn off any service you want to keep it on, then press Remove; closing the window keeps everything. A service is left out when another note still holds the title. Settings > Library > General > Offer to remove deleted notes from sites turns the question off.
 
 Removing takes away the entry, its score, its progress, and its history. Netflix keeps the thumb, so Library hides the viewing history there (on desktop) and skips the title on later imports.
 

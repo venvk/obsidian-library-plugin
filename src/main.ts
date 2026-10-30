@@ -3044,7 +3044,7 @@ export default class LibraryPlugin extends Plugin {
 		return null
 	}
 
-	// one note → Kitsu: progress, status and score, creating the entry when new
+	// one note to Kitsu: progress, status and score, creating the entry when new
 	private async kitsuPushNote(file: TFile, loud: boolean, sendProgress = true): Promise<boolean> {
 		const token = await this.kitsuToken()
 		const name = tr('kitsu.name')

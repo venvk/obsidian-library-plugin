@@ -45,7 +45,7 @@ export function parseDate(val: unknown): number {
 	return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-// ISO → the note's dd.mm.yyyy, local time.
+// ISO to the note's dd.mm.yyyy, local time.
 export function dmyOf(iso: string): string {
 	const date = new Date(iso)
 	if (Number.isNaN(date.getTime())) return ''
@@ -352,7 +352,7 @@ function titleKey(value: string): string {
 		.trim()
 }
 
-// Genre/Cast/Creator hold [[links]]; the UI shows names: [[T|Alias]] → Alias.
+// Genre/Cast/Creator hold [[links]]; the UI shows names: [[T|Alias]] shows Alias.
 export function linkLabel(value: string): string {
 	const match = value.match(/^\[\[([^\]|]*)(?:\|([^\]]*))?\]\]$/)
 	if (!match) return value
@@ -362,13 +362,13 @@ export function linkLabel(value: string): string {
 // What a name's canvas gathers: the link properties and the plain names older notes keep.
 export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist']
 
-// The file a link property points at, without .canvas: [[Drama.canvas|Drama]] → Drama.
+// The file a link property points at, without .canvas: [[Drama.canvas|Drama]] gives Drama.
 export function linkTarget(value: string): string {
 	const target = /^\[\[([^\]|#^]+)/.exec(value)?.[1] ?? sanitizeLink(value)
 	return target.replace(/\.canvas$/i, '').trim()
 }
 
-// Plain names → [[Name.canvas|Name]], the canvas of the titles that share the
+// Plain names become [[Name.canvas|Name]], the canvas of the titles that share the
 // name; a name with a note of its own (hasNote) links the note. Written links
 // are kept, except a bare [[Name]] with no note behind it.
 export function toLinks(value: unknown, hasNote: (name: string) => boolean = () => false): string[] {

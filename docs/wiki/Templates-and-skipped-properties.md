@@ -2,7 +2,7 @@
 
 A template is an ordinary note that new notes of a category start from. Use it for things the sources don't fill: a shelf of your own, tags, or sections you always write.
 
-Templates belong to custom categories. A built-in category, the first one of each kind, takes no template; to use one, add a category of the same kind with Settings → Library → Categories → Add category and give it the template. See [[Getting started|Getting-started#categories-and-folders]].
+Templates belong to custom categories. A built-in category, the first one of each kind, takes no template; to use one, add a category of the same kind with Settings > Library > Categories > Add category and give it the template. See [[Getting started|Getting-started#categories-and-folders]].
 
 1. Create the template, for example `Templates/Movie`:
 
@@ -16,7 +16,7 @@ Templates belong to custom categories. A built-in category, the first one of eac
    ## Quotes
    ```
 
-2. In Settings → Library → Categories, open the custom category with its chevron and enter the template's path in Template, for example `Templates/Movie`. The `.md` ending is optional. Existing notes don't change.
+2. In Settings > Library > Categories, open the custom category with its chevron and enter the template's path in Template, for example `Templates/Movie`. The `.md` ending is optional. Existing notes don't change.
 
 From then on, every note added to the category starts as a copy of the template, properties and text, whether it comes from search, from a Manual category, or from an import. Imports add notes to the first category of their kind in the list, so drag the custom category above the built-in one if imported notes should use the template too. Library then adds its own fields:
 
@@ -31,7 +31,7 @@ If the template is moved or deleted, Library shows "Template not found" and crea
 
 ## Skipped properties
 
-Settings → Library → General → Skip properties takes the fields that notes should not get from the sources, separated by commas, for example `Cast, Gallery, Trailer`. New notes leave them out, and a refresh doesn't add them. Values already in your notes stay; delete them by hand if you want them gone.
+Settings > Library > General > Skip properties takes the fields that notes should not get from the sources, separated by commas, for example `Cast, Gallery, Trailer`. New notes leave them out, and a refresh doesn't add them. Values already in your notes stay; delete them by hand if you want them gone.
 
 - Capitals don't matter.
 - The cover can be listed under either name: with Cover property set to `image`, both `Cover` and `image` skip it.

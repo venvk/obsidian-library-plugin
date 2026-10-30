@@ -59,7 +59,7 @@ export function toEmbed(raw: unknown): Embed | null {
 	if (youtube) return { kind: 'youtube', src: `https://www.youtube-nocookie.com/embed/${youtube}` }
 	const vimeo = vimeoId(url)
 	if (vimeo) return { kind: 'vimeo', src: `https://player.vimeo.com/video/${vimeo}` }
-	// Video file or stream (Steam trailers are HLS) → <video>.
+	// Video file or stream (Steam trailers are HLS) plays in a <video>.
 	try {
 		const parsed = new URL(url)
 		if (parsed.protocol === 'https:' && /\.(m3u8|mp4|webm)$/i.test(parsed.pathname)) return { kind: 'video', src: url }

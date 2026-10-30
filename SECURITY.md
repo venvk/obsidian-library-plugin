@@ -8,7 +8,7 @@ The report stays private between you and the maintainer until a fix is out. The 
 
 ## Supported versions
 
-Only the latest release gets fixes. Obsidian offers it as an update in Settings → Community plugins; there are no separate security releases for older versions.
+Only the latest release gets fixes. Obsidian offers it as an update in Settings > Community plugins; there are no separate security releases for older versions.
 
 ## What Library keeps, and where
 

@@ -109,7 +109,7 @@ Renaming or removing one of these breaks refresh, statistics, or sync for that n
 | `Trailer` | A trailer link | movies, series, anime, games |
 | `Gallery` | Still images or screenshots | movies, series, anime, games |
 
-Settings → Library → General → Skip properties keeps any of these out of notes; see [[Templates and skipped properties|Templates-and-skipped-properties]].
+Settings > Library > General > Skip properties keeps any of these out of notes; see [[Templates and skipped properties|Templates-and-skipped-properties]].
 
 ## Properties from connected accounts
 
@@ -154,9 +154,9 @@ Notes from older versions can have another `Source`, such as `rawg` or `steam`. 
 
 ## Cover
 
-Settings → Library → General → Cover property renames the cover field, for example to `image` if you already use that name. Notes keep working after a rename, because Library also reads `Cover` and `Image`. A cover can be an image address, or an image in your vault written as a path or an internal link.
+Settings > Library > General > Cover property renames the cover field, for example to `image` if you already use that name. Notes keep working after a rename, because Library also reads `Cover` and `Image`. A cover can be an image address, or an image in your vault written as a path or an internal link.
 
-Turn on Settings → Library → General → Keep covers in the vault to keep covers offline. Library downloads each note's cover, one at a time in the background, into a Covers folder in your library folder, and points the cover property at the file, such as `[[Library/Covers/Dune.jpg]]`. New notes get theirs right away. A cover that can't be downloaded stays an address. Turning the setting off leaves the downloaded files and links as they are.
+Turn on Settings > Library > General > Keep covers in the vault to keep covers offline. Library downloads each note's cover, one at a time in the background, into a Covers folder in your library folder, and points the cover property at the file, such as `[[Library/Covers/Dune.jpg]]`. New notes get theirs right away. A cover that can't be downloaded stays an address. Turning the setting off leaves the downloaded files and links as they are.
 
 ## Refresh
 

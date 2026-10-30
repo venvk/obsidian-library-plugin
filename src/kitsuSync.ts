@@ -92,7 +92,7 @@ export function tokensFromKitsuSession(raw: string | null): KitsuTokens | null {
 		const auth = session.authenticated
 		if (typeof auth?.access_token !== 'string' || typeof auth?.refresh_token !== 'string') return null
 		const at = Number(auth.expires_at)
-		// seconds in the old Ember days, milliseconds now; no date → the first call refreshes
+		// seconds in the old Ember days, milliseconds now; no date: the first call refreshes
 		const expiresAt = Number.isFinite(at) && at > 0 ? (at > 1e12 ? at : at * 1000) : 0
 		return { access: auth.access_token, refresh: auth.refresh_token, expiresAt }
 	} catch {
