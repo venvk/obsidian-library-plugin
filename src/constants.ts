@@ -495,7 +495,14 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.section.games': 'Games',
 		'settings.imdb.desc': 'Ratings, episode ratings and watchlist sync both ways; a score in your note wins.',
 		'settings.netflix.desc': 'Titles you watched on Netflix arrive as notes.',
-		'settings.youtube.desc': 'Videos you watched on YouTube in the last 7 days arrive as notes, with the time you spent on each. Shorts are left out.',
+		'settings.youtube.desc': 'Videos you watch on YouTube arrive as notes, with the time you spent on each: the last 7 days first, then one older month a day. Shorts are left out.',
+		'header.description': 'Description',
+		'header.subscribed': 'subscribed',
+		'header.reaction': 'On YouTube',
+		'header.liked': 'Liked',
+		'header.disliked': 'Disliked',
+		'header.rewatched': 'Rewatched',
+		'header.openYoutube': 'Open on YouTube',
 		'site.youtube.loginTitle': 'Sign in to YouTube',
 		'site.imdb.loginTitle': 'Sign in to IMDb',
 		'site.netflix.loginTitle': 'Sign in to Netflix',
@@ -33020,6 +33027,8 @@ export interface ILibrarySettings {
 	steamId: string
 	// Last full read; the daily re-import waits a day from it.
 	steamLastImport: number
+	// YouTube history read back one month a day: the continuation to start from, the first day already read, the end reached
+	youtubeBackfill: { token: string; before: string; done: boolean }
 	nintendoTokens: NintendoTokens | null
 	nintendoStats: NintendoStats | null
 	nintendoLastImport: number
@@ -33101,6 +33110,7 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	nintendoStats: null,
 	nintendoLastImport: 0,
 	watchSites: { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 } },
+	youtubeBackfill: { token: '', before: '', done: false },
 	imdbEcho: {},
 	netflixEcho: {},
 	netflixSeen: {},

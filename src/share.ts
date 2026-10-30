@@ -8,6 +8,8 @@ const H = 630
 const PAD = 48
 const POSTER_W = 340
 const POSTER_H = 510
+// a video thumbnail: room left for the title beside it
+const WIDE_W = 560
 const PLUGIN_URL = 'https://community.obsidian.md/plugins/library'
 
 type Frontmatter = Record<string, unknown>
@@ -171,21 +173,24 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 
 	const posterX = PAD
 	const posterY = (H - POSTER_H) / 2
-	// album covers are square
-	const posterW = toStr(fm.Type).toLowerCase() === 'music' ? POSTER_H : POSTER_W
+	// album covers are square, video thumbnails wide: 16:9 across the poster's height centre
+	const wide = toStr(fm.Source) === 'youtube'
+	const posterW = toStr(fm.Type).toLowerCase() === 'music' ? POSTER_H : wide ? WIDE_W : POSTER_W
+	const imageH = wide ? Math.round((WIDE_W * 9) / 16) : POSTER_H
+	const imageY = posterY + (POSTER_H - imageH) / 2
 	const coverBytes = await loadCoverBytes(app, coverValue(fm, coverProperty))
 	const img = coverBytes ? await loadImage(coverBytes) : null
-	roundRect(ctx, posterX, posterY, posterW, POSTER_H, 16)
+	roundRect(ctx, posterX, imageY, posterW, imageH, 16)
 	ctx.save()
 	ctx.clip()
 	if (img && img.width > 0 && img.height > 0) {
-		const scale = Math.max(posterW / img.width, POSTER_H / img.height)
+		const scale = Math.max(posterW / img.width, imageH / img.height)
 		const dw = img.width * scale
 		const dh = img.height * scale
-		ctx.drawImage(img, posterX + (posterW - dw) / 2, posterY + (POSTER_H - dh) / 2, dw, dh)
+		ctx.drawImage(img, posterX + (posterW - dw) / 2, imageY + (imageH - dh) / 2, dw, dh)
 	} else {
 		ctx.fillStyle = '#24242e'
-		ctx.fillRect(posterX, posterY, posterW, POSTER_H)
+		ctx.fillRect(posterX, imageY, posterW, imageH)
 		ctx.fillStyle = '#5a5a6e'
 		ctx.font = '140px sans-serif'
 		ctx.textAlign = 'center'

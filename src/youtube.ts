@@ -1,3 +1,4 @@
+import { tr } from './i18n'
 import { readPage } from './watchSites'
 
 // YouTube watch history, read from the history page as the signed-in member, Shorts left out.
@@ -7,6 +8,8 @@ export interface HistoryItem {
 	id: string
 	title: string
 	channel: string
+	// the channel's path on the site, "/@name"
+	channelPath?: string
 	// the duration badge, "23:33" or "1:02:03"; '' for a live stream
 	length: string
 	// the watched share of the video, 0 to 100; null when the page shows no bar
@@ -21,12 +24,15 @@ export interface HistorySection {
 export interface HistoryPage {
 	lang: string
 	sections: HistorySection[]
+	// the continuation of older days; '' at the end of the history
+	next?: string
 }
 
 export interface WatchedVideo {
 	id: string
 	title: string
 	channel: string
+	channelUrl: string
 	// the video's length; 0 for a live stream
 	seconds: number
 	// the watched share, 0 to 100
@@ -35,31 +41,59 @@ export interface WatchedVideo {
 	day: string
 }
 
+export interface VideoDetails {
+	description: string
+	reaction: 'like' | 'dislike' | ''
+	subscribed: boolean | null
+	channelUrl: string
+}
+
 const VIDEO_ID = /^[\w-]{11}$/
+const CHANNEL_PATH = /^\/(@[^/?#\s]+|channel\/UC[\w-]+)$/
 
 // the category and Source of the connector's notes
 export const YOUTUBE_TYPE = 'YouTube'
 export const YOUTUBE_SOURCE = 'youtube'
+
+// dated headings reach back this far
+const HISTORY_DAYS = 25 * 366
 
 export function lengthSeconds(length: string): number {
 	if (!/^\d+(:\d{1,2}){1,2}$/.test(length.trim())) return 0
 	return length.trim().split(':').reduce((total, part) => total * 60 + Number(part), 0)
 }
 
-// How the page names a day `offset` days back: "today", "yesterday", a weekday within
-// the week, then a short date, with its year before this one.
-function dayName(lang: string, now: Date, offset: number): string {
+export function channelUrl(path: string | undefined): string {
+	return path && CHANNEL_PATH.test(path) ? `https://www.youtube.com${path}` : ''
+}
+
+// How the page names each day back, to its offset: "today", "yesterday", a weekday
+// within the week, then a short date, with its year before this one.
+function dayOffsets(lang: string, now: Date): Map<string, number> {
 	type Relative = new (lang: string, options: { numeric: string }) => { format: (value: number, unit: string) => string }
 	const relative = (Intl as unknown as { RelativeTimeFormat?: Relative }).RelativeTimeFormat
-	const date = dayBack(now, offset)
-	try {
-		if (offset < 2) return relative ? new relative(lang, { numeric: 'auto' }).format(-offset, 'day') : ''
-		if (offset < 7) return date.toLocaleDateString(lang, { weekday: 'long' })
-		const year = date.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' as const }
-		return date.toLocaleDateString(lang, { day: 'numeric', month: 'short', ...year })
-	} catch {
-		return ''
+	const offsets = new Map<string, number>()
+	const add = (name: string, offset: number): void => {
+		const key = name.trim().toLocaleLowerCase()
+		if (key && !offsets.has(key)) offsets.set(key, offset)
 	}
+	try {
+		if (relative) {
+			const named = new relative(lang, { numeric: 'auto' })
+			add(named.format(0, 'day'), 0)
+			add(named.format(-1, 'day'), 1)
+		}
+		const weekday = new Intl.DateTimeFormat(lang, { weekday: 'long' })
+		const short = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short' })
+		const dated = new Intl.DateTimeFormat(lang, { day: 'numeric', month: 'short', year: 'numeric' })
+		for (let offset = 2; offset < HISTORY_DAYS; offset++) {
+			const date = dayBack(now, offset)
+			add((offset < 7 ? weekday : date.getFullYear() === now.getFullYear() ? short : dated).format(date), offset)
+		}
+	} catch {
+		// an unknown language: every day reads as today
+	}
+	return offsets
 }
 
 // Calendar days from `time` (ms) to today: 0 for today.
@@ -72,51 +106,71 @@ function dayBack(now: Date, offset: number): Date {
 	return new Date(now.getFullYear(), now.getMonth(), now.getDate() - offset)
 }
 
-// Newest first, one entry per video: its latest viewing, from the last `days` days.
-export function newHistory(page: HistoryPage, days: number, now = new Date()): WatchedVideo[] {
-	const offsets = new Map<string, number>()
-	for (let offset = 0; offset < days; offset++) {
-		const name = dayName(page.lang, now, offset).trim().toLocaleLowerCase()
-		if (name && !offsets.has(name)) offsets.set(name, offset)
-	}
-	const out: WatchedVideo[] = []
+export function isoDay(date: Date): string {
+	return `${String(date.getFullYear())}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+// A page's videos, newest first, each at its latest viewing, with the day of its
+// last section; `days` keeps only the last so many days.
+export function pageVideos(page: HistoryPage, now = new Date(), days = HISTORY_DAYS): { videos: WatchedVideo[]; lastDay: string } {
+	const offsets = dayOffsets(page.lang, now)
+	const videos: WatchedVideo[] = []
 	const seen = new Set<string>()
 	let offset = 0
+	let lastDay = ''
 	for (const section of page.sections) {
 		const named = offsets.get(section.title.trim().toLocaleLowerCase())
 		// an unknown name stays on the day before it: never a later one
 		if (named !== undefined && named >= offset) offset = named
-		// a day older than wanted has no name in the table
-		if (named === undefined && /\d/.test(section.title)) break
-		const items = section.items.filter(item => VIDEO_ID.test(item.id) && item.title)
-		const date = dayBack(now, offset)
-		const day = `${String(date.getFullYear())}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-		for (const item of items) {
-			if (seen.has(item.id)) continue
+		if (offset >= days) break
+		lastDay = isoDay(dayBack(now, offset))
+		for (const item of section.items) {
+			if (!VIDEO_ID.test(item.id) || !item.title || seen.has(item.id)) continue
 			seen.add(item.id)
-			out.push({ id: item.id, title: item.title, channel: item.channel, seconds: lengthSeconds(item.length), percent: Math.round(Math.min(100, Math.max(0, item.percent ?? 100))), day })
+			videos.push({ id: item.id, title: item.title, channel: item.channel, channelUrl: channelUrl(item.channelPath), seconds: lengthSeconds(item.length), percent: Math.round(Math.min(100, Math.max(0, item.percent ?? 100))), day: lastDay })
 		}
 	}
-	return out
+	return { videos, lastDay }
 }
 
-// ponytail: only the page's first batch (about two weeks of an average history); scrolling
-// for more is needed only after weeks away or for hundreds of videos a week.
-const YOUTUBE_READ = `(() => {
-	const data = window.ytInitialData;
+// The page's own API calls carry the signed-in session: SAPISIDHASH, as its scripts sign them.
+const YOUTUBE_ASK = `
 	const config = window.ytcfg && window.ytcfg.get ? window.ytcfg.get.bind(window.ytcfg) : null;
-	if (!data || !config) return '';
+	if (!window.ytInitialData || !config) return '';
 	if (config('LOGGED_IN') === false || location.hostname !== 'www.youtube.com') return 'signed-out';
-	const text = (t) => t ? (t.content ?? t.simpleText ?? (t.runs || []).map(r => r.text).join('')) : '';
-	const tabs = data.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
-	const sections = tabs[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
-	const out = [];
-	for (const section of sections) {
-		const list = section.itemSectionRenderer;
+	const ask = async (path, body) => {
+		const sid = (document.cookie.match(/(?:^|; )SAPISID=([^;]+)/) || [])[1] || '';
+		const time = Math.floor(Date.now() / 1000);
+		const digest = await crypto.subtle.digest('SHA-1', new TextEncoder().encode(time + ' ' + sid + ' ' + location.origin));
+		const hash = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
+		const r = await window.fetch('/youtubei/v1/' + path + '?prettyPrint=false', { method: 'POST', credentials: 'include', body: JSON.stringify({ context: config('INNERTUBE_CONTEXT'), ...body }),
+			headers: { 'content-type': 'application/json', authorization: 'SAPISIDHASH ' + time + '_' + hash, 'x-origin': location.origin, 'x-goog-authuser': '0' } });
+		if (!r.ok) throw new Error(String(r.status));
+		return r.json();
+	};
+	const text = (t) => t ? (t.content ?? t.simpleText ?? (t.runs || []).map(r => r.text).join('')) : '';`
+
+// One batch of the history: the page's own, or the continuation `token` names.
+function historyCode(token: string): string {
+	return `(async () => {${YOUTUBE_ASK}
+	const token = ${JSON.stringify(token)};
+	let entries;
+	if (token) {
+		const more = await ask('browse', { continuation: token });
+		entries = [].concat(...(more.onResponseReceivedActions || []).map(a => a.appendContinuationItemsAction?.continuationItems || []));
+	} else {
+		const tabs = window.ytInitialData.contents?.twoColumnBrowseResultsRenderer?.tabs || [];
+		entries = tabs[0]?.tabRenderer?.content?.sectionListRenderer?.contents || [];
+	}
+	const sections = [];
+	let next = '';
+	for (const entry of entries) {
+		next = entry.continuationItemRenderer?.continuationEndpoint?.continuationCommand?.token || next;
+		const list = entry.itemSectionRenderer;
 		if (!list) continue;
 		const items = [];
-		for (const entry of list.contents || []) {
-			const lockup = entry.lockupViewModel;
+		for (const item of list.contents || []) {
+			const lockup = item.lockupViewModel;
 			if (lockup && lockup.contentType === 'LOCKUP_CONTENT_TYPE_VIDEO') {
 				const meta = lockup.metadata?.lockupMetadataViewModel;
 				let length = '', percent = null;
@@ -127,28 +181,80 @@ const YOUTUBE_READ = `(() => {
 					if (typeof bar === 'number') percent = bar;
 					for (const badge of bottom.badges || []) length = badge.thumbnailBadgeViewModel?.text || length;
 				}
-				items.push({ id: lockup.contentId || '', title: text(meta?.title), channel: text(meta?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts?.[0]?.text), length, percent });
+				const channelPath = meta?.image?.decoratedAvatarViewModel?.rendererContext?.commandContext?.onTap?.innertubeCommand?.browseEndpoint?.canonicalBaseUrl || '';
+				items.push({ id: lockup.contentId || '', title: text(meta?.title), channel: text(meta?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts?.[0]?.text), channelPath, length, percent });
 			}
-			const video = entry.videoRenderer;
+			const video = item.videoRenderer;
 			if (video) {
 				const resume = (video.thumbnailOverlays || []).map(o => o.thumbnailOverlayResumePlaybackRenderer).find(Boolean);
-				items.push({ id: video.videoId || '', title: text(video.title), channel: text(video.ownerText || video.longBylineText), length: text(video.lengthText), percent: typeof resume?.percentDurationWatched === 'number' ? resume.percentDurationWatched : null });
+				const owner = video.ownerText || video.longBylineText;
+				items.push({ id: video.videoId || '', title: text(video.title), channel: text(owner), channelPath: owner?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '', length: text(video.lengthText), percent: typeof resume?.percentDurationWatched === 'number' ? resume.percentDurationWatched : null });
 			}
 		}
-		out.push({ title: text(list.header?.itemSectionHeaderRenderer?.title), items });
+		sections.push({ title: text(list.header?.itemSectionHeaderRenderer?.title), items });
 	}
-	return JSON.stringify({ lang: document.documentElement.lang || 'en', sections: out });
-})()`
+	return JSON.stringify({ lang: document.documentElement.lang || 'en', sections, next });
+})().catch(() => '')`
+}
 
-export async function youtubeHistory(days: number, now = new Date()): Promise<WatchedVideo[] | 'signed-out' | null> {
-	// signed out, the page sends the window to the Google sign-in
-	const answer = await readPage('https://www.youtube.com/feed/history', YOUTUBE_READ, 60000, "!!window.ytInitialData || location.hostname !== 'www.youtube.com'")
+const HISTORY_URL = 'https://www.youtube.com/feed/history'
+// signed out, the page sends the window to the Google sign-in
+const HISTORY_READY = "!!window.ytInitialData || location.hostname !== 'www.youtube.com'"
+
+export async function youtubePage(token = ''): Promise<HistoryPage | 'signed-out' | null> {
+	const answer = await readPage(HISTORY_URL, historyCode(token), 60000, HISTORY_READY)
 	if (answer === 'signed-out') return answer
 	try {
-		return newHistory(JSON.parse(answer) as HistoryPage, days, now)
+		return JSON.parse(answer) as HistoryPage
 	} catch {
 		return null
 	}
+}
+
+// Description, like and subscription of each video, as the watch page shows them.
+export async function videoDetails(ids: string[]): Promise<Map<string, VideoDetails>> {
+	const out = new Map<string, VideoDetails>()
+	const clean = ids.filter(id => VIDEO_ID.test(id))
+	if (clean.length === 0) return out
+	const code = `(async () => {${YOUTUBE_ASK}
+	const out = {};
+	for (const id of ${JSON.stringify(clean)}) {
+		try {
+			const watch = await ask('next', { videoId: id });
+			const parts = watch.contents?.twoColumnWatchNextResults?.results?.results?.contents || [];
+			const primary = parts.map(p => p.videoPrimaryInfoRenderer).find(Boolean);
+			const secondary = parts.map(p => p.videoSecondaryInfoRenderer).find(Boolean);
+			const like = (JSON.stringify(primary || {}).match(/"likeStatus":"([A-Z]+)"/) || [])[1] || '';
+			const subscribed = secondary?.subscribeButton?.subscribeButtonRenderer?.subscribed;
+			out[id] = { description: text(secondary?.attributedDescription) || text(secondary?.description), reaction: like === 'LIKE' ? 'like' : like === 'DISLIKE' ? 'dislike' : '',
+				subscribed: typeof subscribed === 'boolean' ? subscribed : null, channelPath: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '' };
+		} catch {}
+		await new Promise(r => setTimeout(r, 300));
+	}
+	return JSON.stringify(out);
+})().catch(() => '')`
+	try {
+		const answer = JSON.parse(await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown }>
+		for (const id of clean) {
+			const found = answer[id]
+			if (!found) continue
+			out.set(id, {
+				description: typeof found.description === 'string' ? found.description : '',
+				reaction: found.reaction === 'like' || found.reaction === 'dislike' ? found.reaction : '',
+				subscribed: typeof found.subscribed === 'boolean' ? found.subscribed : null,
+				channelUrl: channelUrl(typeof found.channelPath === 'string' ? found.channelPath : ''),
+			})
+		}
+	} catch {
+		// no answer: the notes are made without
+	}
+	return out
+}
+
+// The description as a callout in the note's body, every line quoted.
+export function descriptionCallout(description: string, title = tr('header.description')): string {
+	const lines = description.replace(/\r/g, '').trim().split('\n').map(line => `> ${line}`.replace(/\s+$/, ''))
+	return [`> [!quote] ${title}`, ...lines].join('\n')
 }
 
 export function videoUrl(id: string): string {

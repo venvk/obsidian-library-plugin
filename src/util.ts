@@ -273,8 +273,10 @@ export function watchedRuntimeMinutes(fm: Record<string, unknown>, kind?: Conten
 	const { watched, total } = progressEpisodes(fm)
 	// Album Runtime is the whole album: the played track share counts.
 	if (kind === 'music' || isVideo(fm)) {
-		if (isFinished(fm, kind)) return perEpisode
-		return total > 0 ? Math.round(perEpisode * Math.min(1, watched / total)) : 0
+		// a rewatched video counts once more for each rewatch
+		const times = isVideo(fm) ? 1 + Math.max(0, Number(fm.Rewatched) || 0) : 1
+		if (isFinished(fm, kind)) return perEpisode * times
+		return total > 0 ? Math.round(perEpisode * Math.min(1, watched / total) * times) : 0
 	}
 	if (isFinished(fm, kind)) return perEpisode * (total > 0 ? total : 1)
 	return perEpisode * watched

@@ -40,7 +40,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeHistory, videoCover, videoUrl } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -1416,72 +1416,172 @@ export default class LibraryPlugin extends Plugin {
 		void (site === 'imdb' ? this.imdbBackfill() : this.netflixBackfill().then(() => this.netflixUnwatchAll()))
 	}
 
-	// YouTube: the history kept from the day of connecting on; each import brings the last 7 days, Shorts left out,
-	// into a YouTube category made on first use; later ones catch up every day since. Older viewings are never read:
-	// years of history would flood the vault.
+	// YouTube: a note per video, Shorts left out, in a YouTube category made on first use. The first import brings
+	// the last 7 days, later ones every day since the last; a video seen again on a later day counts a rewatch.
+	// Then one older month a day, back to the start of the history, so years of it never land at once.
 	private async youtubeImport(loud: boolean): Promise<void> {
 		this.watchImporting = true
 		try {
 			if (loud) new Notice(tr('notice.site.importing', { site: 'YouTube' }))
-			const byId = new Map<string, TFile>()
-			for (const file of this.app.vault.getMarkdownFiles()) {
-				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-				if (fm && toStr(fm.Source) === YOUTUBE_SOURCE && !isTemplateFile(file.path)) byId.set(toStr(fm['Source ID']), file)
-			}
-			// the first import takes 7 days, a later one every day since the last, that day included
+			const notes = this.youtubeNotes()
 			const last = this.settings.watchSites.youtube.lastImport
-			const videos = await youtubeHistory(last > 0 ? Math.max(7, daysSince(last) + 1) : 7)
-			if (videos === 'signed-out') {
-				this.settings.watchSites.youtube.connected = false
-				await this.saveSettings()
-				new Notice(tr('notice.site.signedOut', { site: 'YouTube' }))
-				return
-			}
-			if (!videos) { if (loud) new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
-			let created = 0
-			let updated = 0
-			let category = this.settings.categories.find(c => c.typeValue === YOUTUBE_TYPE)
-			for (const video of videos) {
-				if (this.unloaded) return
-				try {
-					// Runtime is the whole video, Progress the watched share in percent
-					const length = video.seconds > 0 ? Math.max(1, Math.round(video.seconds / 60)) : 0
-					const done = video.percent >= 95
-					const existing = byId.get(video.id)
-					if (existing) {
-						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
-						const had = /^(\d+)\/100$/.exec(toStr(fm?.Progress))
-						// progress never moves backwards
-						if (had && video.percent <= Number(had[1])) continue
-						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
-							if (length > 0) current.Runtime = length
-							current.Progress = `${String(video.percent)}/100`
-							// notes of the first build held minutes watched and always Complete
-							if (!had) current.Complete = done
-							else if (done) current.Complete = true
-						})
-						updated++
-						continue
-					}
-					if (!category) category = await this.youtubeCategory()
-					const url = videoUrl(video.id)
-					const meta: NormalizedMetadata = {
-						fields: { Name: video.title, Creator: video.channel, Cover: videoCover(video.id), URL: url, Trailer: url, ...(length > 0 ? { Runtime: length } : {}) },
-						progressTotal: null,
-						imdbId: null,
-					}
-					byId.set(video.id, await this.newNote(category, YOUTUBE_SOURCE, video.id, video.title, meta, { Progress: `${String(video.percent)}/100`, Complete: done, Date: dmyOf(`${video.day}T12:00:00`) }))
-					created++
-				} catch (e) {
-					console.error('Library: YouTube import error', video.id, e)
+			const days = last > 0 ? Math.max(7, daysSince(last) + 1) : 7
+			const fresh: WatchedVideo[] = []
+			const seen = new Set<string>()
+			let token = ''
+			for (let batch = 0; batch < 20; batch++) {
+				const page = await youtubePage(token)
+				if (page === 'signed-out') {
+					this.settings.watchSites.youtube.connected = false
+					await this.saveSettings()
+					new Notice(tr('notice.site.signedOut', { site: 'YouTube' }))
+					return
 				}
+				if (!page) { if (loud) new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+				const { videos, lastDay } = pageVideos(page, new Date(), days)
+				for (const video of videos) if (!seen.has(video.id)) { seen.add(video.id); fresh.push(video) }
+				const windowStart = isoDay(new Date(Date.now() - (days - 1) * 86400000))
+				if (!page.next || !lastDay || lastDay <= windowStart || videos.length === 0) break
+				token = page.next
 			}
+			const { created, updated } = await this.youtubeSave(fresh, notes, true)
+			// older months start below the first import's week
+			if (!this.settings.youtubeBackfill.before) this.settings.youtubeBackfill = { token: '', before: isoDay(new Date(Date.now() - 6 * 86400000)), done: false }
 			this.settings.watchSites.youtube.lastImport = Date.now()
 			await this.saveSettings()
 			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated }))
+			await this.youtubeBackfill(notes)
 		} finally {
 			this.watchImporting = false
 		}
+	}
+
+	private youtubeNotes(): Map<string, TFile> {
+		const byId = new Map<string, TFile>()
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (fm && toStr(fm.Source) === YOUTUBE_SOURCE && !isTemplateFile(file.path)) byId.set(toStr(fm['Source ID']), file)
+		}
+		return byId
+	}
+
+	// One older month of the history: from where the last run stopped back to that month's first day.
+	private async youtubeBackfill(notes: Map<string, TFile>): Promise<void> {
+		const state = this.settings.youtubeBackfill
+		if (state.done || !state.before) return
+		const before = new Date(`${state.before}T12:00:00`)
+		const monthStart = isoDay(new Date(before.getFullYear(), before.getMonth() - (before.getDate() === 1 ? 1 : 0), 1))
+		const found: WatchedVideo[] = []
+		let token = state.token
+		let reached = false
+		for (let batch = 0; batch < 40 && !reached; batch++) {
+			const page = await youtubePage(token)
+			// a stale continuation: the next run walks from the top again
+			if (!page || page === 'signed-out') { state.token = ''; await this.saveSettings(); return }
+			const { videos, lastDay } = pageVideos(page)
+			for (const video of videos) if (video.day < state.before && video.day >= monthStart && !notes.has(video.id)) found.push(video)
+			if (lastDay && lastDay < monthStart) {
+				// the page holds the month's end: read again next time
+				reached = true
+			} else if (!page.next) {
+				state.done = true
+				reached = true
+			} else {
+				token = page.next
+			}
+		}
+		const { created } = await this.youtubeSave(found, notes, false)
+		// a month longer than the run's batches goes on from where it stopped
+		state.token = token
+		if (reached && !state.done) state.before = monthStart
+		await this.saveSettings()
+		if (created > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated: 0 }))
+	}
+
+	// New videos become notes; on `rewatch`, a known one seen on a later day counts a rewatch, and its progress only grows.
+	private async youtubeSave(videos: WatchedVideo[], notes: Map<string, TFile>, rewatch: boolean): Promise<{ created: number; updated: number }> {
+		let created = 0
+		let updated = 0
+		const lastSeen = (file: TFile): string => {
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			const dmy = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(toStr(fm?.['Last Watched']) || toStr(fm?.Date))
+			return dmy ? `${dmy[3] ?? ''}-${dmy[2] ?? ''}-${dmy[1] ?? ''}` : ''
+		}
+		// notes of the first builds have no details yet
+		const bare = (file: TFile): boolean => !('Subscribed' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))
+		const wanted = videos.filter(video => {
+			const file = notes.get(video.id)
+			return !file || (rewatch && (video.day > lastSeen(file) || bare(file)))
+		})
+		const details = new Map<string, VideoDetails>()
+		for (let i = 0; i < wanted.length && !this.unloaded; i += 40) {
+			for (const [id, found] of await videoDetails(wanted.slice(i, i + 40).map(video => video.id))) details.set(id, found)
+		}
+		let category = this.settings.categories.find(c => c.typeValue === YOUTUBE_TYPE)
+		for (const video of videos) {
+			if (this.unloaded) break
+			try {
+				// Runtime is the whole video, Progress the watched share in percent
+				const length = video.seconds > 0 ? Math.max(1, Math.round(video.seconds / 60)) : 0
+				const done = video.percent >= 95
+				const found = details.get(video.id)
+				const existing = notes.get(video.id)
+				if (existing) {
+					if (!rewatch) continue
+					const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+					const had = /^(\d+)\/100$/.exec(toStr(fm?.Progress))
+					const again = video.day > lastSeen(existing)
+					const fill = !!found && bare(existing)
+					// progress never moves backwards
+					if (!again && !fill && had && video.percent <= Number(had[1])) continue
+					await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+						if (length > 0) current.Runtime = length
+						if (!had || video.percent > Number(had[1])) current.Progress = `${String(video.percent)}/100`
+						// notes of the first build held minutes watched and always Complete
+						if (!had) current.Complete = done
+						else if (done) current.Complete = true
+						if (again) {
+							current.Rewatched = (Number(current.Rewatched) || 0) + 1
+							current['Last Watched'] = dmyOf(`${video.day}T12:00:00`)
+						}
+						if (found) this.youtubeDetails(current, found)
+					})
+					if (fill && found?.description) await this.addDescription(existing, found.description)
+					updated++
+					continue
+				}
+				if (!category) category = await this.youtubeCategory()
+				const url = videoUrl(video.id)
+				const meta: NormalizedMetadata = {
+					fields: { Name: video.title, Creator: video.channel, Cover: videoCover(video.id), URL: url, Trailer: url, ...(length > 0 ? { Runtime: length } : {}) },
+					progressTotal: null,
+					imdbId: null,
+				}
+				const extra: Record<string, unknown> = { Progress: `${String(video.percent)}/100`, Complete: done, Date: dmyOf(`${video.day}T12:00:00`) }
+				const channel = found?.channelUrl || video.channelUrl
+				if (channel) extra['Channel URL'] = channel
+				if (found) this.youtubeDetails(extra, found)
+				const file = await this.newNote(category, YOUTUBE_SOURCE, video.id, video.title, meta, extra)
+				if (found?.description) await this.addDescription(file, found.description)
+				notes.set(video.id, file)
+				created++
+			} catch (e) {
+				console.error('Library: YouTube import error', video.id, e)
+			}
+		}
+		return { created, updated }
+	}
+
+	private async addDescription(file: TFile, description: string): Promise<void> {
+		const callout = descriptionCallout(description)
+		await this.app.vault.process(file, text => text.indexOf(callout) >= 0 ? text : `${text.replace(/\s*$/, '')}\n\n${callout}\n`)
+	}
+
+	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
+		if (found.reaction) fm.Reaction = found.reaction
+		else delete fm.Reaction
+		if (found.subscribed !== null) fm.Subscribed = found.subscribed
+		if (found.channelUrl) fm['Channel URL'] = found.channelUrl
 	}
 
 	private async youtubeCategory(): Promise<ICategory> {
@@ -3940,6 +4040,9 @@ export default class LibraryPlugin extends Plugin {
 			e.preventDefault()
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
+		const video = toStr(fm.Source) === YOUTUBE_SOURCE
+		// the title links the video too; the button says so
+		if (video && url) titleEl.appendChild(this.youtubeLink(url, tr('header.openYoutube')))
 		titleEl.appendChild(shareBtn)
 		infoSide.appendChild(titleEl)
 		const badges = createDiv({ cls: 'note-header-badges' })
@@ -3971,6 +4074,14 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		addNames(tr('header.creator'), creators)
+		if (video && infoSide.lastElementChild && creators.length > 0) {
+			const row = infoSide.lastElementChild as HTMLElement
+			const channel = safeUrl(fm['Channel URL'])
+			if (channel) row.appendChild(this.youtubeLink(channel, tr('header.openYoutube')))
+			if (fm.Subscribed === true) row.appendText(` · ${tr('header.subscribed')}`)
+		}
+		if (video && (fm.Reaction === 'like' || fm.Reaction === 'dislike')) addRow(tr('header.reaction'), fm.Reaction === 'like' ? `👍 ${tr('header.liked')}` : `👎 ${tr('header.disliked')}`)
+		if (video && Number(fm.Rewatched) > 0) addRow(tr('header.rewatched'), String(Number(fm.Rewatched)))
 		addNames(tr('header.cast'), cast)
 		const yearsStr = year + (endYear ? '–' + endYear : '')
 		if (yearsStr) addRow(tr('header.years'), yearsStr)
@@ -4031,6 +4142,12 @@ export default class LibraryPlugin extends Plugin {
 		this.buildTrophiesBlock(wrap, fm, file)
 		this.buildRecommendations(wrap, fm)
 		return wrap
+	}
+
+	private youtubeLink(href: string, label: string): HTMLElement {
+		const a = createEl('a', { cls: 'note-header-youtube', href, attr: { 'aria-label': label, target: '_blank', rel: 'noopener noreferrer' } })
+		setIcon(a, 'youtube')
+		return a
 	}
 
 	// an album's awards from Wikidata, a row that appears once they arrive
@@ -4490,6 +4607,8 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
+		const backfill = (this.settings.youtubeBackfill && typeof this.settings.youtubeBackfill === 'object' ? this.settings.youtubeBackfill : {}) as Partial<ILibrarySettings['youtubeBackfill']>
+		this.settings.youtubeBackfill = { token: typeof backfill.token === 'string' ? backfill.token : '', before: typeof backfill.before === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(backfill.before) ? backfill.before : '', done: backfill.done === true }
 		if (!this.settings.nintendoTokens || typeof this.settings.nintendoTokens !== 'object') this.settings.nintendoTokens = null
 		if (typeof this.settings.nintendoLastImport !== 'number') this.settings.nintendoLastImport = 0
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
