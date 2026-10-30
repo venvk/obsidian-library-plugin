@@ -32,9 +32,9 @@ Imports run on desktop once a day. Run one now with `Import from AniList`, `Impo
 
 | Site | When | Anime | Manga |
 | --- | --- | --- | --- |
-| AniList | When you run `Push current note to AniList` | ✓ | — |
-| MyAnimeList | A moment after you change a note; `Push current note to MyAnimeList` sends an open anime note now | ✓ | ✓ |
-| Kitsu | A moment after you change a note; `Push current note to Kitsu` sends the open note now | ✓ | — |
+| AniList | When you run `Push current note to AniList` | Yes | No |
+| MyAnimeList | A moment after you change a note; `Push current note to MyAnimeList` sends an open anime note now | Yes | Yes |
+| Kitsu | A moment after you change a note; `Push current note to Kitsu` sends the open note now | Yes | No |
 
 What is sent:
 
