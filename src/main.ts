@@ -1454,9 +1454,30 @@ export default class LibraryPlugin extends Plugin {
 			await this.saveSettings()
 			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated }))
 			await this.youtubeBackfill(notes)
+			await this.youtubeFill(notes)
 		} finally {
 			this.watchImporting = false
 		}
+	}
+
+	// Notes without counts yet (made before they were read, or while signed out) get them, a few hundred a run.
+	async youtubeFill(notes = this.youtubeNotes(), limit = 300): Promise<number> {
+		const bare = [...notes.values()].filter(file => !('Views' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))).slice(0, limit)
+		let filled = 0
+		for (let i = 0; i < bare.length && !this.unloaded; i += 40) {
+			const batch = bare.slice(i, i + 40)
+			const ids = batch.map(file => toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.['Source ID']))
+			const details = await videoDetails(ids)
+			if (details === 'signed-out') break
+			for (const file of batch) {
+				const found = details.get(toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.['Source ID']))
+				if (!found) continue
+				await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => this.youtubeDetails(current, found))
+				if (found.description) await this.addDescription(file, found.description)
+				filled++
+			}
+		}
+		return filled
 	}
 
 	private youtubeNotes(): Map<string, TFile> {
