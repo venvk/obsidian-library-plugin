@@ -14,6 +14,7 @@ import { YOUTUBE_TYPE } from './youtube'
 import {
 	toStr,
 	toStrArray,
+	isCollectible,
 	parseDate,
 	isTemplateFile,
 	linkLabel,
@@ -72,9 +73,9 @@ function timeColor(cat: ICategory): string | undefined {
 	return TIME_COLORS[cat.typeValue === YOUTUBE_TYPE ? 'video' : cat.contentType]
 }
 
-type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress'
+type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress' | 'chain' | 'favorite'
 
-const SORT_KEYS: SortKey[] = ['name', 'year', 'rating', 'date', 'modified', 'played', 'unstarted', 'progress']
+const SORT_KEYS: SortKey[] = ['name', 'year', 'rating', 'date', 'modified', 'played', 'unstarted', 'progress', 'chain', 'favorite']
 
 interface SortChoice {
 	key: SortKey
@@ -968,7 +969,15 @@ export class LibraryView extends ItemView {
 
 		const grid = section.createDiv({ cls: 'library-grid' })
 
-		const sortOptions: { label: string; key: SortKey }[] = [
+		// tokens have no year, rating or progress: their own keys instead
+		const collectibles = cards.length > 0 && cards.every(card => isCollectible(card.fm))
+		const sortOptions: { label: string; key: SortKey }[] = collectibles ? [
+			{ label: tr('sort.name'), key: 'name' },
+			{ label: tr('sort.date'), key: 'date' },
+			{ label: tr('sort.modified'), key: 'modified' },
+			{ label: tr('filter.chain'), key: 'chain' },
+			{ label: tr('header.favorite'), key: 'favorite' },
+		] : [
 			{ label: tr('sort.name'), key: 'name' },
 			{ label: tr('sort.year'), key: 'year' },
 			{ label: tr('sort.rating'), key: 'rating' },
@@ -982,7 +991,8 @@ export class LibraryView extends ItemView {
 		]
 
 		const restored = this.readSort(spec.sortId, spec.defaultSort)
-		const savedSort = sortOptions.some(o => o.key === restored.key) ? restored : spec.defaultSort
+		const fallback = sortOptions.some(o => o.key === spec.defaultSort.key) ? spec.defaultSort : { key: 'date' as SortKey, asc: false }
+		const savedSort = sortOptions.some(o => o.key === restored.key) ? restored : fallback
 		let currentSort: SortKey = savedSort.key
 		let sortAsc = savedSort.asc
 
@@ -1004,6 +1014,11 @@ export class LibraryView extends ItemView {
 					case 'modified': cmp = a.file.stat.mtime - b.file.stat.mtime; break
 					case 'played': cmp = parseDate(a.fm['Last Played']) - parseDate(b.fm['Last Played']); break
 					case 'progress': cmp = progressOf(a) - progressOf(b) || a.name.localeCompare(b.name); break
+					case 'chain': cmp = toStrArray(a.fm.Platforms).join().localeCompare(toStrArray(b.fm.Platforms).join()) || a.name.localeCompare(b.name); break
+					case 'favorite':
+						cmp = Number(a.fm.Favorite === true) - Number(b.fm.Favorite === true)
+						if (cmp === 0) return a.name.localeCompare(b.name)
+						break
 					case 'unstarted':
 						cmp = Number(notStarted(b.fm, b.kind)) - Number(notStarted(a.fm, a.kind))
 						// Named order within each half, whichever way the halves go.

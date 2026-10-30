@@ -1566,6 +1566,9 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-platform-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	padding: 1px 7px;
 	border-radius: 4px;
 	font-size: var(--font-ui-smaller);
@@ -1573,6 +1576,92 @@ sort trigger, the chosen one in the accent colour. */
 	letter-spacing: 0.02em;
 	color: #ffffff;
 	background-color: #3a3a3a;
+}
+
+.library-platform-label svg {
+	width: 1em;
+	height: 1em;
+	fill: currentColor;
+}
+
+.library-platform-label.is-ethereum {
+	background-color: #3c3c3d;
+}
+
+.library-platform-label.is-optimism {
+	background-color: #ff0420;
+}
+
+.library-platform-label.is-base {
+	background-color: #0052ff;
+}
+
+.library-platform-label.is-arbitrum {
+	background-color: #28a0f0;
+}
+
+.library-platform-label.is-polygon {
+	background-color: #7b3fe4;
+}
+
+.library-platform-label.is-bnb {
+	background-color: #f0b90b;
+	color: #1e2026;
+}
+
+.library-platform-label.is-taiko {
+	background-color: #e81899;
+}
+
+.library-platform-label.is-gnosis {
+	background-color: #04795b;
+}
+
+.library-platform-label.is-celo {
+	background-color: #fcff52;
+	color: #000000;
+}
+
+.library-platform-label.is-zksync {
+	background-color: #1e69ff;
+}
+
+.library-platform-label.is-scroll {
+	background-color: #ffeeda;
+	color: #190f05;
+}
+
+.library-platform-label.is-ink {
+	background-color: #7132f5;
+}
+
+.library-platform-label.is-soneium {
+	background-color: #000000;
+}
+
+.library-platform-label.is-unichain {
+	background-color: #f50db4;
+}
+
+.library-platform-label.is-mode {
+	background-color: #dffe00;
+	color: #000000;
+}
+
+.library-platform-label.is-arbitrum-nova {
+	background-color: #ef8220;
+}
+
+.library-platform-label.is-shape {
+	background-color: #000000;
+}
+
+.library-platform-label.is-ton {
+	background-color: #0098ea;
+}
+
+.library-platform-label.is-solana {
+	background-color: #9945ff;
 }
 
 .library-platform-label.is-playstation {

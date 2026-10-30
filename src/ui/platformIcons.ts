@@ -152,6 +152,9 @@ export function renderPlatformLabels(parent: HTMLElement, fm: Record<string, unk
 	const row = parent.createDiv({ cls: 'library-platform-labels' })
 	for (const platform of platforms) {
 		const family = platformFamily(platform) ?? 'other'
-		row.createSpan({ cls: `library-platform-label is-${family}`, text: platform })
+		// a badge like shields.io: the brand's colour, its mark, the name
+		const label = row.createSpan({ cls: `library-platform-label is-${family}` })
+		if (MARKS[family]) label.appendChild(platformMark(family))
+		label.createSpan({ text: platform })
 	}
 }

@@ -1735,11 +1735,16 @@ export default class LibraryPlugin extends Plugin {
 						const recover = !!token.image && (!cover || (/^https?:\/\//i.test(cover) && cover !== token.image))
 						// spam rules grow: a note they newly catch is marked, never unmarked
 						const spam = token.spam && known?.Spam === undefined
-						if (Number(known?.Count) === token.count && !recover && !spam) continue
+						const checkbox = known?.Favorite === undefined
+						if (Number(known?.Count) === token.count && !recover && !spam && !checkbox) continue
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
 							current.Count = token.count
 							if (recover) current.Cover = token.image
 							if (spam) current.Spam = true
+							if (checkbox) {
+								if (isEmptyValue(current['My Rating'])) delete current['My Rating']
+								current.Favorite = false
+							}
 						})
 						if (recover) this.queueCover(existing)
 						updated++
@@ -1757,6 +1762,9 @@ export default class LibraryPlugin extends Plugin {
 					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 						delete current.Progress
 						delete current.Complete
+						// a token is a favorite or not: a checkbox instead of a rating
+						delete current['My Rating']
+						current.Favorite = false
 					})
 					notes.set(token.key, file)
 					created++
@@ -4271,8 +4279,7 @@ export default class LibraryPlugin extends Plugin {
 				e.preventDefault()
 				void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 					const next = current.Favorite !== true
-					if (next) current.Favorite = true
-					else delete current.Favorite
+					current.Favorite = next
 					star.toggleClass('is-on', next)
 					star.setAttr('aria-pressed', next ? 'true' : 'false')
 				})
