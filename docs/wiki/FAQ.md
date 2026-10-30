@@ -12,11 +12,11 @@ Adding a title that is already there opens its note instead, and imports look fo
 
 ## The cover is missing
 
-Check Settings → Library → Cover property: notes may keep the cover under another name. A vault image needs a path or an internal link to a file that exists. Some sources have no cover for older or rare titles; paste any image address into the cover property. To keep covers when you are offline, turn on Keep covers in the vault; see [[Note properties|Frontmatter-reference#cover]].
+Check Settings → Library → General → Cover property: notes may keep the cover under another name. A vault image needs a path or an internal link to a file that exists. Some sources have no cover for older or rare titles; paste any image address into the cover property. To keep covers when you are offline, turn on Keep covers in the vault; see [[Note properties|Frontmatter-reference#cover]].
 
 ## A refresh or an import changed my values
 
-A refresh fills only empty fields and updates the source ratings; see the refresh rules in [[Note properties|Frontmatter-reference]]. Imports never overwrite a score you gave, and anime progress only moves forward; game progress follows your trophies and achievements. See [[Connected accounts|Connected-accounts]]. To keep a source field out of your notes for good, add it to Settings → Library → Skip properties.
+A refresh fills only empty fields and updates the source ratings; see the refresh rules in [[Note properties|Frontmatter-reference]]. Imports never overwrite a score you gave, and anime progress only moves forward; game progress follows your trophies and achievements. See [[Connected accounts|Connected-accounts]]. To keep a source field out of your notes for good, add it to Settings → Library → General → Skip properties.
 
 ## Can I rename the properties?
 
@@ -28,7 +28,7 @@ Yes. Everything is in frontmatter, so you can filter by `Type` or `Platforms`, s
 
 ## Connect does nothing, or the sign-in window stays open
 
-The window closes by itself once the service's page shows you are signed in: IMDb's home page, Netflix's Browse page, or the service's confirmation. Finish any extra steps the site asks for, such as a code or picking a profile. Close the window to cancel. IMDb, Netflix, PlayStation, Steam, and Nintendo connect only on desktop.
+The window closes by itself once the service's page shows you are signed in: IMDb's home page, Netflix's Browse page, YouTube, or the service's confirmation. Finish any extra steps the site asks for, such as a code or picking a profile. Close the window to cancel. IMDb, Netflix, YouTube, PlayStation, Steam, and Nintendo connect only on desktop.
 
 ## Where are my keys and tokens?
 

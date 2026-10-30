@@ -1,4 +1,4 @@
-Connect AniList, MyAnimeList, Kitsu, or any of them, in Settings → Library → Anime · Manga. Your lists arrive as notes, and your progress and scores go back. Every anime note works with all three sites, whichever one it came from.
+Connect AniList, MyAnimeList, Kitsu, or any of them, in Settings → Library → Connectors → Anime · Manga. Your lists arrive as notes, and your progress and scores go back. Every anime note works with all three sites, whichever one it came from.
 
 General rules for connected accounts, such as when imports run and where tokens are kept, are on [[Connected accounts|Connected-accounts]].
 

@@ -11,7 +11,7 @@ Every kind of title is searched in open sources that need no key:
 
 Anime results come from all three sites at once, MyAnimeList's first. A title two sites list shows once.
 
-Settings → Library → Anime decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
+Settings → Library → Connectors → Anime · Manga decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
 
 An optional key adds a service, listed first in search, or extra data:
 

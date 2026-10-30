@@ -31,7 +31,7 @@ If the template is moved or deleted, Library shows "Template not found" and crea
 
 ## Skipped properties
 
-Settings → Library → Skip properties takes the fields that notes should not get from the sources, separated by commas, for example `Cast, Gallery, Trailer`. New notes leave them out, and a refresh doesn't add them. Values already in your notes stay; delete them by hand if you want them gone.
+Settings → Library → General → Skip properties takes the fields that notes should not get from the sources, separated by commas, for example `Cast, Gallery, Trailer`. New notes leave them out, and a refresh doesn't add them. Values already in your notes stay; delete them by hand if you want them gone.
 
 - Capitals don't matter.
 - The cover can be listed under either name: with Cover property set to `image`, both `Cover` and `image` skip it.
