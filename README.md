@@ -46,16 +46,16 @@ Same name, different films? Add the year: `dune 1984`.
 
 Connect an account in the plugin settings. Your lists arrive as notes, and anime progress and scores stay in sync.
 
-- [![AniList](https://img.shields.io/badge/AniList-02A9FF?style=for-the-badge&logo=anilist&logoColor=white)](https://anilist.co) anime and manga lists, progress and scores; changes go back with the Push command
-- [![MyAnimeList](https://img.shields.io/badge/MyAnimeList-2E51A2?style=for-the-badge&logo=myanimelist&logoColor=white)](https://myanimelist.net) anime and manga lists, progress and scores; changes go back on save
-- [![Kitsu](https://img.shields.io/badge/Kitsu-F75239?style=for-the-badge&logo=kitsu&logoColor=white)](https://kitsu.app) anime list, progress and ratings; changes go back on save
-- [![IMDb](https://img.shields.io/badge/IMDb-F5C518?style=for-the-badge&logo=imdb&logoColor=black)](https://www.imdb.com) ratings, episode ratings and watchlist; scores and new watchlist titles go back
-- [![Netflix](https://img.shields.io/badge/Netflix-E50914?style=for-the-badge&logo=netflix&logoColor=white)](https://www.netflix.com) viewing history and thumbs, anime into the anime category; scores go back as thumbs, unticked episodes leave the history, and series you haven't started go to My List
-- [![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://www.youtube.com) one note per video, in the Video category, with the time you spent, rewatches, publish date, views, likes and estimated dislikes, and the description; like, dislike and subscribe from the note; the last 7 days first, then one older month a day back to the start of the history; Shorts are left out
-- [![Trakt](https://img.shields.io/badge/Trakt-9F42C6?style=for-the-badge&logo=trakt&logoColor=white)](https://trakt.tv) watch history, ratings and watchlist; scores, ticked and unticked episodes and new watchlist titles go back
-- [![PlayStation](https://img.shields.io/badge/PlayStation-0070D1?style=for-the-badge&logo=playstation&logoColor=white)](https://www.playstation.com) played games, playtime and trophies
-- [![Steam](https://img.shields.io/badge/Steam-000000?style=for-the-badge&logo=steam&logoColor=white)](https://store.steampowered.com) library, playtime and achievements
-- [![Nintendo Switch](https://img.shields.io/badge/Nintendo%20Switch-E60012?style=for-the-badge&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xNC4xNzYgMjRoMy42NzRjMy4zNzYgMCA2LjE1LTIuNzc0IDYuMTUtNi4xNVY2LjE1QzI0IDIuNzc1IDIxLjIyNiAwIDE3Ljg1IDBIMTQuMWMtLjA3NCAwLS4xNS4wNzQtLjE1LjE1djIzLjdjLS4wMDEuMDc2LjA3NS4xNS4yMjYuMTV6bTQuNTc0LTEzLjE5OWMxLjM1MSAwIDIuMzk5IDEuMTI1IDIuMzk5IDIuMzk4IDAgMS4zNTItMS4xMjUgMi40LTIuMzk5IDIuNC0xLjM1IDAtMi40LTEuMDQ5LTIuNC0yLjQtLjA3NS0xLjM0OSAxLjA1LTIuMzk4IDIuNC0yLjM5OHpNMTEuNCAwSDYuMTVDMi43NzUgMCAwIDIuNzc1IDAgNi4xNXYxMS43QzAgMjEuMjI2IDIuNzc1IDI0IDYuMTUgMjRoNS4yNWMuMDc0IDAgLjE1LS4wNzQuMTUtLjE0OVYuMTVjLjAwMS0uMDc2LS4wNzUtLjE1LS4xNS0uMTV6TTkuNjc2IDIyLjA1MUg2LjE1Yy0yLjMyNiAwLTQuMjAxLTEuODc1LTQuMjAxLTQuMjAxVjYuMTVjMC0yLjMyNiAxLjg3NS00LjIwMSA0LjIwMS00LjIwMUg5LjZsLjA3NiAyMC4xMDJ6TTMuNzUgNy4xOTljMCAxLjI3NS45NzUgMi4yNSAyLjI1IDIuMjVzMi4yNS0uOTc1IDIuMjUtMi4yNS0yLjI1LTIuMjVjMC0xLjI3My0uOTc1LTIuMjUtMi4yNS0yLjI1cy0yLjI1Ljk3Ny0yLjI1IDIuMjV6Ii8%2BPC9zdmc%2B&logoColor=white)](https://www.nintendo.com) played games and playtime
+- <img src="assets/connectors/anilist.svg" width="18" height="18" alt=""> **AniList**: anime and manga lists, progress and scores; changes go back with the Push command
+- <img src="assets/connectors/myanimelist.svg" width="18" height="18" alt=""> **MyAnimeList**: anime and manga lists, progress and scores; changes go back on save
+- <img src="assets/connectors/kitsu.svg" width="18" height="18" alt=""> **Kitsu**: anime list, progress and ratings; changes go back on save
+- <img src="assets/connectors/imdb.svg" width="18" height="18" alt=""> **IMDb**: ratings, episode ratings and watchlist; scores and new watchlist titles go back
+- <img src="assets/connectors/netflix.svg" width="18" height="18" alt=""> **Netflix**: viewing history and thumbs, anime into the anime category; scores go back as thumbs, unticked episodes leave the history, and series you haven't started go to My List
+- <img src="assets/connectors/youtube.svg" width="18" height="18" alt=""> **YouTube**: one note per video, in the Video category, with the time you spent, rewatches, publish date, views, likes and estimated dislikes, and the description; like, dislike and subscribe from the note; the last 7 days first, then one older month a day back to the start of the history; Shorts are left out
+- <img src="assets/connectors/trakt.svg" width="18" height="18" alt=""> **Trakt**: watch history, ratings and watchlist; scores, ticked and unticked episodes and new watchlist titles go back
+- <img src="assets/connectors/playstation.svg" width="18" height="18" alt=""> **PlayStation**: played games, playtime and trophies
+- <img src="assets/connectors/steam.svg" width="18" height="18" alt=""> **Steam**: library, playtime and achievements
+- <img src="assets/connectors/nintendo.svg" width="18" height="18" alt=""> **Nintendo Switch**: played games and playtime
 
 Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam and Nintendo work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
 
@@ -65,12 +65,12 @@ Each category searches open sources. An API key adds richer data, and its servic
 
 | Category | Open sources | With a key |
 | --- | --- | --- |
-| Movies, series | [![Cinemeta](https://img.shields.io/badge/Cinemeta-8A5AAB?style=for-the-badge&logo=stremio&logoColor=white)](https://github.com/Stremio/stremio-addon-cinemeta) [![Wikidata](https://img.shields.io/badge/Wikidata-006699?style=for-the-badge&logo=wikidata&logoColor=white)](https://www.wikidata.org) | [![OMDb](https://img.shields.io/badge/OMDb-4B4B4B?style=for-the-badge&logoColor=white)](https://www.omdbapi.com/apikey.aspx) [![TMDB](https://img.shields.io/badge/TMDB-01B4E4?style=for-the-badge&logo=themoviedatabase&logoColor=white)](https://www.themoviedb.org/settings/api) season ratings, episode images |
-| Books | [![Open Library](https://img.shields.io/badge/Open%20Library-4B4B4B?style=for-the-badge&logo=internetarchive&logoColor=white)](https://openlibrary.org) | [![Google Books](https://img.shields.io/badge/Google%20Books-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://console.cloud.google.com/apis/library/books.googleapis.com) |
-| Games | [![Steam](https://img.shields.io/badge/Steam-000000?style=for-the-badge&logo=steam&logoColor=white)](https://store.steampowered.com) [![Wikidata](https://img.shields.io/badge/Wikidata-006699?style=for-the-badge&logo=wikidata&logoColor=white)](https://www.wikidata.org) | [![RAWG](https://img.shields.io/badge/RAWG-20232A?style=for-the-badge&logoColor=white)](https://rawg.io/apidocs) [![Twitch](https://img.shields.io/badge/Twitch-9146FF?style=for-the-badge&logo=twitch&logoColor=white)](https://dev.twitch.tv/console/apps) game trailers |
-| Anime, manga | [![AniList](https://img.shields.io/badge/AniList-02A9FF?style=for-the-badge&logo=anilist&logoColor=white)](https://anilist.co) [![MyAnimeList](https://img.shields.io/badge/MyAnimeList-2E51A2?style=for-the-badge&logo=myanimelist&logoColor=white)](https://myanimelist.net) [![Kitsu](https://img.shields.io/badge/Kitsu-F75239?style=for-the-badge&logo=kitsu&logoColor=white)](https://kitsu.app) | None |
-| Comics | [![Wikidata](https://img.shields.io/badge/Wikidata-006699?style=for-the-badge&logo=wikidata&logoColor=white)](https://www.wikidata.org) [![AniList](https://img.shields.io/badge/AniList-02A9FF?style=for-the-badge&logo=anilist&logoColor=white)](https://anilist.co) | [![Comic Vine](https://img.shields.io/badge/Comic%20Vine-E41D1B?style=for-the-badge&logoColor=white)](https://comicvine.gamespot.com/api/) |
-| Music | [![Deezer](https://img.shields.io/badge/Deezer-A238FF?style=for-the-badge&logo=deezer&logoColor=white)](https://www.deezer.com) | None |
+| Movies, series | Cinemeta, Wikidata | [OMDb](https://www.omdbapi.com/apikey.aspx), [TMDB](https://www.themoviedb.org/settings/api) for season ratings and episode images |
+| Books | Open Library | [Google Books](https://console.cloud.google.com/apis/library/books.googleapis.com) |
+| Games | Steam, Wikidata | [RAWG](https://rawg.io/apidocs), [Twitch](https://dev.twitch.tv/console/apps) (game trailers) |
+| Anime, manga | AniList, MyAnimeList, Kitsu | None |
+| Comics | Wikidata, AniList | [Comic Vine](https://comicvine.gamespot.com/api/) |
+| Music | Deezer | None |
 
 Anime and manga notes take English, romaji or original names, as you choose in the settings. Titles marked adult stay out of search until you turn them on.
 
