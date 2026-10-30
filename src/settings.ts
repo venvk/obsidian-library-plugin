@@ -392,7 +392,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					note(tr("settings.nft.desc")),
 					...WALLET_FIELDS.map((field): Row => ({
 						name: field,
-						desc: field === "EVM" ? tr("settings.wallets.evm.desc") : tr("settings.nftWallets.desc"),
+						desc: field === "EVM" ? tr("settings.wallets.evm.desc") : field === "TON" ? tr("settings.wallets.ton.desc") : tr("settings.nftWallets.desc"),
 						render: (row) => this.walletList(row, field),
 					})),
 					{

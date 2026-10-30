@@ -77,7 +77,7 @@ export function groupHeld(tokens: HeldNft[]): HeldNft[] {
 }
 
 // Unsolicited drops lure with money and a site to visit; the explorers flag only some of them.
-const SPAM = /\$\s?\d|\d\s?(usdt|usdc|eth|ton|sol)\b|reward|claim|airdrop|voucher|giveaway|bonus|eligible|visit|free mint|https?:|www\.|t\.me\/|\.(com|io|xyz|net|org|app|site|top|vip|pro|gift|fun|lol|cc)\b/i
+const SPAM = /\$\s?\d|\d\s?k?\s?\$|\d\s?(usdt|usdc|eth|ton|sol)\b|reward|claim|airdrop|voucher|giveaway|\bgift\b|bonus|eligible|visit|free mint|https?:|www\.|t\.me\/|\.(com|io|xyz|net|org|app|site|top|vip|pro|gift|fun|lol|cc|ly|me|gg|to|link|click|live|info)\b/i
 
 export function looksLikeSpam(name: string, collection: string): boolean {
 	return SPAM.test(name) || SPAM.test(collection)
@@ -402,6 +402,35 @@ export function tonTokens(items: TonItem[]): HeldNft[] {
 	return out
 }
 
+// One TON key has a wallet per version (v3, v4, v5), each its own address. A wallet that has sent anything
+// shows its key, and the key lists the other versions; those in use are read too.
+async function tonWallets(address: string): Promise<string[]> {
+	try {
+		const key = (await requestUrl({ url: `https://tonapi.io/v2/accounts/${address}/publickey`, throw: false })).json as { public_key?: unknown }
+		if (typeof key.public_key !== 'string' || !/^[0-9a-f]{64}$/i.test(key.public_key)) return [address]
+		const list = (await requestUrl({ url: `https://tonapi.io/v2/pubkeys/${key.public_key}/wallets`, throw: false })).json as { accounts?: Array<{ address?: unknown; status?: unknown }> }
+		const used = (list.accounts ?? []).filter(a => typeof a.address === 'string' && a.status === 'active').map(a => a.address as string)
+		return [address, ...used]
+	} catch {
+		return [address]
+	}
+}
+
+async function tonAllHeld(address: string): Promise<NftRead> {
+	const held: HeldNft[] = []
+	const seen = new Set<string>()
+	for (const wallet of await tonWallets(address)) {
+		const read = await tonHeld(wallet)
+		if (read.chains.length === 0) return { held, chains: [] }
+		// the same wallet in two spellings (friendly and raw) lists the same tokens
+		for (const token of read.held) if (!seen.has(token.url)) {
+			seen.add(token.url)
+			held.push(token)
+		}
+	}
+	return { held, chains: ['TON'] }
+}
+
 async function tonHeld(address: string): Promise<NftRead> {
 	const held: HeldNft[] = []
 	for (let offset = 0; offset < 10000; offset += 1000) {
@@ -491,7 +520,7 @@ export async function nftHoldings(pairs: WalletPair[], etherscanKey: string, has
 		let read: NftRead | null = null
 		if (host) read = await blockscoutHeld(chain, host, address)
 		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : await pageScanHeld(chain, address, hasCover)
-		else if (chain === 'TON') read = await tonHeld(address)
+		else if (chain === 'TON') read = await tonAllHeld(address)
 		else if (chain === 'Solana') read = await solanaHeld(address)
 		if (!read) continue
 		wanted.set(chain, (wanted.get(chain) ?? 0) + 1)

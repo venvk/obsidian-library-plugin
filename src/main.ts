@@ -1733,10 +1733,13 @@ export default class LibraryPlugin extends Plugin {
 						const known = this.app.metadataCache.getFileCache(existing)?.frontmatter
 						const cover = toStr(known?.Cover)
 						const recover = !!token.image && (!cover || (/^https?:\/\//i.test(cover) && cover !== token.image))
-						if (Number(known?.Count) === token.count && !recover) continue
+						// spam rules grow: a note they newly catch is marked, never unmarked
+						const spam = token.spam && known?.Spam === undefined
+						if (Number(known?.Count) === token.count && !recover && !spam) continue
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
 							current.Count = token.count
 							if (recover) current.Cover = token.image
+							if (spam) current.Spam = true
 						})
 						if (recover) this.queueCover(existing)
 						updated++

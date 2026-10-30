@@ -165,6 +165,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.page.wallets': 'Wallets',
 		'settings.wallets.evm.desc': 'Read on Ethereum, its L2 networks, Polygon, BNB Chain and Taiko.',
 		'settings.wallets.add': 'Add address',
+		'settings.wallets.ton.desc': 'One address per wallet is enough: its v3, v4 and v5 versions are read too, once it has sent anything.',
 		'settings.nftWallets.desc': 'Public addresses, only read, never signed.',
 		'settings.nftImport': 'Import now',
 		'settings.etherscan.name': 'Etherscan API key',
