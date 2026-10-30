@@ -191,6 +191,8 @@ export default class LibraryPlugin extends Plugin {
 	private lookingUp = false
 	private psnImporting = false
 	private watchImporting = false
+	// YouTube's older months and missing counts, running apart from the imports
+	private youtubeBackfilling = false
 	// Notes an import just found or made, before the metadata cache knows the new ones
 	private watchNotes = new Map<string, TFile>()
 	// shows whose note got its Netflix ID in this import: their viewings tick, nothing to undo yet
@@ -1348,7 +1350,12 @@ export default class LibraryPlugin extends Plugin {
 	// IMDb ratings, watchlist and episode scores; Netflix viewing history and thumbs into Movies and Series.
 	// A note found by its IMDb id, Netflix id or name only gains what it lacks; a wrong Netflix id is replaced, your edits win.
 	async watchImport(site: WatchSite, loud: boolean): Promise<void> {
-		if (this.watchImporting || !Platform.isDesktopApp || !this.settings.watchSites[site].connected) return
+		if (!Platform.isDesktopApp || !this.settings.watchSites[site].connected) return
+		// one import at a time; a press while one runs says so instead of doing nothing
+		if (this.watchImporting) {
+			if (loud) new Notice(tr('notice.site.importing', { site: SITE_NAME[site] }))
+			return
+		}
 		if (site === 'youtube') return this.youtubeImport(loud)
 		this.watchImporting = true
 		const name = SITE_NAME[site]
@@ -1453,10 +1460,23 @@ export default class LibraryPlugin extends Plugin {
 			this.settings.watchSites.youtube.lastImport = Date.now()
 			await this.saveSettings()
 			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'YouTube', created, updated }))
+		} finally {
+			this.watchImporting = false
+		}
+		void this.youtubeBackground()
+	}
+
+	// Older months and missing counts take long: they run apart, so a press of Update is never held up by them.
+	// Their days are older than any import's, so the two never make the same note.
+	private async youtubeBackground(): Promise<void> {
+		if (this.youtubeBackfilling) return
+		this.youtubeBackfilling = true
+		try {
+			const notes = this.youtubeNotes()
 			await this.youtubeBackfill(notes)
 			await this.youtubeFill(notes)
 		} finally {
-			this.watchImporting = false
+			this.youtubeBackfilling = false
 		}
 	}
 
