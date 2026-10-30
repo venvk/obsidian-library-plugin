@@ -36,6 +36,10 @@ export interface WatchedVideo {
 
 const VIDEO_ID = /^[\w-]{11}$/
 
+// the category and Source of the connector's notes
+export const YOUTUBE_TYPE = 'YouTube'
+export const YOUTUBE_SOURCE = 'youtube'
+
 export function lengthSeconds(length: string): number {
 	if (!/^\d+(:\d{1,2}){1,2}$/.test(length.trim())) return 0
 	return length.trim().split(':').reduce((total, part) => total * 60 + Number(part), 0)

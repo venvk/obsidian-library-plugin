@@ -10,6 +10,7 @@ import { renderTrophies } from './ui/trophyIcons'
 import { tasteOf } from './taste'
 import { logOf, todayIso } from './diary'
 import { renderPlatforms } from './ui/platformIcons'
+import { YOUTUBE_TYPE } from './youtube'
 import {
 	toStr,
 	toStrArray,
@@ -61,7 +62,13 @@ const TIME_COLORS: Record<string, string> = {
 	movie: 'var(--interactive-accent)',
 	series: 'color-mix(in srgb, var(--interactive-accent) 60%, var(--background-primary))',
 	anime: 'color-mix(in srgb, var(--interactive-accent) 30%, var(--background-primary))',
-	game: 'color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal))'
+	game: 'color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal))',
+	youtube: 'color-mix(in srgb, #ff0000 70%, var(--background-primary))'
+}
+
+// the YouTube connector's category is a manual one, counted by its minutes watched
+function timeColor(cat: ICategory): string | undefined {
+	return TIME_COLORS[cat.typeValue === YOUTUBE_TYPE ? 'youtube' : cat.contentType]
 }
 
 type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress'
@@ -178,7 +185,7 @@ export class LibraryRenderer {
 			})
 			rated.set(cat, list)
 
-			if (TIME_COLORS[cat.contentType]) {
+			if (timeColor(cat)) {
 				const minutes = spentMinutes(fm, cat.contentType)
 				if (minutes > 0) {
 					timeMinutes.set(cat.name, (timeMinutes.get(cat.name) || 0) + minutes)
@@ -218,7 +225,7 @@ export class LibraryRenderer {
 
 		const time: TimeSlice[] = []
 		for (const cat of this.plugin.settings.categories) {
-			const color = TIME_COLORS[cat.contentType]
+			const color = timeColor(cat)
 			if (!color) continue
 			const minutes = timeMinutes.get(cat.name) || 0
 			if (minutes > 0) time.push({ name: categoryLabel(cat), minutes, color })
@@ -285,7 +292,7 @@ export class LibraryRenderer {
 		const stats = this.collectStats()
 		const columns = stats.columns.filter(column => column.items.length > 0)
 		const showTime = this.plugin.settings.stats.watchTime
-			&& this.plugin.settings.categories.some(c => TIME_COLORS[c.contentType])
+			&& this.plugin.settings.categories.some(c => timeColor(c) !== undefined)
 		const psn = this.plugin.settings.psnStats
 		const mal = this.plugin.settings.malStats
 		const nintendo = this.plugin.settings.nintendoStats
@@ -900,7 +907,7 @@ export class LibraryView extends ItemView {
 			text: count,
 			attr: { 'aria-label': `${count} ${trCount('stats.works', cards.length)}` }
 		})
-		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game') return
+		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game' && kind !== 'manual') return
 		let minutes = 0
 		for (const card of cards) minutes += spentMinutes(card.fm, card.kind)
 		if (minutes <= 0) return

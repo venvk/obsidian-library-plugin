@@ -40,7 +40,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { youtubeHistory, videoCover, videoUrl } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, youtubeHistory, videoCover, videoUrl } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -117,9 +117,6 @@ import {
 // Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
 // the name, or to a note of that name when there is one; the graph draws them.
 const LINK_FIELDS = ['Genre', 'Creator', 'Cast']
-// notes of the YouTube connector
-const YOUTUBE_SOURCE = 'youtube'
-const YOUTUBE_TYPE = 'YouTube'
 
 // let the vault settle before the walk starts
 const ENRICH_START_DELAY = 10 * 1000
@@ -1419,7 +1416,8 @@ export default class LibraryPlugin extends Plugin {
 		void (site === 'imdb' ? this.imdbBackfill() : this.netflixBackfill().then(() => this.netflixUnwatchAll()))
 	}
 
-	// YouTube: a note per video watched in the last 7 days, Shorts left out, in a YouTube category made on first use.
+	// YouTube: the history kept from the day of connecting on; each import brings the last 7 days, Shorts left out,
+	// into a YouTube category made on first use. Older viewings are never read: years of history would flood the vault.
 	// Runtime holds the minutes watched; a video watched again only gains the longer time.
 	private async youtubeImport(loud: boolean): Promise<void> {
 		this.watchImporting = true
