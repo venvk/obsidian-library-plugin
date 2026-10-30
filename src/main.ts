@@ -41,7 +41,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, nftHoldings, parseWallets } from './nft'
+import { NFT_SOURCE, NFT_TYPE, WALLET_FIELDS, nftHoldings, parseWallets, walletPairs } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -1695,10 +1695,10 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// NFTs of the wallets in the settings, a note per token group in the NFT category made on first use.
-	// A known note only follows the count and whether it is still owned; a token gone from a chain read in full is marked, not deleted.
+	// A known note only follows the count; a token gone from a network read in full leaves for the trash.
 	async nftImport(loud: boolean): Promise<void> {
 		if (this.nftImporting || !Platform.isDesktopApp) return
-		const wallets = parseWallets(this.settings.nftWallets)
+		const wallets = walletPairs(this.settings.nftWallets)
 		if (wallets.length === 0) return
 		this.nftImporting = true
 		try {
@@ -1723,12 +1723,8 @@ export default class LibraryPlugin extends Plugin {
 				const existing = notes.get(token.key)
 				try {
 					if (existing) {
-						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
-						if (Number(fm?.Count) === token.count && fm?.Owned !== false) continue
-						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
-							current.Count = token.count
-							current.Owned = true
-						})
+						if (Number(this.app.metadataCache.getFileCache(existing)?.frontmatter?.Count) === token.count) continue
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => { current.Count = token.count })
 						updated++
 						continue
 					}
@@ -1738,7 +1734,8 @@ export default class LibraryPlugin extends Plugin {
 						progressTotal: null,
 						imdbId: null,
 					}
-					const file = await this.newNote(category, NFT_SOURCE, token.key, token.name, meta, { Platforms: [token.chain], Count: token.count, Owned: true })
+					// Spam and OAT are set once; you can change them, and the next import leaves them
+					const file = await this.newNote(category, NFT_SOURCE, token.key, token.name, meta, { Platforms: [token.chain], Count: token.count, ...(token.spam ? { Spam: true } : {}), ...(token.oat ? { OAT: true } : {}) })
 					// a collectible is held, not watched: no progress, no Complete
 					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 						delete current.Progress
@@ -1750,11 +1747,11 @@ export default class LibraryPlugin extends Plugin {
 					console.error('Library: NFT import error', token.key, e)
 				}
 			}
+			// gone from a network read in full: to the trash, where it can be restored
 			for (const [key, file] of notes) {
 				const chain = key.split(':')[0] ?? ''
 				if (seen.has(key) || read.chains.indexOf(chain) < 0) continue
-				if (this.app.metadataCache.getFileCache(file)?.frontmatter?.Owned === false) continue
-				await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current.Owned = false })
+				await this.app.fileManager.trashFile(file)
 				updated++
 			}
 			this.settings.nftLastImport = Date.now()
@@ -1775,7 +1772,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async nftSyncIfDue(): Promise<void> {
-		if (!this.settings.nftWallets.trim() || Date.now() - this.settings.nftLastImport < 24 * 3600000) return
+		if (walletPairs(this.settings.nftWallets).length === 0 || Date.now() - this.settings.nftLastImport < 24 * 3600000) return
 		await this.nftImport(false)
 	}
 
@@ -3471,7 +3468,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.steamId.trim()) await this.steamImport(true)
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
 		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
-		if (this.settings.nftWallets.trim()) await this.nftImport(true)
+		if (walletPairs(this.settings.nftWallets).length > 0) await this.nftImport(true)
 	}
 
 	private pruneEcho(): void {
@@ -4245,6 +4242,18 @@ export default class LibraryPlugin extends Plugin {
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
 		const video = toStr(fm.Source) === YOUTUBE_SOURCE
+		if (toStr(fm.Source) === NFT_SOURCE) {
+			const on = fm.Favorite === true
+			const star = titleEl.createEl('button', { cls: `note-header-favorite${on ? ' is-on' : ''}`, attr: { 'aria-label': tr('header.favorite'), 'aria-pressed': on ? 'true' : 'false' } })
+			setIcon(star, 'star')
+			star.addEventListener('click', (e) => {
+				e.preventDefault()
+				void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+					if (on) delete current.Favorite
+					else current.Favorite = true
+				})
+			})
+		}
 		titleEl.appendChild(shareBtn)
 		infoSide.appendChild(titleEl)
 		const badges = createDiv({ cls: 'note-header-badges' })
@@ -4296,8 +4305,7 @@ export default class LibraryPlugin extends Plugin {
 		if (nft) {
 			const chains = toStrArray(fm.Platforms)
 			if (chains.length > 0) addRow(tr('header.chain'), chains.join(', '))
-			if (Number(fm.Count) > 1) addRow(tr('header.owned'), String(Number(fm.Count)))
-			if (fm.Owned === false) infoSide.createDiv({ cls: 'note-header-row', text: tr('header.notOwned') })
+			if (Number(fm.Count) > 1) addRow(tr('header.count'), String(Number(fm.Count)))
 		}
 		// the channel: its canvas by name, the channel itself on YouTube, and the subscription
 		if (video && infoSide.lastElementChild && creators.length > 0) {
@@ -4846,9 +4854,24 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
-		if (typeof this.settings.nftWallets !== 'string') this.settings.nftWallets = ''
+		// the first build kept one list of addresses; each goes to the field of its kind
+		const savedWallets = this.settings.nftWallets as unknown
+		this.settings.nftWallets = {}
+		if (typeof savedWallets === 'string') {
+			for (const wallet of parseWallets(savedWallets)) {
+				const field = wallet.kind === 'evm' ? 'EVM' : wallet.kind === 'ton' ? 'TON' : 'Solana'
+				this.settings.nftWallets[field] = [this.settings.nftWallets[field], wallet.address].filter(Boolean).join('\n')
+			}
+		} else if (savedWallets && typeof savedWallets === 'object') {
+			for (const field of WALLET_FIELDS) {
+				const value = (savedWallets as Record<string, unknown>)[field]
+				if (typeof value === 'string' && value.trim()) this.settings.nftWallets[field] = value
+			}
+		}
 		if (typeof this.settings.etherscanApiKey !== 'string') this.settings.etherscanApiKey = ''
 		if (typeof this.settings.nftLastImport !== 'number') this.settings.nftLastImport = 0
+		if (typeof this.settings.showNftSpam !== 'boolean') this.settings.showNftSpam = false
+		if (typeof this.settings.showNftOat !== 'boolean') this.settings.showNftOat = true
 		const secrets = (this.settings.keySecrets && typeof this.settings.keySecrets === 'object' ? this.settings.keySecrets : {}) as Record<string, unknown>
 		this.settings.keySecrets = {}
 		for (const name of API_KEY_NAMES) {

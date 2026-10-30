@@ -27,6 +27,10 @@ export interface HeldNft {
 	image: string
 	url: string
 	count: number
+	// looks like a phishing drop: amounts, rewards, claim or airdrop calls, links
+	spam: boolean
+	// an achievement or attendance token (Galxe OAT, POAP, Layer3 CUBE), not a collectible
+	oat: boolean
 }
 
 // The chains a read covered: a token missing from one of them has left the wallet.
@@ -71,6 +75,19 @@ export function groupHeld(tokens: HeldNft[]): HeldNft[] {
 	return [...out.values()]
 }
 
+// Unsolicited drops lure with money and a site to visit; the explorers flag only some of them.
+const SPAM = /\$\s?\d|\d\s?(usdt|usdc|eth|ton|sol)\b|reward|claim|airdrop|voucher|giveaway|bonus|eligible|visit|free mint|https?:|www\.|t\.me\/|\.(com|io|xyz|net|org|app|site|top|vip|pro|gift|fun|lol|cc)\b/i
+
+export function looksLikeSpam(name: string, collection: string): boolean {
+	return SPAM.test(name) || SPAM.test(collection)
+}
+
+const OAT = /\b(oat|poap)\b|galxe|galaxy oat|layer3 cube/i
+
+export function isOat(name: string, collection: string): boolean {
+	return OAT.test(collection) || OAT.test(name)
+}
+
 export function nftKey(chain: string, contract: string, name: string): string {
 	return `${chain}:${contract.toLowerCase()}:${name.trim().toLowerCase()}`
 }
@@ -109,6 +126,7 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 			image: mediaUrl(item.image_url) || mediaUrl(item.metadata?.image),
 			url: `https://${host}/token/${contract}/instance/${id}`,
 			count: Math.max(1, Number(item.value) || 1),
+			spam: looksLikeSpam(name, collection), oat: isOat(name, collection),
 		})
 	}
 	return out
@@ -130,22 +148,17 @@ async function explorerJson(url: string): Promise<unknown> {
 	}
 }
 
-async function blockscoutHeld(address: string): Promise<NftRead> {
+async function blockscoutHeld(chain: string, host: string, address: string): Promise<NftRead> {
 	const held: HeldNft[] = []
-	const chains: string[] = []
-	for (const [chain, host] of Object.entries(BLOCKSCOUT)) {
-		let next = ''
-		let complete = false
-		for (let page = 0; page < 40; page++) {
-			const data = await explorerJson(`https://${host}/api/v2/addresses/${address}/nft?type=ERC-721,ERC-1155${next}`) as { items?: BlockscoutItem[]; next_page_params?: Record<string, unknown> | null } | null
-			if (!data || !Array.isArray(data.items)) break
-			held.push(...blockscoutTokens(chain, host, data.items))
-			if (!data.next_page_params) { complete = true; break }
-			next = '&' + new URLSearchParams(Object.entries(data.next_page_params).map(([k, v]) => [k, String(v)])).toString()
-		}
-		if (complete) chains.push(chain)
+	let next = ''
+	for (let page = 0; page < 40; page++) {
+		const data = await explorerJson(`https://${host}/api/v2/addresses/${address}/nft?type=ERC-721,ERC-1155${next}`) as { items?: BlockscoutItem[]; next_page_params?: Record<string, unknown> | null } | null
+		if (!data || !Array.isArray(data.items)) return { held, chains: [] }
+		held.push(...blockscoutTokens(chain, host, data.items))
+		if (!data.next_page_params) return { held, chains: [chain] }
+		next = '&' + new URLSearchParams(Object.entries(data.next_page_params).map(([k, v]) => [k, String(v)])).toString()
 	}
-	return { held, chains }
+	return { held, chains: [] }
 }
 
 // BNB and Taiko: the transfers Etherscan lists, replayed into what the wallet holds now.
@@ -233,37 +246,34 @@ async function tokenMetadata(uri: string): Promise<{ image?: unknown } | null> {
 	}
 }
 
-async function etherscanHeld(address: string, key: string): Promise<NftRead> {
-	const held: HeldNft[] = []
-	const chains: string[] = []
-	for (const [chain, info] of Object.entries(ETHERSCAN_CHAINS)) {
-		const transfers: EtherscanTransfer[] = []
-		let ok = true
-		for (const action of ['tokennfttx', 'token1155tx']) {
-			try {
-				const answer = await requestUrl({ url: `https://api.etherscan.io/v2/api?chainid=${String(info.id)}&module=account&action=${action}&address=${address}&startblock=0&endblock=999999999&sort=asc&apikey=${encodeURIComponent(key)}`, throw: false })
-				const data = answer.json as { status?: string; message?: string; result?: unknown }
-				if (Array.isArray(data.result)) transfers.push(...data.result as EtherscanTransfer[])
-				else if (data.message !== 'No transactions found') ok = false
-			} catch {
-				ok = false
-			}
-		}
-		if (!ok) continue
-		chains.push(chain)
-		for (const token of replayTransfers(address, transfers)) {
-			held.push({
-				key: nftKey(chain, token.contract, token.collection),
-				chain,
-				collection: token.collection,
-				name: token.collection,
-				image: await tokenImage(info.rpc, token.contract, token.id),
-				url: `https://${info.site}/nft/${token.contract}/${token.id}`,
-				count: token.count,
-			})
+async function etherscanHeld(chain: string, address: string, key: string): Promise<NftRead> {
+	const info = ETHERSCAN_CHAINS[chain]
+	if (!info) return { held: [], chains: [] }
+	const transfers: EtherscanTransfer[] = []
+	for (const action of ['tokennfttx', 'token1155tx']) {
+		try {
+			const answer = await requestUrl({ url: `https://api.etherscan.io/v2/api?chainid=${String(info.id)}&module=account&action=${action}&address=${address}&startblock=0&endblock=999999999&sort=asc&apikey=${encodeURIComponent(key)}`, throw: false })
+			const data = answer.json as { message?: string; result?: unknown }
+			if (Array.isArray(data.result)) transfers.push(...data.result as EtherscanTransfer[])
+			else if (data.message !== 'No transactions found') return { held: [], chains: [] }
+		} catch {
+			return { held: [], chains: [] }
 		}
 	}
-	return { held, chains }
+	const held: HeldNft[] = []
+	for (const token of replayTransfers(address, transfers)) {
+		held.push({
+			key: nftKey(chain, token.contract, token.collection),
+			chain,
+			collection: token.collection,
+			name: token.collection,
+			image: await tokenImage(info.rpc, token.contract, token.id),
+			url: `https://${info.site}/nft/${token.contract}/${token.id}`,
+			count: token.count,
+			spam: looksLikeSpam(token.collection, token.collection), oat: isOat(token.collection, token.collection),
+		})
+	}
+	return { held, chains: [chain] }
 }
 
 interface TonItem {
@@ -283,7 +293,7 @@ export function tonTokens(items: TonItem[]): HeldNft[] {
 		const collection = typeof item.collection?.name === 'string' && item.collection.name.trim() ? item.collection.name.trim() : 'TON'
 		const name = typeof item.metadata?.name === 'string' && item.metadata.name.trim() ? item.metadata.name.trim() : collection
 		const preview = (item.previews ?? []).find(p => p.resolution === '500x500')?.url
-		out.push({ key: nftKey('TON', contract, name), chain: 'TON', collection, name, image: mediaUrl(preview) || mediaUrl(item.metadata?.image), url: `https://tonviewer.com/${address}`, count: 1 })
+		out.push({ key: nftKey('TON', contract, name), chain: 'TON', collection, name, image: mediaUrl(preview) || mediaUrl(item.metadata?.image), url: `https://tonviewer.com/${address}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection) })
 	}
 	return out
 }
@@ -320,7 +330,7 @@ export function solanaTokens(items: SolanaItem[]): HeldNft[] {
 		const contract = typeof item.collection === 'string' && item.collection ? item.collection : mint
 		const collection = typeof item.collectionName === 'string' && item.collectionName.trim() ? item.collectionName.trim() : 'Solana'
 		const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : collection
-		out.push({ key: nftKey('Solana', contract, name), chain: 'Solana', collection, name, image: mediaUrl(item.image), url: `https://solscan.io/token/${mint}`, count: 1 })
+		out.push({ key: nftKey('Solana', contract, name), chain: 'Solana', collection, name, image: mediaUrl(item.image), url: `https://solscan.io/token/${mint}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection) })
 	}
 	return out
 }
@@ -341,32 +351,49 @@ async function solanaHeld(address: string): Promise<NftRead> {
 	return { held, chains: ['Solana'] }
 }
 
-// Every wallet's tokens, grouped. A chain counts as read only when every wallet of its kind
-// read it in full: only then may a token missing from it be taken as gone.
-export async function nftHoldings(wallets: Wallet[], etherscanKey: string): Promise<NftRead> {
+// The networks a wallet list can name; "EVM" stands for every EVM network at once.
+export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko']
+export const WALLET_FIELDS = ['EVM', ...EVM_NETWORKS, 'TON', 'Solana']
+
+export interface WalletPair {
+	chain: string
+	address: string
+}
+
+// Per network, the addresses its own field lists, plus for EVM networks those of the "EVM" field.
+export function walletPairs(fields: Record<string, string>): WalletPair[] {
+	const out: WalletPair[] = []
+	const add = (chain: string, text: string | undefined, kind: WalletKind): void => {
+		for (const wallet of parseWallets(text ?? '')) {
+			if (wallet.kind === kind && !out.some(p => p.chain === chain && p.address.toLowerCase() === wallet.address.toLowerCase())) out.push({ chain, address: wallet.address })
+		}
+	}
+	for (const chain of EVM_NETWORKS) {
+		add(chain, fields.EVM, 'evm')
+		add(chain, fields[chain], 'evm')
+	}
+	add('TON', fields.TON, 'ton')
+	add('Solana', fields.Solana, 'solana')
+	return out
+}
+
+// Every wallet's tokens, grouped. A network counts as read only when all its wallets read in full:
+// only then may a token missing from it be taken as gone. BNB and Taiko need the Etherscan key.
+export async function nftHoldings(pairs: WalletPair[], etherscanKey: string): Promise<NftRead> {
 	const held: HeldNft[] = []
 	const done = new Map<string, number>()
 	const wanted = new Map<string, number>()
-	const want = (chains: string[]): void => { for (const chain of chains) wanted.set(chain, (wanted.get(chain) ?? 0) + 1) }
-	const take = (read: NftRead): void => {
+	for (const { chain, address } of pairs) {
+		const host = BLOCKSCOUT[chain]
+		let read: NftRead | null = null
+		if (host) read = await blockscoutHeld(chain, host, address)
+		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : null
+		else if (chain === 'TON') read = await tonHeld(address)
+		else if (chain === 'Solana') read = await solanaHeld(address)
+		if (!read) continue
+		wanted.set(chain, (wanted.get(chain) ?? 0) + 1)
 		held.push(...read.held)
-		for (const chain of read.chains) done.set(chain, (done.get(chain) ?? 0) + 1)
-	}
-	for (const wallet of wallets) {
-		if (wallet.kind === 'evm') {
-			want(Object.keys(BLOCKSCOUT))
-			take(await blockscoutHeld(wallet.address))
-			if (etherscanKey) {
-				want(Object.keys(ETHERSCAN_CHAINS))
-				take(await etherscanHeld(wallet.address, etherscanKey))
-			}
-		} else if (wallet.kind === 'ton') {
-			want(['TON'])
-			take(await tonHeld(wallet.address))
-		} else {
-			want(['Solana'])
-			take(await solanaHeld(wallet.address))
-		}
+		for (const c of read.chains) done.set(c, (done.get(c) ?? 0) + 1)
 	}
 	const chains = [...wanted.keys()].filter(chain => done.get(chain) === wanted.get(chain))
 	return { held: groupHeld(held), chains }

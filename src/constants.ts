@@ -162,16 +162,24 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'header.complete': 'Complete',
 		'header.markComplete': 'Mark complete',
 		'settings.nft.desc': 'NFTs held by your wallets arrive in the NFT category: Ethereum, Optimism, Base, Arbitrum and Polygon, TON and Solana; with an Etherscan key, BNB and Taiko too. Desktop only.',
+		'settings.page.wallets': 'Wallets',
+		'settings.wallets.evm': 'All EVM networks',
+		'settings.wallets.evm.desc': 'A 0x address here is read on every EVM network below.',
 		'settings.nftWallets.name': 'Wallet addresses',
-		'settings.nftWallets.desc': 'Public addresses, separated by commas or lines: 0x… for Ethereum and its networks, TON and Solana addresses as they are. Only read, never signed.',
+		'settings.nftWallets.desc': 'Public addresses, one per line. Only read, never signed.',
 		'settings.nftImport': 'Import now',
 		'settings.etherscan.name': 'Etherscan API key',
 		'settings.etherscan.desc': 'Free at etherscan.io; adds NFTs on BNB Chain and Taiko.',
 		'stats.topCollections': 'Top collections',
 		'header.collection': 'Collection',
 		'header.chain': 'Network',
-		'header.owned': 'Owned',
-		'header.notOwned': 'No longer in your wallets',
+		'header.count': 'Quantity',
+		'header.favorite': 'Favorite',
+		'filter.chain': 'Blockchain',
+		'settings.nftOat.name': 'Show OATs',
+		'settings.nftOat.desc': 'Achievement and attendance tokens (Galxe OAT, POAP, Layer3 CUBE) get OAT in their properties. Set OAT yourself to move a token in or out.',
+		'settings.nftSpam.name': 'Show spam NFTs',
+		'settings.nftSpam.desc': 'Tokens that look like phishing drops (money amounts, rewards, claim or airdrop calls, links in the name) get Spam in their properties and stay hidden. Set Spam yourself to hide or show one.',
 		'notice.canvasOff': 'Turn on the core Canvas plugin in Settings > Core plugins to open canvases.',
 		'stats.showCalendar': 'Show in days, months and years',
 		'stats.showHours': 'Show in hours',
@@ -34764,9 +34772,11 @@ export interface ILibrarySettings {
 	libraryFolder: string
 	omdbApiKey: string
 	// NFT wallets, any chain, separated by commas or lines; Etherscan's key adds BNB and Taiko
-	nftWallets: string
+	nftWallets: Record<string, string>
 	etherscanApiKey: string
 	nftLastImport: number
+	showNftSpam: boolean
+	showNftOat: boolean
 	// API keys taken from Obsidian's Keychain instead of these fields: the secret's id per key
 	keySecrets: Partial<Record<ApiKeyName, string>>
 	googleBooksApiKey: string
@@ -34856,9 +34866,11 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	categories: [],
 	libraryFolder: 'Library',
 	omdbApiKey: '',
-	nftWallets: '',
+	nftWallets: {},
 	etherscanApiKey: '',
 	nftLastImport: 0,
+	showNftSpam: false,
+	showNftOat: true,
 	keySecrets: {},
 	googleBooksApiKey: '',
 	rawgApiKey: '',

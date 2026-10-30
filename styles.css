@@ -1546,6 +1546,12 @@ sort trigger, the chosen one in the accent colour. */
 	background: color-mix(in srgb, var(--background-primary) 80%, transparent);
 }
 
+.library-platform-initial {
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+}
+
 .library-platform svg {
 	width: 13px;
 	height: 13px;
@@ -2042,4 +2048,42 @@ sort trigger, the chosen one in the accent colour. */
 .library-settings-tabs button.is-active {
 	background-color: var(--interactive-accent);
 	color: var(--text-on-accent);
+}
+
+/* An NFT's favorite star: an outline, filled when on */
+.card-favorite-row {
+	display: flex;
+	justify-content: center;
+}
+
+.card-favorite {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+
+.card-favorite svg {
+	width: 16px;
+	height: 16px;
+}
+
+.card-favorite.is-on svg,
+.note-header-favorite.is-on svg {
+	color: #e3b341;
+	fill: currentColor;
+}
+
+.note-header-favorite {
+	display: inline-flex;
+	vertical-align: middle;
+	margin-left: 6px;
+	padding: 4px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.note-header-favorite svg {
+	width: 18px;
+	height: 18px;
 }

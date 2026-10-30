@@ -131,6 +131,9 @@ export class LibraryRenderer {
 			if (isTemplateFile(file.path)) continue
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			if (!fm || fm.Type !== category.typeValue) continue
+			// spam NFTs stay hidden unless the setting shows them, OATs while it hides them
+			if (fm.Spam === true && fm.Source === 'nft' && !this.plugin.settings.showNftSpam) continue
+			if (fm.OAT === true && fm.Source === 'nft' && !this.plugin.settings.showNftOat) continue
 			cards.push({
 				file,
 				fm,
@@ -637,6 +640,13 @@ export class LibraryRenderer {
 
 		// a video: likes, dislikes and views where a score would be; your own like or dislike filled
 		if (video) this.renderVotes(info, fm)
+		// an NFT's star where a score would be: filled for a favorite; it is set in the note
+		if (toStr(fm.Source) === 'nft') {
+			const on = fm.Favorite === true
+			const star = info.createDiv({ cls: 'card-rating card-favorite-row' }).createSpan({ cls: `card-favorite${on ? ' is-on' : ''}`, attr: on ? { 'role': 'img', 'aria-label': tr('header.favorite') } : { 'aria-hidden': 'true' } })
+			setIcon(star, 'star')
+		}
+
 
 		const myRating = fm['My Rating'] ?? fm.Rating
 		const imdb = fm['Rating IMDB']
@@ -848,7 +858,10 @@ export class LibraryView extends ItemView {
 
 	// Only values some card has; a filter shows with 2+ values or a chosen one.
 	private sectionFilters(toolbar: HTMLElement, filters: NonNullable<SectionSpec['filters']>): void {
-		const groups = FACETS.map(({ facet, label }) => {
+		// an NFT's platform is its blockchain
+		const nft = filters.all.length > 0 && filters.all.every(card => card.fm.Source === 'nft')
+		const groups = FACETS.map(({ facet, label: base }) => {
+			const label = nft && facet === 'platform' ? 'filter.chain' : base
 			const counts = new Map<string, number>()
 			for (const card of filters.all) {
 				for (const value of facetValues(card, facet)) counts.set(value, (counts.get(value) ?? 0) + 1)

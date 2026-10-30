@@ -12,6 +12,7 @@ import {
 	type SettingDefinitionItem,
 } from "obsidian";
 import type LibraryPlugin from "./main";
+import { WALLET_FIELDS } from "./nft";
 import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constants";
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
@@ -53,9 +54,9 @@ interface Row {
 }
 
 // The tabs of the settings, each with its sections under the strip.
-type Page = "general" | "categories" | "connectors" | "keys" | "stats";
-const PAGES: Page[] = ["general", "categories", "connectors", "keys", "stats"];
-const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", keys: "key-round", stats: "bar-chart-3" };
+type Page = "general" | "categories" | "connectors" | "wallets" | "keys" | "stats";
+const PAGES: Page[] = ["general", "categories", "connectors", "wallets", "keys", "stats"];
+const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", wallets: "wallet", keys: "key-round", stats: "bar-chart-3" };
 
 // A group of rows; a group scopes row names — each category is its own (each has "Type value").
 interface Section {
@@ -136,6 +137,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 		if (page === "categories") return tr("settings.section.categories");
 		if (page === "keys") return tr("settings.section.keys");
 		if (page === "stats") return tr("stats.title");
+		if (page === "wallets") return tr("settings.page.wallets");
 		return tr(`settings.page.${page}`);
 	}
 
@@ -384,23 +386,53 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
-				page: "connectors",
+				page: "wallets",
 				heading: "NFT",
 				rows: [
 					note(tr("settings.nft.desc")),
-					{
-						name: tr("settings.nftWallets.name"),
-						desc: tr("settings.nftWallets.desc"),
+					...WALLET_FIELDS.map((field): Row => ({
+						name: field === "EVM" ? tr("settings.wallets.evm") : field === "BNB" ? "BNB Chain" : field,
+						desc: field === "EVM" ? tr("settings.wallets.evm.desc") : tr("settings.nftWallets.desc"),
 						render: (row) => {
 							row.addTextArea((area) => {
-								area.inputEl.rows = 3;
-								area.setValue(settings.nftWallets).onChange(async (value) => {
-									settings.nftWallets = value;
+								area.inputEl.rows = 2;
+								area.setValue(settings.nftWallets[field] ?? "").onChange(async (value) => {
+									if (value.trim()) settings.nftWallets[field] = value;
+									else delete settings.nftWallets[field];
 									await this.plugin.saveSettings();
 								});
 							});
+						},
+					})),
+					{
+						name: tr("settings.nftImport"),
+						render: (row) => {
 							row.addButton((button) =>
-								button.setButtonText(tr("settings.nftImport")).onClick(() => void this.plugin.nftImport(true)),
+								button.setButtonText(tr("settings.nftImport")).setCta().onClick(() => void this.plugin.nftImport(true)),
+							);
+						},
+					},
+					{
+						name: tr("settings.nftOat.name"),
+						desc: tr("settings.nftOat.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(settings.showNftOat).onChange(async (value) => {
+									settings.showNftOat = value;
+									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+					{
+						name: tr("settings.nftSpam.name"),
+						desc: tr("settings.nftSpam.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(settings.showNftSpam).onChange(async (value) => {
+									settings.showNftSpam = value;
+									await this.plugin.saveSettings();
+								}),
 							);
 						},
 					},
