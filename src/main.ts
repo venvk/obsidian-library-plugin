@@ -40,7 +40,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -195,6 +195,8 @@ export default class LibraryPlugin extends Plugin {
 	private watchNotes = new Map<string, TFile>()
 	// shows whose note got its Netflix ID in this import: their viewings tick, nothing to undo yet
 	private netflixFresh = new Set<number>()
+	// video notes already read afresh this session
+	private youtubeFresh = new Set<string>()
 	// per show, in this import: a first pass over a note that had the ID before (unticked = unticked by hand)
 	private netflixSeeding = new Map<number, boolean>()
 	private malImporting = false
@@ -287,6 +289,7 @@ export default class LibraryPlugin extends Plugin {
 			banner()
 			if (file instanceof TFile && file.extension === 'canvas') void this.fillLinkCanvas(file)
 			else if (file instanceof TFile) {
+				void this.youtubeRefresh(file)
 				const existing = this.linkTimers.get(file.path)
 				if (existing) window.clearTimeout(existing)
 				this.linkTimers.set(file.path, window.setTimeout(() => {
@@ -1508,7 +1511,7 @@ export default class LibraryPlugin extends Plugin {
 			return dmy ? `${dmy[3] ?? ''}-${dmy[2] ?? ''}-${dmy[1] ?? ''}` : ''
 		}
 		// notes of the first builds have no details yet
-		const bare = (file: TFile): boolean => !('Subscribed' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))
+		const bare = (file: TFile): boolean => !('Published' in (this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}))
 		const wanted = videos.filter(video => {
 			const file = notes.get(video.id)
 			return !file || (rewatch && (video.day > lastSeen(file) || bare(file)))
@@ -1582,6 +1585,45 @@ export default class LibraryPlugin extends Plugin {
 		else delete fm.Reaction
 		if (found.subscribed !== null) fm.Subscribed = found.subscribed
 		if (found.channelUrl) fm['Channel URL'] = found.channelUrl
+		if (found.channelId) fm['Channel ID'] = found.channelId
+		if (found.published) {
+			fm.Published = dmyOf(`${found.published}T12:00:00`)
+			fm.Year = Number(found.published.slice(0, 4))
+		}
+	}
+
+	// An opened video note reads its like, subscription and date afresh, once a session.
+	private async youtubeRefresh(file: TFile): Promise<void> {
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const id = toStr(fm?.['Source ID'])
+		if (!fm || toStr(fm.Source) !== YOUTUBE_SOURCE || this.youtubeFresh.has(id) || !this.settings.watchSites.youtube.connected || !Platform.isDesktopApp) return
+		this.youtubeFresh.add(id)
+		const found = (await videoDetails([id])).get(id)
+		if (!found || this.unloaded) return
+		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => this.youtubeDetails(current, found))
+		if (found.description) await this.addDescription(file, found.description)
+	}
+
+	// The note's like or channel subscription, sent to YouTube; the notes follow once it took.
+	private async youtubeToggle(file: TFile, action: YoutubeAction): Promise<void> {
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const id = toStr(fm?.['Source ID'])
+		if (!fm || !this.settings.watchSites.youtube.connected) { new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+		if (!await youtubeAct(id, action)) { new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
+		if (action === 'like' || action === 'dislike' || action === 'removelike') {
+			await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+				if (action === 'removelike') delete current.Reaction
+				else current.Reaction = action
+			})
+			return
+		}
+		// every note of the channel
+		const channel = toStr(fm['Channel ID']) || toStr(fm['Channel URL'])
+		for (const other of this.youtubeNotes().values()) {
+			const theirs = this.app.metadataCache.getFileCache(other)?.frontmatter
+			if (other !== file && (!channel || (toStr(theirs?.['Channel ID']) || toStr(theirs?.['Channel URL'])) !== channel)) continue
+			await this.app.fileManager.processFrontMatter(other, (current: Record<string, unknown>) => { current.Subscribed = action === 'subscribe' })
+		}
 	}
 
 	private async youtubeCategory(): Promise<ICategory> {
@@ -4043,6 +4085,19 @@ export default class LibraryPlugin extends Plugin {
 		const video = toStr(fm.Source) === YOUTUBE_SOURCE
 		// the title links the video too; the button says so
 		if (video && url) titleEl.appendChild(this.youtubeLink(url, tr('header.openYoutube')))
+		if (video) {
+			const reaction = toStr(fm.Reaction)
+			for (const kind of ['like', 'dislike'] as const) {
+				const on = reaction === kind
+				const button = titleEl.createEl('button', { cls: `note-header-reaction is-${kind}${on ? ' is-on' : ''}`, attr: { 'aria-label': tr(kind === 'like' ? 'header.liked' : 'header.disliked'), 'aria-pressed': on ? 'true' : 'false' } })
+				setIcon(button, kind === 'like' ? 'thumbs-up' : 'thumbs-down')
+				button.addEventListener('click', (e) => {
+					e.preventDefault()
+					button.disabled = true
+					void this.youtubeToggle(file, on ? 'removelike' : kind).then(() => { button.disabled = false })
+				})
+			}
+		}
 		titleEl.appendChild(shareBtn)
 		infoSide.appendChild(titleEl)
 		const badges = createDiv({ cls: 'note-header-badges' })
@@ -4074,17 +4129,30 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		addNames(tr('header.creator'), creators)
+		// the channel: its canvas by name, the channel itself on YouTube, and the subscription
 		if (video && infoSide.lastElementChild && creators.length > 0) {
 			const row = infoSide.lastElementChild as HTMLElement
 			const channel = safeUrl(fm['Channel URL'])
-			if (channel) row.appendChild(this.youtubeLink(channel, tr('header.openYoutube')))
-			if (fm.Subscribed === true) row.appendText(` · ${tr('header.subscribed')}`)
+			if (channel) {
+				const go = row.createEl('a', { cls: 'note-header-pill', href: channel, attr: { target: '_blank', rel: 'noopener noreferrer' } })
+				setIcon(go.createSpan(), 'youtube')
+				go.createSpan({ text: tr('header.channel') })
+			}
+			const subscribed = fm.Subscribed === true
+			const sub = row.createEl('button', { cls: `note-header-pill is-subscribe${subscribed ? ' is-on' : ''}`, attr: { 'aria-pressed': subscribed ? 'true' : 'false' } })
+			setIcon(sub.createSpan(), subscribed ? 'bell-ring' : 'bell-plus')
+			sub.createSpan({ text: tr(subscribed ? 'header.subscribed' : 'header.subscribe') })
+			sub.addEventListener('click', (e) => {
+				e.preventDefault()
+				sub.disabled = true
+				void this.youtubeToggle(file, subscribed ? 'unsubscribe' : 'subscribe').then(() => { sub.disabled = false })
+			})
 		}
-		if (video && (fm.Reaction === 'like' || fm.Reaction === 'dislike')) addRow(tr('header.reaction'), fm.Reaction === 'like' ? `👍 ${tr('header.liked')}` : `👎 ${tr('header.disliked')}`)
+		if (video && toStr(fm.Published)) addRow(tr('header.published'), toStr(fm.Published))
 		if (video && Number(fm.Rewatched) > 0) addRow(tr('header.rewatched'), String(Number(fm.Rewatched)))
 		addNames(tr('header.cast'), cast)
 		const yearsStr = year + (endYear ? '–' + endYear : '')
-		if (yearsStr) addRow(tr('header.years'), yearsStr)
+		if (yearsStr && !video) addRow(tr('header.years'), yearsStr)
 		if (season) addRow(tr('header.seasons'), season)
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))

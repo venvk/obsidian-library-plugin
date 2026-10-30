@@ -1,3 +1,4 @@
+import { YOUTUBE_CATEGORY } from './categories'
 import { tr } from './i18n'
 import { readPage } from './watchSites'
 
@@ -46,13 +47,19 @@ export interface VideoDetails {
 	reaction: 'like' | 'dislike' | ''
 	subscribed: boolean | null
 	channelUrl: string
+	channelId: string
+	// ISO date the video came out; '' when unknown
+	published: string
 }
 
+export type YoutubeAction = 'like' | 'dislike' | 'removelike' | 'subscribe' | 'unsubscribe'
+
 const VIDEO_ID = /^[\w-]{11}$/
+const CHANNEL_ID = /^UC[\w-]{22}$/
 const CHANNEL_PATH = /^\/(@[^/?#\s]+|channel\/UC[\w-]+)$/
 
 // the category and Source of the connector's notes
-export const YOUTUBE_TYPE = 'YouTube'
+export const YOUTUBE_TYPE = YOUTUBE_CATEGORY
 export const YOUTUBE_SOURCE = 'youtube'
 
 // dated headings reach back this far
@@ -226,15 +233,17 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 			const secondary = parts.map(p => p.videoSecondaryInfoRenderer).find(Boolean);
 			const like = (JSON.stringify(primary || {}).match(/"likeStatus":"([A-Z]+)"/) || [])[1] || '';
 			const subscribed = secondary?.subscribeButton?.subscribeButtonRenderer?.subscribed;
+			const player = await ask('player', { videoId: id }).catch(() => null);
 			out[id] = { description: text(secondary?.attributedDescription) || text(secondary?.description), reaction: like === 'LIKE' ? 'like' : like === 'DISLIKE' ? 'dislike' : '',
-				subscribed: typeof subscribed === 'boolean' ? subscribed : null, channelPath: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '' };
+				subscribed: typeof subscribed === 'boolean' ? subscribed : null, channelPath: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '',
+				channelId: secondary?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.browseId || '', published: player?.microformat?.playerMicroformatRenderer?.publishDate || '' };
 		} catch {}
 		await new Promise(r => setTimeout(r, 300));
 	}
 	return JSON.stringify(out);
 })().catch(() => '')`
 	try {
-		const answer = JSON.parse(await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown }>
+		const answer = JSON.parse(await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown; channelId?: unknown; published?: unknown }>
 		for (const id of clean) {
 			const found = answer[id]
 			if (!found) continue
@@ -243,6 +252,8 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 				reaction: found.reaction === 'like' || found.reaction === 'dislike' ? found.reaction : '',
 				subscribed: typeof found.subscribed === 'boolean' ? found.subscribed : null,
 				channelUrl: channelUrl(typeof found.channelPath === 'string' ? found.channelPath : ''),
+				channelId: typeof found.channelId === 'string' && CHANNEL_ID.test(found.channelId) ? found.channelId : '',
+				published: typeof found.published === 'string' ? /^\d{4}-\d{2}-\d{2}/.exec(found.published)?.[0] ?? '' : '',
 			})
 		}
 	} catch {
@@ -251,10 +262,30 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 	return out
 }
 
-// The description as a callout in the note's body, every line quoted.
+// Like, dislike or clear the video, or subscribe to or leave its channel, as the watch page's buttons do.
+export async function youtubeAct(videoId: string, action: YoutubeAction): Promise<boolean> {
+	if (!VIDEO_ID.test(videoId)) return false
+	const code = `(async () => {${YOUTUBE_ASK}
+	const id = ${JSON.stringify(videoId)};
+	const action = ${JSON.stringify(action)};
+	if (action === 'like' || action === 'dislike' || action === 'removelike') {
+		await ask('like/' + action, { target: { videoId: id } });
+		return 'ok';
+	}
+	const watch = await ask('next', { videoId: id });
+	const parts = watch.contents?.twoColumnWatchNextResults?.results?.results?.contents || [];
+	const channel = parts.map(p => p.videoSecondaryInfoRenderer).find(Boolean)?.owner?.videoOwnerRenderer?.navigationEndpoint?.browseEndpoint?.browseId;
+	if (!channel) return '';
+	await ask('subscription/' + action, { channelIds: [channel] });
+	return 'ok';
+})().catch(() => '')`
+	return await readPage(HISTORY_URL, code, 60000, HISTORY_READY) === 'ok'
+}
+
+// The description as a callout in the note's body, folded, every line quoted.
 export function descriptionCallout(description: string, title = tr('header.description')): string {
 	const lines = description.replace(/\r/g, '').trim().split('\n').map(line => `> ${line}`.replace(/\s+$/, ''))
-	return [`> [!quote] ${title}`, ...lines].join('\n')
+	return [`> [!quote]- ${title}`, ...lines].join('\n')
 }
 
 export function videoUrl(id: string): string {

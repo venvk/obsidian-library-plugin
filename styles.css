@@ -34,6 +34,82 @@
 	aspect-ratio: 16 / 9;
 }
 
+.card-reaction {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	display: flex;
+	padding: 4px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.55);
+	color: #ffffff;
+}
+
+.card-reaction svg {
+	width: 14px;
+	height: 14px;
+}
+
+.card-reaction.is-like svg,
+.note-header-reaction.is-like.is-on svg {
+	color: #2ea043;
+	fill: currentColor;
+}
+
+.card-reaction.is-dislike svg,
+.note-header-reaction.is-dislike.is-on svg {
+	color: #e5484d;
+	fill: currentColor;
+}
+
+.note-header-reaction {
+	display: inline-flex;
+	vertical-align: middle;
+	margin-left: 6px;
+	padding: 4px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.note-header-reaction svg {
+	width: 18px;
+	height: 18px;
+}
+
+.note-header-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	margin-left: 8px;
+	padding: 2px 10px;
+	height: auto;
+	border-radius: 999px;
+	font-size: var(--font-ui-smaller);
+	vertical-align: middle;
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+	text-decoration: none;
+	box-shadow: none;
+	cursor: pointer;
+}
+
+.note-header-pill svg {
+	width: 14px;
+	height: 14px;
+}
+
+.note-header-pill.is-subscribe {
+	background: #ff0000;
+	color: #ffffff;
+}
+
+.note-header-pill.is-subscribe.is-on {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
 .note-header-youtube {
 	display: inline-flex;
 	vertical-align: middle;
@@ -1956,4 +2032,17 @@ sort trigger, the chosen one in the accent colour. */
 .library-name-link:focus-visible {
 	color: var(--text-accent);
 	text-decoration: underline;
+}
+
+/* Settings before 1.13: the pages as tabs */
+.library-settings-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+	margin-bottom: 16px;
+}
+
+.library-settings-tabs button.is-active {
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
 }

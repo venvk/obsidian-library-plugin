@@ -50,8 +50,13 @@ interface Row {
 	searchable?: boolean;
 }
 
+// The pages of the tab: entries of its menu on 1.13+, tabs before.
+type Page = "general" | "categories" | "connectors" | "keys" | "stats";
+const PAGES: Page[] = ["general", "categories", "connectors", "keys", "stats"];
+
 // A group of rows; a group scopes row names — each category is its own (each has "Type value").
 interface Section {
+	page: Page;
 	heading?: string;
 	group?: boolean;
 	rows: Row[];
@@ -72,6 +77,8 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private plugin: LibraryPlugin;
 	private expanded = new Set<ICategory>();
 	private dragging: ICategory | null = null;
+	// before 1.13: the tab shown
+	private page: Page = "general";
 	// Edits in progress, by starting value: notes move on blur/tab close, not per keystroke.
 	private libraryFrom: string | null = null;
 	private folderFrom = new Map<ICategory, string>();
@@ -81,15 +88,26 @@ export class LibrarySettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	// 1.13+: renders these and indexes them for the settings search; no vault scans (called per refresh).
+	// 1.13+: a menu of pages, rendered and indexed for the settings search; no vault scans (called per refresh).
 	getSettingDefinitions(): SettingDefinitionItem[] {
-		const items: SettingDefinitionItem[] = [];
-		for (const section of this.sections()) {
-			const definitions = section.rows.map((row) => this.definition(row));
-			if (section.heading || section.group) items.push({ type: "group", heading: section.heading, items: definitions });
-			else items.push(...definitions);
-		}
-		return items;
+		const sections = this.sections();
+		return PAGES.map((page) => {
+			const items: SettingDefinitionItem[] = [];
+			for (const section of sections) {
+				if (section.page !== page) continue;
+				const definitions = section.rows.map((row) => this.definition(row));
+				if (section.heading || section.group) items.push({ type: "group", heading: section.heading, items: definitions });
+				else items.push(...definitions);
+			}
+			return { type: "page", name: this.pageName(page), items };
+		});
+	}
+
+	private pageName(page: Page): string {
+		if (page === "categories") return tr("settings.section.categories");
+		if (page === "keys") return tr("settings.section.keys");
+		if (page === "stats") return tr("stats.title");
+		return tr(`settings.page.${page}`);
 	}
 
 	// Before 1.13: the same rows, drawn by hand.
@@ -125,7 +143,16 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private draw(): void {
 		const { containerEl } = this;
 		containerEl.empty();
+		const tabs = containerEl.createDiv({ cls: "library-settings-tabs" });
+		for (const page of PAGES) {
+			const tab = tabs.createEl("button", { text: this.pageName(page), cls: page === this.page ? "is-active" : "" });
+			tab.addEventListener("click", () => {
+				this.page = page;
+				this.draw();
+			});
+		}
 		for (const section of this.sections()) {
+			if (section.page !== this.page) continue;
 			if (section.heading) new Setting(containerEl).setName(section.heading).setHeading();
 			for (const row of section.rows) {
 				if (row.visible && !row.visible()) continue;
@@ -151,12 +178,12 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private sections(): Section[] {
 		const settings = this.plugin.settings;
 		const categories: Section[] = [
-			{ heading: tr("settings.section.categories"), rows: [note(tr("settings.categories.desc")), this.libraryFolderRow()] },
+			{ page: "categories", heading: tr("settings.section.categories"), rows: [note(tr("settings.categories.desc")), this.libraryFolderRow()] },
 		];
 		settings.categories.forEach((cat, index) => {
-			categories.push({ group: true, rows: this.categoryRows(cat, index) });
+			categories.push({ page: "categories", group: true, rows: this.categoryRows(cat, index) });
 		});
-		categories.push({ group: true, rows: [{ name: tr("settings.addCategory"), render: (row) => this.addCategory(row) }] });
+		categories.push({ page: "categories", group: true, rows: [{ name: tr("settings.addCategory"), render: (row) => this.addCategory(row) }] });
 
 		const statsRows: Row[] = [
 			note(tr("settings.stats.desc")),
@@ -219,6 +246,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 
 		return [
 			{
+				page: "general",
 				rows: [
 					note(tr("settings.intro")),
 					this.textRow("settings.coverProperty", "coverProperty", "Cover"),
@@ -299,6 +327,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "keys",
 				heading: tr("settings.section.keys"),
 				rows: [
 					this.textRow("settings.omdb", "omdbApiKey", tr("settings.omdb.placeholder")),
@@ -311,6 +340,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "connectors",
 				heading: `${tr("settings.default.movie")} · ${tr("settings.default.series")}`,
 				rows: [
 					{ name: "IMDb", desc: tr("settings.imdb.desc"), render: (row) => this.siteAccount(row, "imdb") },
@@ -319,10 +349,12 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "connectors",
 				heading: "YouTube",
 				rows: [{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") }],
 			},
 			{
+				page: "connectors",
 				heading: tr("settings.section.anime"),
 				rows: [
 					{ name: tr("anilist.name"), desc: tr("settings.anilist.desc"), render: (row) => this.anilistAccount(row) },
@@ -356,6 +388,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "connectors",
 				heading: tr("settings.section.games"),
 				rows: [
 					{ name: "PlayStation", desc: tr("settings.psn.desc"), render: (row) => this.psnAccount(row) },
@@ -364,8 +397,9 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			...categories,
-			{ heading: tr("stats.title"), rows: statsRows },
+			{ page: "stats", heading: tr("stats.title"), rows: statsRows },
 			{
+				page: "general",
 				heading: tr("settings.section.example"),
 				rows: [
 					{

@@ -594,12 +594,25 @@ export class LibraryRenderer {
 			setIcon(badge, 'eye')
 		}
 
+		// a video: your like or dislike on YouTube, an outline when neither
+		const video = toStr(fm.Source) === 'youtube'
+		if (video) {
+			const reaction = toStr(fm.Reaction)
+			const mark = imgDiv.createSpan({
+				cls: `card-reaction${reaction === 'like' || reaction === 'dislike' ? ` is-${reaction}` : ''}`,
+				attr: { 'role': 'img', 'aria-label': reaction === 'dislike' ? tr('header.disliked') : tr('header.liked') }
+			})
+			setIcon(mark, reaction === 'dislike' ? 'thumbs-down' : 'thumbs-up')
+		}
+
 		const info = cardEl.createDiv({ cls: 'card-info' })
 		info.createDiv({ cls: 'card-title', text: card.name })
 
 		const author = toStrArray(fm.Author || fm.Creator || fm.Director || fm.Artist).map(linkLabel).join(', ')
 		if (author) info.createDiv({ cls: 'card-author', text: author })
-		if (fm.Year) info.createDiv({ cls: 'card-year', text: toStr(fm.Year) })
+		// a video shows the day it came out
+		const year = video && toStr(fm.Published) ? toStr(fm.Published) : toStr(fm.Year)
+		if (year) info.createDiv({ cls: 'card-year', text: year })
 
 		const myRating = fm['My Rating'] ?? fm.Rating
 		const imdb = fm['Rating IMDB']

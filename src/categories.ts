@@ -15,11 +15,19 @@ export const TYPE_DEFAULTS: Record<string, string> = {
 
 export const MEDIA: ContentType[] = ['movie', 'series', 'book', 'comic', 'game', 'music', 'anime', 'manual']
 
+// the YouTube connector's category: fixed like the built-in ones, named the same in every language
+export const YOUTUBE_CATEGORY = 'YouTube'
+
+function isYoutube(cat: ICategory): boolean {
+	return cat.contentType === 'manual' && cat.typeValue === YOUTUBE_CATEGORY
+}
+
 export function isBuiltInCategory(cat: ICategory): boolean {
-	return cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType]
+	return isYoutube(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
 }
 
 export function categoryLabel(cat: ICategory): string {
+	if (isYoutube(cat)) return YOUTUBE_CATEGORY
 	return isBuiltInCategory(cat) ? tr(`settings.default.${cat.contentType}`) : cat.name
 }
 
