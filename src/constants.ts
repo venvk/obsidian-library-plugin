@@ -498,6 +498,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.youtube.desc': 'Videos you watch on YouTube arrive as notes, with the time you spent on each: the last 7 days first, then one older month a day. Shorts are left out.',
 		'header.description': 'Description',
 		'settings.page.general': 'General',
+		'cmd.openSettings': 'Library settings',
 		'settings.showStats.name': 'Show statistics',
 		'settings.showStats.desc': 'The statistics section at the top of the Library tab.',
 		'settings.page.connectors': 'Connectors',

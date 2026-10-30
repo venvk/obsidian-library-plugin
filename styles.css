@@ -666,42 +666,6 @@ sort trigger, the chosen one in the accent colour. */
 	width: auto;
 }
 
-.library-view .library-page-header {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	margin-bottom: 24px;
-	flex-wrap: wrap;
-}
-
-.library-actions {
-	display: flex;
-	gap: 6px;
-	margin-left: auto;
-}
-
-.library-icon-btn {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 38px;
-	height: 38px;
-	border-radius: 6px;
-	cursor: pointer;
-	border: 1px solid var(--background-modifier-border);
-	background: var(--background-secondary);
-	color: var(--text-normal);
-}
-
-.library-icon-btn:hover {
-	background: var(--background-modifier-hover);
-}
-
-.library-icon-btn .svg-icon {
-	width: 22px;
-	height: 22px;
-}
-
 .library-view .library-section {
 	margin-bottom: 36px;
 }
@@ -778,12 +742,6 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-view .library-toolbar {
 	margin-bottom: 14px;
-}
-
-.library-page-header {
-	display: flex;
-	gap: 8px;
-	margin-bottom: 16px;
 }
 
 .library-prompt-input {
@@ -1436,32 +1394,6 @@ sort trigger, the chosen one in the accent colour. */
 	display: flex;
 	width: 12px;
 	height: 12px;
-}
-
-/* + and search in the statistics header: compact, the accent colour. */
-.library-stats-header .library-actions {
-	margin-left: 4px;
-	gap: 4px;
-}
-
-.library-stats-header .library-icon-btn {
-	width: 28px;
-	height: 28px;
-	padding: 0;
-}
-
-.library-stats-header .library-icon-btn .svg-icon {
-	width: 16px;
-	height: 16px;
-}
-
-.library-view .library-icon-btn {
-	color: var(--text-accent);
-}
-
-.library-view .library-icon-btn:hover {
-	color: var(--text-accent-hover, var(--text-accent));
-	background-color: color-mix(in srgb, var(--interactive-accent) 14%, var(--background-secondary));
 }
 
 /* A sign-in page inside Obsidian. */

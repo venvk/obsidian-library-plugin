@@ -693,6 +693,18 @@ export class LibraryView extends ItemView {
 		this.registerDomEvent(activeDocument, 'click', () => {
 			this.contentEl.querySelectorAll('.library-sort-menu.open').forEach(m => m.removeClass('open'))
 		})
+		// in the tab's header, right to left: each new action goes in front
+		this.addAction('settings', tr('cmd.openSettings'), () => {
+			const setting = (this.app as unknown as { setting: { open(): void; openTabById(id: string): void } }).setting
+			setting.open()
+			setting.openTabById(this.plugin.manifest.id)
+		})
+		// the map has its own command; this is the same thing one press away
+		this.addAction('network', tr('cmd.libraryMap'), () => void this.plugin.buildLibraryMap())
+		// one press, every platform: forces what would otherwise wait for the daily timers
+		this.addAction('refresh-cw', tr('cmd.updateAll'), () => void this.plugin.updateAll())
+		this.addAction('search', tr('cmd.searchLibrary'), () => this.plugin.openLibrarySearch())
+		this.addAction('plus', tr('cmd.addContent'), () => this.plugin.openAddContent())
 		this.render()
 	}
 
@@ -732,43 +744,7 @@ export class LibraryView extends ItemView {
 			for (const card of cards) this.shown.add(card.file.path)
 		}
 
-		const actions = createDiv({ cls: 'library-actions' })
-
-		const addBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.addContent') }
-		})
-		setIcon(addBtn, 'plus')
-		addBtn.addEventListener('click', () => this.plugin.openAddContent())
-
-		const searchBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.searchLibrary') }
-		})
-		setIcon(searchBtn, 'search')
-		searchBtn.addEventListener('click', () => this.plugin.openLibrarySearch())
-
-		// One press, every platform: forces what would otherwise wait for the daily timers.
-		const updateBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.updateAll') }
-		})
-		setIcon(updateBtn, 'refresh-cw')
-		updateBtn.addEventListener('click', () => void this.plugin.updateAll())
-
-		// The map has its own command; this is the same thing one press away.
-		const mapBtn = actions.createEl('button', {
-			cls: 'library-icon-btn',
-			attr: { 'aria-label': tr('cmd.libraryMap') }
-		})
-		setIcon(mapBtn, 'network')
-		mapBtn.addEventListener('click', () => void this.plugin.buildLibraryMap())
-
-		const pageHeader = (): void => {
-			root.createDiv({ cls: 'library-page-header' }).appendChild(actions)
-		}
 		if (sections.length === 0) {
-			pageHeader()
 			root.createEl('p', { text: tr('view.empty') })
 			return
 		}
@@ -776,9 +752,7 @@ export class LibraryView extends ItemView {
 		// Not-started may live in Up next alone only while that block is on.
 		const settings = this.plugin.settings
 		const everything = sections.reduce((all, section) => all.concat(section.cards), [] as CardData[])
-		const statsHeader = this.r.renderStats(root, everything)
-		if (statsHeader) statsHeader.appendChild(actions)
-		else pageHeader()
+		this.r.renderStats(root, everything)
 
 		if (settings.showComingSoon) this.r.renderComingSoon(root, everything)
 		const upNextOnly = settings.showUpNext && !settings.upNextInCategories
