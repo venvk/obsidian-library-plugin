@@ -1518,7 +1518,9 @@ export default class LibraryPlugin extends Plugin {
 		})
 		const details = new Map<string, VideoDetails>()
 		for (let i = 0; i < wanted.length && !this.unloaded; i += 40) {
-			for (const [id, found] of await videoDetails(wanted.slice(i, i + 40).map(video => video.id))) details.set(id, found)
+			const batch = await videoDetails(wanted.slice(i, i + 40).map(video => video.id))
+			if (batch === 'signed-out') break
+			for (const [id, found] of batch) details.set(id, found)
 		}
 		let category = this.settings.categories.find(c => c.typeValue === YOUTUBE_TYPE)
 		for (const video of videos) {
@@ -1601,7 +1603,15 @@ export default class LibraryPlugin extends Plugin {
 		const id = toStr(fm?.['Source ID'])
 		if (!fm || toStr(fm.Source) !== YOUTUBE_SOURCE || this.youtubeFresh.has(id) || !this.settings.watchSites.youtube.connected || !Platform.isDesktopApp) return
 		this.youtubeFresh.add(id)
-		const found = (await videoDetails([id])).get(id)
+		const details = await videoDetails([id])
+		// the session is gone: say so once, as the import would
+		if (details === 'signed-out') {
+			this.settings.watchSites.youtube.connected = false
+			await this.saveSettings()
+			new Notice(tr('notice.site.signedOut', { site: 'YouTube' }))
+			return
+		}
+		const found = details.get(id)
 		if (!found || this.unloaded) return
 		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => this.youtubeDetails(current, found))
 		if (found.description) await this.addDescription(file, found.description)

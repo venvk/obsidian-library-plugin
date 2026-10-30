@@ -224,7 +224,7 @@ export async function youtubePage(token = ''): Promise<HistoryPage | 'signed-out
 }
 
 // Description, like and subscription of each video, as the watch page shows them.
-export async function videoDetails(ids: string[]): Promise<Map<string, VideoDetails>> {
+export async function videoDetails(ids: string[]): Promise<Map<string, VideoDetails> | 'signed-out'> {
 	const out = new Map<string, VideoDetails>()
 	const clean = ids.filter(id => VIDEO_ID.test(id))
 	if (clean.length === 0) return out
@@ -247,8 +247,10 @@ export async function videoDetails(ids: string[]): Promise<Map<string, VideoDeta
 	}
 	return JSON.stringify(out);
 })().catch(() => '')`
+	const text = await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)
+	if (text === 'signed-out') return text
 	try {
-		const answer = JSON.parse(await readPage(HISTORY_URL, code, 60000 + clean.length * 3000, HISTORY_READY)) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown; channelId?: unknown; published?: unknown; views?: unknown }>
+		const answer = JSON.parse(text) as Record<string, { description?: unknown; reaction?: unknown; subscribed?: unknown; channelPath?: unknown; channelId?: unknown; published?: unknown; views?: unknown }>
 		for (const id of clean) {
 			const found = answer[id]
 			if (!found) continue
