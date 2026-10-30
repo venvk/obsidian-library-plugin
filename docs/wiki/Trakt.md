@@ -1,4 +1,4 @@
-Trakt connects in Settings → Library → Connectors → Movies · Series. It works on desktop and on mobile, because nothing has to come back to Obsidian: you approve the sign-in on Trakt's own page.
+Trakt connects in Settings > Library > Connectors > Movies · Series. It works on desktop and on mobile, because nothing has to come back to Obsidian: you approve the sign-in on Trakt's own page.
 
 General rules for connected accounts, such as where sign-ins are kept and what Disconnect does, are on [[Connected accounts|Connected-accounts]].
 

@@ -9,9 +9,10 @@ import {
 	Platform,
 	getLanguage,
 	requestUrl,
+	requireApiVersion,
 	type CachedMetadata,
 } from 'obsidian'
-import { progressPattern, RATING_RT_ICON, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
+import { API_KEY_NAMES, progressPattern, RATING_RT_ICON, type ApiKeyName, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
 import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
@@ -40,7 +41,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -252,24 +253,24 @@ export default class LibraryPlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadSettings()
-		const googleBooks = new GoogleBooksProvider(() => this.settings.googleBooksApiKey)
+		const googleBooks = new GoogleBooksProvider(() => this.apiKey('googleBooksApiKey'))
 		const openLibrary = new OpenLibraryProvider()
-		const tmdb = new TmdbEnricher(() => this.settings.tmdbApiKey)
+		const tmdb = new TmdbEnricher(() => this.apiKey('tmdbApiKey'))
 		// Cinemeta is keyless; TMDB runs first and wins where both have data
 		this.registry.register(
-			new OmdbProvider(() => this.settings.omdbApiKey, [tmdb, new CinemetaEnricher(), new RottenTomatoesEnricher()])
+			new OmdbProvider(() => this.apiKey('omdbApiKey'), [tmdb, new CinemetaEnricher(), new RottenTomatoesEnricher()])
 		)
 		this.registry.register(new BookAggregatorProvider(googleBooks, openLibrary))
-		const trailers = new GameTrailerFinder(() => ({ id: this.settings.twitchClientId, secret: this.settings.twitchClientSecret }))
+		const trailers = new GameTrailerFinder(() => ({ id: this.apiKey('twitchClientId'), secret: this.apiKey('twitchClientSecret') }))
 		this.registry.register(new GameAggregatorProvider(
-			new RawgProvider(() => this.settings.rawgApiKey, trailers),
+			new RawgProvider(() => this.apiKey('rawgApiKey'), trailers),
 			new SteamProvider(trailers),
 			new WikidataGameProvider()
 		))
 		this.registry.register(new DeezerProvider())
 		this.registry.register(new AnimeAggregatorProvider(new AnimeProvider(() => this.settings), new MalProvider(() => MAL_CLIENT_ID, () => this.settings), new KitsuProvider(() => this.settings)))
 		this.registry.register(new ComicsAggregatorProvider(
-			new ComicsProvider(() => this.settings.comicVineApiKey),
+			new ComicsProvider(() => this.apiKey('comicVineApiKey')),
 			new WikidataComicProvider(),
 			new MangaProvider(() => this.settings)
 		))
@@ -992,6 +993,15 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// With the core Canvas plugin off, Obsidian hands a .canvas to the system, which hands it back to
+	// Obsidian, over and over until the app crashes: the plugin opens no canvas then, and says why.
+	private canvasOff(): boolean {
+		const plugins = (this.app as unknown as { internalPlugins?: { getEnabledPluginById?: (id: string) => unknown } }).internalPlugins
+		const off = typeof plugins?.getEnabledPluginById === 'function' && !plugins.getEnabledPluginById('canvas')
+		if (off) new Notice(tr('notice.canvasOff'))
+		return off
+	}
+
 	// A genre or a person shown in Library opens like its link: its note, or its canvas.
 	linkName(el: HTMLElement, value: string): void {
 		const link = this.toLinks(value)[0]
@@ -1003,6 +1013,7 @@ export default class LibraryPlugin extends Plugin {
 		const open = (event: Event): void => {
 			event.preventDefault()
 			event.stopPropagation()
+			if (target.endsWith('.canvas') && this.canvasOff()) return
 			void this.app.workspace.openLinkText(target, '', false)
 		}
 		el.addEventListener('click', open)
@@ -1011,6 +1022,7 @@ export default class LibraryPlugin extends Plugin {
 
 	// A canvas of the library: titles joined by the people they share.
 	async buildLibraryMap(): Promise<void> {
+		if (this.canvasOff()) return
 		const titles: { path: string; name: string; cover: string; people: string[] }[] = []
 		for (const file of this.app.vault.getMarkdownFiles()) {
 			if (isTemplateFile(file.path)) continue
@@ -1620,7 +1632,7 @@ export default class LibraryPlugin extends Plugin {
 
 	private async addDescription(file: TFile, description: string): Promise<void> {
 		const callout = descriptionCallout(description)
-		await this.app.vault.process(file, text => text.indexOf(callout) >= 0 ? text : `${text.replace(/\s*$/, '')}\n\n${callout}\n`)
+		await this.app.vault.process(file, text => withDescription(text, callout))
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
@@ -3032,7 +3044,7 @@ export default class LibraryPlugin extends Plugin {
 		return null
 	}
 
-	// one note → Kitsu: progress, status and score, creating the entry when new
+	// one note to Kitsu: progress, status and score, creating the entry when new
 	private async kitsuPushNote(file: TFile, loud: boolean, sendProgress = true): Promise<boolean> {
 		const token = await this.kitsuToken()
 		const name = tr('kitsu.name')
@@ -3886,17 +3898,25 @@ export default class LibraryPlugin extends Plugin {
 		})
 	}
 
+	// A key from Obsidian's Keychain when one is picked for it (1.11.4+), else the one typed in the settings.
+	apiKey(name: ApiKeyName): string {
+		const id = this.settings.keySecrets[name]
+		if (!id) return this.settings[name].trim()
+		if (requireApiVersion('1.11.4')) return (this.app.secretStorage.getSecret(id) ?? '').trim()
+		return this.settings[name].trim()
+	}
+
 	// key signature per content type: only the types a changed key serves re-walk
 	private apiKeySignatures(): Record<string, string> {
-		const s = this.settings
-		const video = `${s.omdbApiKey}|${s.tmdbApiKey}`
+		const k = (name: ApiKeyName): string => this.apiKey(name)
+		const video = `${k('omdbApiKey')}|${k('tmdbApiKey')}`
 		return {
 			movie: video,
 			series: video,
-			book: s.googleBooksApiKey,
-			googlebook: s.googleBooksApiKey,
-			comic: s.comicVineApiKey,
-			game: `${s.rawgApiKey}|${s.twitchClientId}|${s.twitchClientSecret}`
+			book: k('googleBooksApiKey'),
+			googlebook: k('googleBooksApiKey'),
+			comic: k('comicVineApiKey'),
+			game: `${k('rawgApiKey')}|${k('twitchClientId')}|${k('twitchClientSecret')}`
 		}
 	}
 
@@ -4248,11 +4268,16 @@ export default class LibraryPlugin extends Plugin {
 			infoSide.appendChild(progRow)
 		}
 
-		if (complete) {
-			const doneRow = createDiv()
-			doneRow.classList.add('note-header-row', 'note-header-complete')
-			doneRow.setText(tr('header.complete'))
-			infoSide.appendChild(doneRow)
+		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
+		if (trackingOf(kind) !== 'progress') {
+			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
+			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
+			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
+			toggle.addEventListener('click', (e) => {
+				e.preventDefault()
+				toggle.disabled = true
+				void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current.Complete = !complete })
+			})
 		}
 
 		header.appendChild(infoSide)
@@ -4300,8 +4325,8 @@ export default class LibraryPlugin extends Plugin {
 				if (id) known.add(id)
 			}
 			pending = recommendationsFor(source, sourceId, toStr(fm.Name), toStrArray(fm.Genre).map(linkLabel), {
-				tmdb: this.settings.tmdbApiKey.trim(),
-				rawg: this.settings.rawgApiKey.trim()
+				tmdb: this.apiKey('tmdbApiKey'),
+				rawg: this.apiKey('rawgApiKey')
 			}, category?.contentType === 'series', known).catch(() => [] as Recommendation[])
 			this.recommendations.set(key, pending)
 		}
@@ -4726,6 +4751,12 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
+		const secrets = (this.settings.keySecrets && typeof this.settings.keySecrets === 'object' ? this.settings.keySecrets : {}) as Record<string, unknown>
+		this.settings.keySecrets = {}
+		for (const name of API_KEY_NAMES) {
+			const id = secrets[name]
+			if (typeof id === 'string' && id) this.settings.keySecrets[name] = id
+		}
 		const backfill = (this.settings.youtubeBackfill && typeof this.settings.youtubeBackfill === 'object' ? this.settings.youtubeBackfill : {}) as Partial<ILibrarySettings['youtubeBackfill']>
 		this.settings.youtubeBackfill = { token: typeof backfill.token === 'string' ? backfill.token : '', before: typeof backfill.before === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(backfill.before) ? backfill.before : '', done: backfill.done === true }
 		if (!this.settings.nintendoTokens || typeof this.settings.nintendoTokens !== 'object') this.settings.nintendoTokens = null
@@ -4789,6 +4820,7 @@ export default class LibraryPlugin extends Plugin {
 			// once: games and videos get the creator tops their creators left the shared one for
 			if (raw.creatorsSplit !== true) for (const cat of this.settings.categories) addCreatorTop(stats.tops, cat)
 			stats.creatorsSplit = true
+			if (raw.calendarTime === true) stats.calendarTime = true
 			return stats
 		}
 		// builds before the list: the chosen properties, then every category whose best-rated switch was on

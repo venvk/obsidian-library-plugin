@@ -1,4 +1,4 @@
-PlayStation, Steam, and Nintendo Switch connect in Settings → Library → Connectors → Games, and only in Obsidian on desktop. The games you played arrive in your Games category with their playtime, and nothing is sent back.
+PlayStation, Steam, and Nintendo Switch connect in Settings > Library > Connectors > Games, and only in Obsidian on desktop. The games you played arrive in your Games category with their playtime, and nothing is sent back.
 
 General rules for connected accounts, such as where sign-ins are kept and what Disconnect does, are on [[Connected accounts|Connected-accounts]].
 
@@ -59,7 +59,7 @@ Nintendo has no trophies or achievements, so a Switch game's progress is yours t
 
 ## Statistics
 
-In Settings → Library → Statistics, Add top offers each connected platform:
+In Settings > Library > Statistics, Add top offers each connected platform:
 
 - PlayStation: games, time played, trophy level, and your platinum, gold, silver, and bronze trophies;
 - Nintendo Switch: games and time played.

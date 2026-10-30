@@ -1,5 +1,6 @@
 import { requestUrl } from 'obsidian'
 import { VIDEO_CATEGORY } from './categories'
+import { I18N } from './constants'
 import { tr } from './i18n'
 import { readPage } from './watchSites'
 
@@ -322,6 +323,29 @@ export async function youtubeAct(videoId: string, action: YoutubeAction): Promis
 export function descriptionCallout(description: string, title = tr('header.description')): string {
 	const lines = description.replace(/\r/g, '').trim().split('\n').map(line => `> ${line}`.replace(/\s+$/, ''))
 	return [`> [!quote]- ${title}`, ...lines].join('\n')
+}
+
+// The note's text with the description callout in place of any it had: one written under
+// another language's title counts too, so switching languages never adds a second one.
+export function withDescription(text: string, callout: string): string {
+	const titles = new Set(Object.values(I18N).map(block => block['header.description']).filter((title): title is string => !!title))
+	const ours = (line: string): boolean => {
+		const head = /^> \[!quote\][-+]? (.*)$/.exec(line)
+		return !!head && titles.has((head[1] ?? '').trim())
+	}
+	const kept: string[] = []
+	const lines = text.split('\n')
+	let found = 0
+	for (let i = 0; i < lines.length; i++) {
+		if (!ours(lines[i] ?? '')) { kept.push(lines[i] ?? ''); continue }
+		found++
+		while (i + 1 < lines.length && (lines[i + 1] ?? '').startsWith('>')) i++
+		// the blank line that set the block apart goes with it
+		if ((lines[i + 1] ?? 'x').trim() === '') i++
+	}
+	// the same description, once: the note is left as it is, not written again
+	if (found === 1 && text.indexOf(callout) >= 0) return text
+	return `${kept.join('\n').replace(/\s*$/, '')}\n\n${callout}\n`
 }
 
 export function videoUrl(id: string): string {

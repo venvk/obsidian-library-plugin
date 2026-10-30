@@ -45,7 +45,7 @@ export function parseDate(val: unknown): number {
 	return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-// ISO → the note's dd.mm.yyyy, local time.
+// ISO to the note's dd.mm.yyyy, local time.
 export function dmyOf(iso: string): string {
 	const date = new Date(iso)
 	if (Number.isNaN(date.getTime())) return ''
@@ -297,7 +297,8 @@ export function spentMinutes(fm: Record<string, unknown>, kind?: ContentType): n
 	return watchedRuntimeMinutes(fm, kind)
 }
 
-export function spentTime(totalMinutes: number): string {
+// Time in the two largest calendar units it fills: "6 mo 2 d", "87 d 1 h".
+export function spentParts(totalMinutes: number): string[] {
 	const minutes = Math.round(totalMinutes)
 	const HOUR = 60
 	const DAY = 24 * HOUR
@@ -305,13 +306,17 @@ export function spentTime(totalMinutes: number): string {
 	const YEAR = 365.25 * DAY
 	const unit = (count: number, name: string): string =>
 		formatNumber(count, { style: 'unit', unit: name, unitDisplay: 'short' })
-	const pair = (big: number, bigName: string, small: number, smallName: string): string =>
-		small > 0 ? `${unit(big, bigName)} ${unit(small, smallName)}` : unit(big, bigName)
-	if (minutes < HOUR) return unit(minutes, 'minute')
+	const pair = (big: number, bigName: string, small: number, smallName: string): string[] =>
+		small > 0 ? [unit(big, bigName), unit(small, smallName)] : [unit(big, bigName)]
+	if (minutes < HOUR) return [unit(minutes, 'minute')]
 	if (minutes < DAY) return pair(Math.floor(minutes / HOUR), 'hour', minutes % HOUR, 'minute')
 	if (minutes < 100 * DAY) return pair(Math.floor(minutes / DAY), 'day', Math.floor((minutes % DAY) / HOUR), 'hour')
 	if (minutes < YEAR) return pair(Math.floor(minutes / MONTH), 'month', Math.floor((minutes % MONTH) / DAY), 'day')
 	return pair(Math.floor(minutes / YEAR), 'year', Math.floor((minutes % YEAR) / MONTH), 'month')
+}
+
+export function spentTime(totalMinutes: number): string {
+	return spentParts(totalMinutes).join(' ')
 }
 
 export function runtimeParts(totalMinutes: number): string[] {
@@ -347,7 +352,7 @@ function titleKey(value: string): string {
 		.trim()
 }
 
-// Genre/Cast/Creator hold [[links]]; the UI shows names: [[T|Alias]] → Alias.
+// Genre/Cast/Creator hold [[links]]; the UI shows names: [[T|Alias]] shows Alias.
 export function linkLabel(value: string): string {
 	const match = value.match(/^\[\[([^\]|]*)(?:\|([^\]]*))?\]\]$/)
 	if (!match) return value
@@ -357,13 +362,13 @@ export function linkLabel(value: string): string {
 // What a name's canvas gathers: the link properties and the plain names older notes keep.
 export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist']
 
-// The file a link property points at, without .canvas: [[Drama.canvas|Drama]] → Drama.
+// The file a link property points at, without .canvas: [[Drama.canvas|Drama]] gives Drama.
 export function linkTarget(value: string): string {
 	const target = /^\[\[([^\]|#^]+)/.exec(value)?.[1] ?? sanitizeLink(value)
 	return target.replace(/\.canvas$/i, '').trim()
 }
 
-// Plain names → [[Name.canvas|Name]], the canvas of the titles that share the
+// Plain names become [[Name.canvas|Name]], the canvas of the titles that share the
 // name; a name with a note of its own (hasNote) links the note. Written links
 // are kept, except a bare [[Name]] with no note behind it.
 export function toLinks(value: unknown, hasNote: (name: string) => boolean = () => false): string[] {

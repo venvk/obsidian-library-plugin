@@ -4,6 +4,7 @@ import {
 	Platform,
 	PluginSettingTab,
 	requireApiVersion,
+	SecretComponent,
 	Setting,
 	setIcon,
 	type DropdownComponent,
@@ -11,7 +12,7 @@ import {
 	type SettingDefinitionItem,
 } from "obsidian";
 import type LibraryPlugin from "./main";
-import type { ICategory, IStatsTop, TitleLanguage } from "./constants";
+import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constants";
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
 import type { WatchSite } from "./watchSites";
@@ -61,6 +62,21 @@ interface Section {
 	heading?: string;
 	group?: boolean;
 	rows: Row[];
+}
+
+// A text button shown as an icon; its text, kept as the tooltip, comes back as the icon if the button is relabelled.
+function iconButton(button: HTMLElement, icon: string): void {
+	const swap = (): void => {
+		const label = button.textContent?.trim() ?? "";
+		if (!label) return;
+		button.setAttribute("aria-label", label);
+		button.empty();
+		setIcon(button, icon);
+	};
+	swap();
+	new MutationObserver(() => {
+		if (!button.querySelector("svg")) swap();
+	}).observe(button, { childList: true, characterData: true, subtree: true });
 }
 
 // Rendered via a callback: a declarative row with neither name nor control is skipped.
@@ -347,13 +363,13 @@ export class LibrarySettingTab extends PluginSettingTab {
 				page: "keys",
 				heading: tr("settings.section.keys"),
 				rows: [
-					this.textRow("settings.omdb", "omdbApiKey", tr("settings.omdb.placeholder")),
-					this.textRow("settings.tmdbApiKey", "tmdbApiKey", tr("settings.rawg.placeholder")),
-					this.textRow("settings.google", "googleBooksApiKey", tr("settings.google.placeholder")),
-					this.textRow("settings.rawg", "rawgApiKey", tr("settings.rawg.placeholder")),
-					this.textRow("settings.twitchId", "twitchClientId", tr("settings.rawg.placeholder")),
-					this.textRow("settings.twitchSecret", "twitchClientSecret", tr("settings.rawg.placeholder")),
-					this.textRow("settings.comicvine", "comicVineApiKey", tr("settings.comicvine.placeholder")),
+					this.keyRow("settings.omdb", "omdbApiKey", tr("settings.omdb.placeholder")),
+					this.keyRow("settings.tmdbApiKey", "tmdbApiKey", tr("settings.rawg.placeholder")),
+					this.keyRow("settings.google", "googleBooksApiKey", tr("settings.google.placeholder")),
+					this.keyRow("settings.rawg", "rawgApiKey", tr("settings.rawg.placeholder")),
+					this.keyRow("settings.twitchId", "twitchClientId", tr("settings.rawg.placeholder")),
+					this.keyRow("settings.twitchSecret", "twitchClientSecret", tr("settings.rawg.placeholder")),
+					this.keyRow("settings.comicvine", "comicVineApiKey", tr("settings.comicvine.placeholder")),
 				],
 			},
 			{
@@ -457,6 +473,34 @@ export class LibrarySettingTab extends PluginSettingTab {
 			name: tr(`${prefix}.name`),
 			desc: tr(`${prefix}.desc`),
 			render: (row) => this.textInput(row, key, placeholder),
+		};
+	}
+
+	// A key field, and from 1.11.4 a pick from Obsidian's Keychain: a picked secret is read from there, the field stays off.
+	private keyRow(prefix: string, key: ApiKeyName, placeholder: string): Row {
+		return {
+			name: tr(`${prefix}.name`),
+			desc: tr(`${prefix}.desc`),
+			render: (row) => {
+				this.textInput(row, key, placeholder);
+				const secrets = this.plugin.settings.keySecrets;
+				const field = row.controlEl.querySelector("input");
+				if (requireApiVersion("1.11.4")) {
+					row.descEl.createDiv({ text: tr("settings.keychain") });
+					if (field) field.disabled = !!secrets[key];
+					row.addComponent((el) =>
+						new SecretComponent(this.app, el).setValue(secrets[key] ?? "").onChange(async (id) => {
+							if (id) secrets[key] = id;
+							else delete secrets[key];
+							if (field) field.disabled = !!id;
+							await this.plugin.saveSettings();
+						}),
+					);
+					// the picker's "Link…" button as a key icon, its words as the tooltip
+					const button = row.controlEl.querySelector("button");
+					if (button) iconButton(button, "key-round");
+				}
+			},
 		};
 	}
 

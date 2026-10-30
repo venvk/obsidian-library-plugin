@@ -1,8 +1,8 @@
 ## Install
 
-In Obsidian, open Settings → Community plugins → Browse, search for Library, then install and enable it. Library needs Obsidian 1.8.7 or later and works on desktop and mobile. Some accounts connect only on desktop; see [[Connected accounts|Connected-accounts]].
+In Obsidian, open Settings > Community plugins > Browse, search for Library, then install and enable it. Library needs Obsidian 1.8.7 or later and works on desktop and mobile. Some accounts connect only on desktop; see [[Connected accounts|Connected-accounts]].
 
-To install by hand, download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/venvk/obsidian-library-plugin/releases/latest), put them in `.obsidian/plugins/library/` inside your vault, and enable Library in Settings → Community plugins.
+To install by hand, download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/venvk/obsidian-library-plugin/releases/latest), put them in `.obsidian/plugins/library/` inside your vault, and enable Library in Settings > Community plugins.
 
 ## Add a title
 
@@ -27,7 +27,7 @@ A category is one section of the Library tab. A note belongs to the category who
 
 The first title of a kind creates its category. These built-in categories are named in your Obsidian language and follow it when you switch languages. Their folders are named in English inside the library folder: `Library/Movies`, `Library/Series`, `Library/Books`, `Library/Comics`, `Library/Games`, `Library/Music`, `Library/Anime`. Manga imported from AniList or MyAnimeList goes to a comics category of its own, created with the first manga. YouTube videos go to a Video category, `Library/Video`, created with the first video.
 
-Settings → Library → Categories lists your categories:
+Settings > Library > Categories lists your categories:
 
 - Library folder: where new categories get their folders, `Library` by default. Change it, and the categories inside it move along.
 - A built-in category, the first one of each kind, shows only its folder. Its Type value is fixed: `Movie`, `Series`, `Book`, `Comic`, `Game`, `Music`, `Anime`, or `Video`.

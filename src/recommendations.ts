@@ -4,7 +4,7 @@ import { SteamProvider } from './providers/steam'
 import type { ContentType } from './providers/types'
 import { claim, entities, itemIds, languages, searchItems, textIn, yearIn } from './providers/wikidata'
 
-// Similar titles per source: AniList (anime), TMDB→Cinemeta (film), Steam→RAWG→Wikidata (games), Open Library (books), Deezer (music); no comics.
+// Similar titles per source: AniList (anime), TMDB then Cinemeta (film), Steam then RAWG then Wikidata (games), Open Library (books), Deezer (music); no comics.
 
 export interface Recommendation {
 	title: string

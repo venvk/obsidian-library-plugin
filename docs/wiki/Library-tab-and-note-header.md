@@ -1,6 +1,6 @@
 ## The Library tab
 
-Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, Soon, one section per category in the order you set in Settings → Library → Categories, and Up next.
+Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, Soon, one section per category in the order you set in Settings > Library > Categories, and Up next.
 
 The buttons in the tab's header add a title (+), search your whole library, run every import now (Update), build the [[library map|Library-blocks-and-map]], and open the plugin's settings.
 
@@ -41,7 +41,7 @@ Click a card, or focus it with Tab and press Enter or Space, to open the note.
 
 ### Soon and Up next
 
-Soon lists the next episodes of the series and anime you are watching, with their air dates. Up next gathers the titles you haven't started from every category. Both are explained in [[Progress and statistics|Progress-and-statistics]], and both can be turned off in Settings → Library → General.
+Soon lists the next episodes of the series and anime you are watching, with their air dates. Up next gathers the titles you haven't started from every category. Both are explained in [[Progress and statistics|Progress-and-statistics]], and both can be turned off in Settings > Library > General.
 
 ## The note header
 
@@ -49,6 +49,7 @@ A library note shows a header above its text: the cover, creator, cast, years, s
 
 Depending on the note it also has:
 
+- Mark complete, for movies, videos, games, albums, comics, and manual notes: it turns `Complete` on, and pressed again, off. It works with the note's properties hidden;
 - a trailer: Watch trailer plays it inside Obsidian;
 - a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close;
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
@@ -59,7 +60,7 @@ Depending on the note it also has:
 
 Movie, series, anime, game, book, and music notes show a row of similar titles you don't have yet: from AniList for anime, from TMDB or Cinemeta for movies and series, from RAWG or Wikidata for games, from Open Library for books, and from Deezer for music, an album by each related artist. They load when you open the note. Click a cover, or press Enter on it, to add the title.
 
-Settings → Library → General → Show recommendations hides the row and stops those requests.
+Settings > Library > General > Show recommendations hides the row and stops those requests.
 
 ## Share
 

@@ -23,15 +23,15 @@
 
 ## What it does
 
-- **One note per title.** The note keeps the cover, year, genres, creators, cast, ratings and trailer. All of it sits in the note's properties (frontmatter), so Bases, Dataview and other plugins can read it.
-- **Progress you can tick.** Episode and chapter lists live at the top of the note. Tick them off as you go, rate them, and see when the next episode airs.
-- **A library view.** One section per kind of media, with filters and sorting by rating, date or progress, an "Up next" shelf, and a "Soon" list with the air dates of new episodes.
-- **Statistics.** How many titles you have, top directors, developers and channels, how many hours of watching or reading that is, and fun comparisons like "in that time you could have watched every Bond film". It also shows your taste (how your scores compare with other viewers, your favourite genres and decade) and your latest diary entries.
-- **A diary.** Tick an episode or a chapter, or mark a title complete, and the day goes into the note's `Log` property.
-- **Library blocks.** A `library` code block in any note shows cards picked by category, genre, year or score, what you are in the middle of, the Soon list or the statistics.
-- **A library map.** One command draws your library as a canvas, with posters grouped around the actors and creators they share.
-- **Covers offline.** Turn on "Keep covers in the vault" and covers are saved to a Covers folder, so the library looks the same without internet.
-- **Linked canvases.** Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
+- One note per title. The cover, year, genres, creators, cast, ratings and trailer sit in its properties (frontmatter), where Bases, Dataview and other plugins can read them.
+- Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs.
+- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes.
+- Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
+- Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
+- A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
+- One command draws your library as a canvas, with posters grouped around the actors and creators they share.
+- Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
+- Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
 - Works on desktop and mobile, in every Obsidian language.
 
 ## Getting started
@@ -76,7 +76,7 @@ Anime and manga notes take English, romaji or original names, as you choose in t
 
 Anything that doesn't fit goes into a Manual category with your own fields. More in the wiki: [sources and keys](https://github.com/venvk/obsidian-library-plugin/wiki/Sources-and-API-keys), [frontmatter](https://github.com/venvk/obsidian-library-plugin/wiki/Frontmatter-reference), [anime sync](https://github.com/venvk/obsidian-library-plugin/wiki/Anime-sync).
 
-**A note from the library**
+A note from the library looks like this:
 
 ```yaml
 ---

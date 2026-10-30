@@ -3,7 +3,7 @@ import { localeMap, I18N, type SupportedLocale } from './constants'
 
 export function tr(key: string, vars?: Record<string, string | number>): string {
 	const language: string = getLanguage().toLowerCase()
-	// Longest subtag wins: 'zh-tw' → zh-TW, not zh; 'kab' does not match 'ka'.
+	// Longest subtag wins: 'zh-tw' is zh-TW, not zh; 'kab' does not match 'ka'.
 	const match: string | undefined = Object.keys(localeMap)
 		.sort((a, b) => b.length - a.length)
 		.find(lang => {
