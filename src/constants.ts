@@ -34842,6 +34842,9 @@ export interface ILibrarySettings {
 	airing: Record<string, Airing[]>
 	airingChecked: number
 	upNextCollapsed: boolean
+	// Where Soon and Up next sit among the categories: how many come before each.
+	soonAt: number
+	upNextAt: number
 	// Category Up next shows, by name; empty = all.
 	upNextCategory: string
 	// Off: not-started titles appear in Up next only.
@@ -34918,6 +34921,8 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	airing: {},
 	airingChecked: 0,
 	upNextCollapsed: false,
+	soonAt: 0,
+	upNextAt: 999,
 	upNextCategory: '',
 	upNextInCategories: true,
 	twitchClientId: '',
