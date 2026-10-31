@@ -82,7 +82,7 @@ interface SortChoice {
 	asc: boolean
 }
 
-type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform'
+type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform' | 'kind'
 
 const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'year', label: 'sort.year' },
@@ -90,16 +90,19 @@ const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'artist', label: 'header.creator' },
 	{ facet: 'country', label: 'filter.country' },
 	{ facet: 'platform', label: 'settings.stats.groupPlatforms' },
+	{ facet: 'kind', label: 'filter.kind' },
 ]
 
 function facetValues(card: CardData, facet: Facet): string[] {
 	switch (facet) {
 		case 'year': return card.year > 0 ? [String(card.year)] : []
 		case 'genre': return toStrArray(card.fm.Genre).map(linkLabel).filter(Boolean)
-		// an album's artist; other media have too many creators to pick from
-		case 'artist': return card.kind === 'music' ? toStrArray(card.fm.Creator).map(linkLabel).filter(Boolean) : []
+		// an album's artist or a token's collection; other media have too many creators to pick from
+		case 'artist': return card.kind === 'music' || isCollectible(card.fm) ? toStrArray(card.fm.Creator).map(linkLabel).filter(Boolean) : []
 		case 'country': return toStrArray(card.fm.Country)
 		case 'platform': return toStrArray(card.fm.Platforms)
+		// a token is a collectible or an achievement (OAT)
+		case 'kind': return isCollectible(card.fm) ? [card.fm.OAT === true ? 'OAT' : 'NFT'] : []
 	}
 }
 
@@ -606,7 +609,10 @@ export class LibraryRenderer {
 		const cover = coverValue(fm, this.plugin.settings.coverProperty)
 		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
 		const cardCover = coverSrc(this.app, cover)
-		if (cardCover) {
+		// some NFT pictures are short videos
+		if (cardCover && /\.(mp4|webm|mov)(\?|$)/i.test(cardCover)) {
+			imgDiv.createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } })
+		} else if (cardCover) {
 			imgDiv.createEl('img', { attr: { src: cardCover, alt: card.name, loading: 'lazy', decoding: 'async' } })
 		} else {
 			const type = toStr(fm.Type).toLowerCase()
@@ -871,7 +877,7 @@ export class LibraryView extends ItemView {
 		// an NFT's platform is its blockchain
 		const nft = filters.all.length > 0 && filters.all.every(card => card.fm.Source === 'nft')
 		const groups = FACETS.map(({ facet, label: base }) => {
-			const label = nft && facet === 'platform' ? 'filter.chain' : base
+			const label = nft && facet === 'platform' ? 'filter.chain' : nft && facet === 'artist' ? 'header.collection' : base
 			const counts = new Map<string, number>()
 			for (const card of filters.all) {
 				for (const value of facetValues(card, facet)) counts.set(value, (counts.get(value) ?? 0) + 1)
@@ -984,7 +990,6 @@ export class LibraryView extends ItemView {
 			{ label: tr('sort.name'), key: 'name' },
 			{ label: tr('sort.date'), key: 'date' },
 			{ label: tr('sort.modified'), key: 'modified' },
-			{ label: tr('filter.chain'), key: 'chain' },
 			{ label: tr('header.favorite'), key: 'favorite' },
 		] : [
 			{ label: tr('sort.name'), key: 'name' },

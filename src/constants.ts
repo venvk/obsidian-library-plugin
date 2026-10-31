@@ -176,6 +176,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'header.count': 'Quantity',
 		'header.favorite': 'Favorite',
 		'filter.chain': 'Blockchain',
+		'filter.kind': 'Kind',
 		'settings.nftOat.name': 'Show OATs',
 		'settings.nftOat.desc': 'Achievement and attendance tokens (Galxe OAT, POAP, Layer3 CUBE) get OAT in their properties. Set OAT yourself to move a token in or out.',
 		'settings.nftSpam.name': 'Show spam NFTs',
