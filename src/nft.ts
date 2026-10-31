@@ -355,6 +355,17 @@ export function pageHeld(chain: string, site: string, rows: PageTransfer[]): Arr
 	return out
 }
 
+// BscScan and TaikoScan show a cached preview on the token's page.
+async function explorerImage(page: string): Promise<string> {
+	try {
+		const answer = await requestUrl({ url: page, throw: false })
+		const found = answer.status === 200 ? /https:\/\/cdn\d*\.assetquay\.com\/file\/nftimagebucket\/[^"'\s)<]+/.exec(answer.text)?.[0] : undefined
+		return found ? publicHttpsUrl(found) ?? '' : ''
+	} catch {
+		return ''
+	}
+}
+
 // Without a key: the explorer's own transfers page, read in the sign-in browser. Pictures come from
 // tokenURI, a few dozen per import: tokens that already have one are skipped, the rest follow on later imports.
 async function pageScanHeld(chain: string, address: string, hasCover: (key: string) => boolean): Promise<NftRead> {
@@ -376,7 +387,8 @@ async function pageScanHeld(chain: string, address: string, hasCover: (key: stri
 		if (budget <= 0) break
 		if (token.spam || hasCover(token.key) || misses.has(token.contract)) continue
 		budget--
-		token.image = await tokenImage(info.rpc, token.contract, token.id)
+		// the explorer keeps its own copy of some pictures, even when the token's server is gone
+		token.image = await explorerImage(token.url) || await tokenImage(info.rpc, token.contract, token.id)
 		if (!token.image) misses.set(token.contract, (misses.get(token.contract) ?? 0) + 1)
 	}
 	return { held, chains: [chain] }
