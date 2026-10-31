@@ -117,7 +117,7 @@ interface BlockscoutItem {
 	value?: unknown
 	image_url?: unknown
 	metadata?: { name?: unknown; image?: unknown } | null
-	token?: { address_hash?: unknown; name?: unknown; reputation?: unknown } | null
+	token?: { address_hash?: unknown; name?: unknown; symbol?: unknown; reputation?: unknown } | null
 	thumbnails?: Record<string, unknown> | null
 	media_url?: unknown
 }
@@ -129,7 +129,9 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 		const id = typeof item.id === 'string' ? item.id : ''
 		// the explorer's own flag: scam contracts stay out
 		if (!contract || item.token?.reputation === 'scam') continue
-		const collection = typeof item.token?.name === 'string' && item.token.name.trim() ? item.token.name.trim() : contract
+		// an unnamed contract shows its symbol, where airdrop spam writes "Visit website to claim USDT"
+		const symbol = typeof item.token?.symbol === 'string' ? item.token.symbol.trim() : ''
+		const collection = typeof item.token?.name === 'string' && item.token.name.trim() ? item.token.name.trim() : symbol || contract
 		const name = typeof item.metadata?.name === 'string' && item.metadata.name.trim() ? item.metadata.name.trim() : collection
 		out.push({
 			key: nftKey(chain, contract, name),
@@ -140,7 +142,7 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 			image: mediaUrl(item.thumbnails?.['500x500']) || mediaUrl(item.media_url) || mediaUrl(item.image_url) || mediaUrl(item.metadata?.image),
 			url: `https://${host}/token/${contract}/instance/${id}`,
 			count: Math.max(1, Number(item.value) || 1),
-			spam: looksLikeSpam(name, collection), oat: isOat(name, collection),
+			spam: looksLikeSpam(name, collection) || looksLikeSpam(symbol, ''), oat: isOat(name, collection),
 		})
 	}
 	return out
@@ -179,6 +181,17 @@ async function blockscoutHeld(chain: string, host: string, address: string): Pro
 		if (!data || !Array.isArray(data.items)) return { held, chains: [] }
 		held.push(...blockscoutTokens(chain, host, data.items))
 		if (!data.next_page_params) {
+			// a contract nobody verified is how airdrop spam ships: it goes with the spam
+			const verified = new Map<string, boolean>()
+			for (const token of held) {
+				const contract = /\/token\/(0x[0-9a-fA-F]{40})\//.exec(token.url)?.[1] ?? ''
+				if (!contract || token.spam) continue
+				if (!verified.has(contract)) {
+					const info = await explorerJson(`https://${host}/api/v2/addresses/${contract}`) as { is_verified?: unknown } | null
+					verified.set(contract, info?.is_verified !== false)
+				}
+				if (verified.get(contract) === false) token.spam = true
+			}
 			// a token the explorer has no picture for: its tokenURI, read from the chain (spam is not worth the requests)
 			const rpc = PUBLIC_RPC[chain]
 			for (const token of held) {

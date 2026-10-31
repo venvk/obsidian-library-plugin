@@ -440,6 +440,18 @@ export function imageExtension(contentType: string): string | null {
 	return known[type] ?? null
 }
 
+// A short stable name for a URL (two 32-bit FNV-1a passes), for files shared by notes.
+export function urlHash(url: string): string {
+	let a = 0x811c9dc5
+	let b = 0x01000193
+	for (let i = 0; i < url.length; i++) {
+		const c = url.charCodeAt(i)
+		a = Math.imul(a ^ c, 0x01000193) >>> 0
+		b = Math.imul(b ^ c, 0x811c9dc5) >>> 0
+	}
+	return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0')
+}
+
 // Image servers that answer application/octet-stream: the first bytes tell the format.
 export function sniffImage(data: ArrayBuffer): string | null {
 	const b = new Uint8Array(data.slice(0, 12))

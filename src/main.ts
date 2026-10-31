@@ -113,6 +113,7 @@ import {
 	coverKey,
 	imageExtension,
 	sniffImage,
+	urlHash,
 	publicHttpsUrl,
 	plainCopy
 } from './util'
@@ -3726,6 +3727,17 @@ export default class LibraryPlugin extends Plugin {
 		const remote = key ? toStr(fm[key]) : ''
 		const url = publicHttpsUrl(remote)
 		if (!key || !url || this.coverFailed.has(url)) return
+		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
+		// tokens of one collection often share a picture: one file named after its address serves them all
+		const shared = toStr(fm.Source) === NFT_SOURCE ? `nft-${urlHash(url)}` : ''
+		const link = (path: string): Promise<void> => this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+			if (toStr(current[key]) === remote) current[key] = `[[${path}]]`
+		})
+		const known = shared ? ['png', 'jpg', 'webp', 'gif', 'avif'].map(ext => `${dir}/${shared}.${ext}`).find(path => this.app.vault.getAbstractFileByPath(path)) : undefined
+		if (known) {
+			await link(known)
+			return
+		}
 		try {
 			const resp = await requestUrl({ url, throw: false })
 			const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
@@ -3734,15 +3746,14 @@ export default class LibraryPlugin extends Plugin {
 				this.coverFailed.add(url)
 				return
 			}
-			const dir = joinFolder(this.settings.libraryFolder, 'Covers')
 			await this.ensureFolder(dir)
-			const base = sanitizeFilename(file.basename) || 'Cover'
+			const base = shared || sanitizeFilename(file.basename) || 'Cover'
 			let path = `${dir}/${base}.${ext}`
-			for (let n = 2; this.app.vault.getAbstractFileByPath(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
-			await this.app.vault.createBinary(path, resp.arrayBuffer)
-			await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
-				if (toStr(current[key]) === remote) current[key] = `[[${path}]]`
-			})
+			if (!shared || !this.app.vault.getAbstractFileByPath(path)) {
+				for (let n = 2; !shared && this.app.vault.getAbstractFileByPath(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
+				await this.app.vault.createBinary(path, resp.arrayBuffer)
+			}
+			await link(path)
 		} catch (e) {
 			this.coverFailed.add(url)
 			console.error('Library: cover download error', file.path, e)
