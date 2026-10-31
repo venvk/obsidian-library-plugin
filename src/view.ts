@@ -1,7 +1,7 @@
 import { App, ItemView, WorkspaceLeaf, TFile, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
-import { categoryLabel, ownCreators } from './categories'
+import { categoryLabel, ownCreators, sectionOrder } from './categories'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
 import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
@@ -768,12 +768,15 @@ export class LibraryView extends ItemView {
 		const everything = sections.reduce((all, section) => all.concat(section.cards), [] as CardData[])
 		this.r.renderStats(root, everything)
 
-		if (settings.showComingSoon) this.r.renderComingSoon(root, everything)
 		const upNextOnly = settings.showUpNext && !settings.upNextInCategories
 		let rendered = 0
+		const upNext: { category: string, card: CardData }[] = []
 		for (const { category, cards } of sections) {
+			for (const card of cards) if (notStarted(card.fm, card.kind)) upNext.push({ category: category.name, card })
+		}
+		const renderCategory = (category: ICategory, cards: CardData[]): void => {
 			const shown = upNextOnly ? cards.filter(card => !notStarted(card.fm, card.kind)) : cards
-			if (shown.length === 0) continue
+			if (shown.length === 0) return
 			rendered++
 			const chosen = settings.filterState[category.name] ?? {}
 			this.renderSection(root, {
@@ -801,12 +804,8 @@ export class LibraryView extends ItemView {
 				}
 			}, filterCards(shown, chosen))
 		}
-
-		const upNext: { category: string, card: CardData }[] = []
-		for (const { category, cards } of sections) {
-			for (const card of cards) if (notStarted(card.fm, card.kind)) upNext.push({ category: category.name, card })
-		}
-		if (settings.showUpNext && upNext.length > 0) {
+		const renderUpNext = (): void => {
+			if (!settings.showUpNext || upNext.length === 0) return
 			const names: string[] = []
 			for (const item of upNext) if (names.indexOf(item.category) < 0) names.push(item.category)
 			const chosen = names.indexOf(settings.upNextCategory) >= 0 ? settings.upNextCategory : ''
@@ -821,6 +820,16 @@ export class LibraryView extends ItemView {
 			upNextEl.addClass('library-up-next')
 			if (names.length > 1) this.upNextFilter(upNextEl, names, chosen, name => { const cat = settings.categories.find(c => c.name === name); return cat ? categoryLabel(cat) : name })
 			rendered++
+		}
+		// the order set in Settings > Categories, Soon and Up next among them
+		const byCategory = new Map(sections.map(section => [section.category, section.cards] as [ICategory, CardData[]]))
+		for (const entry of sectionOrder(settings.categories, settings.soonAt, settings.upNextAt)) {
+			if (entry === '@soon') { if (settings.showComingSoon) this.r.renderComingSoon(root, everything) }
+			else if (entry === '@upNext') renderUpNext()
+			else {
+				const cards = byCategory.get(entry)
+				if (cards) renderCategory(entry, cards)
+			}
 		}
 		if (rendered === 0) root.createEl('p', { text: tr('view.empty') })
 		root.scrollTop = scrollTop

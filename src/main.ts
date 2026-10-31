@@ -4729,6 +4729,8 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
 		if (typeof this.settings.upNextCollapsed !== 'boolean') this.settings.upNextCollapsed = false
 		if (typeof this.settings.showComingSoon !== 'boolean') this.settings.showComingSoon = true
+		if (typeof this.settings.soonAt !== 'number') this.settings.soonAt = 0
+		if (typeof this.settings.upNextAt !== 'number') this.settings.upNextAt = 999
 		if (typeof this.settings.localCovers !== 'boolean') this.settings.localCovers = false
 		if (!['english', 'romaji', 'native'].includes(this.settings.titleLanguage)) this.settings.titleLanguage = 'english'
 		if (typeof this.settings.adultTitles !== 'boolean') this.settings.adultTitles = false
