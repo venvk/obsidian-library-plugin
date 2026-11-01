@@ -1592,7 +1592,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-platform-label.is-ethereum {
-	background-color: #3c3c3d;
+	background-color: #627eea;
 }
 
 .library-platform-label.is-optimism {
@@ -2201,6 +2201,7 @@ sort trigger, the chosen one in the accent colour. */
 	width: 26em;
 	max-width: 100%;
 	font-family: var(--font-monospace);
+}
 
 /* My Rating: five stars, each half a point out of 10 */
 .note-header-wrap .note-header-stars {
