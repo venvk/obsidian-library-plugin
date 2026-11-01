@@ -27,6 +27,7 @@
 		"vitest": "^5.0.3"
 	},
 	"overrides": {
-		"moment": "^2.31.0"
+		"moment": "^2.31.0",
+		"minimatch": "^11.0.1"
 	}
 }
