@@ -460,6 +460,8 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.localCovers.desc': 'Downloads cover images into a Covers folder in the library folder, so the library shows them offline. The note then links the file.',
 		'settings.comingSoon.name': 'Soon',
 		'settings.comingSoon.desc': 'Next episodes of the series and anime you are watching, with their air dates.',
+		'settings.graphLinks.name': 'Links for the graph',
+		'settings.graphLinks.desc': 'Genre, creators and cast become links, so the graph connects titles that share them. Off, they stay plain names in every note.',
 		'card.notStarted': 'Not started yet',
 		'settings.upNext.name': 'Up next block',
 		'settings.upNext.desc': 'Shows everything you haven\'t started yet, from every category, at the end of the library.',
@@ -34800,6 +34802,8 @@ export interface ILibrarySettings {
 	showRecommendations: boolean
 	showUpNext: boolean
 	showComingSoon: boolean
+	// Genre, Creator and Cast as [[links]] the graph draws; off, plain names
+	graphLinks: boolean
 	localCovers: boolean
 	// anime and manga names: english, romaji or native, the first one a source has
 	titleLanguage: TitleLanguage
@@ -34879,6 +34883,7 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	showRecommendations: true,
 	showUpNext: true,
 	showComingSoon: true,
+	graphLinks: true,
 	localCovers: false,
 	titleLanguage: 'english',
 	offerRemoteDelete: true,

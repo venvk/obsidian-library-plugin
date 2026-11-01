@@ -931,6 +931,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// A name links its own note when there is one that isn't a title's.
 	private toLinks(value: unknown): string[] {
+		// graph links off: the same names as plain text
+		if (!this.settings.graphLinks) return toStrArray(value).map(linkLabel).filter((name, i, all) => name && all.indexOf(name) === i)
 		return toLinks(value, name => {
 			const dest = this.app.metadataCache.getFirstLinkpathDest(name, '')
 			const fm = dest?.extension === 'md' ? this.app.metadataCache.getFileCache(dest)?.frontmatter : undefined
@@ -1117,7 +1119,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	private async rebuildGraphLinks(): Promise<void> {
+	async rebuildGraphLinks(): Promise<void> {
 		const types = new Set(this.settings.categories.map(c => c.typeValue))
 		const files = this.app.vault.getMarkdownFiles().filter(f => {
 			if (isTemplateFile(f.path)) return false
@@ -4246,7 +4248,7 @@ export default class LibraryPlugin extends Plugin {
 		if (ratingRT) addRow(RATING_RT_ICON, ratingRT, ' ')
 		if (ratingRawg) addRow('RAWG', ratingRawg)
 		if (ratingMc) addRow('MC', ratingMc)
-		if (myRating) addRow(tr('header.myRating'), myRating)
+		infoSide.appendChild(this.ratingStars(file, Number(myRating) || 0))
 
 		if (progressPercent !== null) {
 			const progRow = createDiv()
@@ -4640,6 +4642,38 @@ export default class LibraryPlugin extends Plugin {
 		return box
 	}
 
+	// My Rating out of 10 as five stars: each half is a point. The same rating again clears it.
+	private ratingStars(file: TFile, value: number): HTMLElement {
+		const row = createDiv({ cls: 'note-header-stars', attr: { role: 'group', 'aria-label': tr('header.myRating') } })
+		row.createSpan({ cls: 'note-header-stars-label', text: tr('header.myRating') })
+		const stars = row.createSpan({ cls: 'note-header-stars-row' })
+		const text = row.createSpan({ cls: 'note-header-stars-value' })
+		const show = (points: number): void => {
+			stars.querySelectorAll<HTMLElement>('.note-header-star').forEach((star, i) => {
+				const fill = Math.max(0, Math.min(2, Math.round(points) - i * 2))
+				star.toggleClass('is-half', fill === 1)
+				star.toggleClass('is-full', fill === 2)
+			})
+			text.setText(points > 0 ? `${String(Math.round(points * 10) / 10)}/10` : '—')
+		}
+		for (let i = 0; i < 5; i++) {
+			const star = stars.createSpan({ cls: 'note-header-star' })
+			for (const half of [1, 2]) {
+				const points = i * 2 + half
+				const button = star.createEl('button', { cls: `note-header-star-half is-${half === 1 ? 'left' : 'right'}`, attr: { 'aria-label': `${String(points)}/10` } })
+				button.addEventListener('mouseenter', () => show(points))
+				button.addEventListener('click', (e) => {
+					e.preventDefault()
+					const next = Math.round(value) === points ? null : points
+					void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next })
+				})
+			}
+		}
+		stars.addEventListener('mouseleave', () => show(value))
+		show(value)
+		return row
+	}
+
 	private ratingInput(value: number | null, computed: boolean, onChange: (rating: number | null) => void): HTMLElement {
 		const input = createEl('input')
 		input.type = 'number'
@@ -4729,6 +4763,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
 		if (typeof this.settings.upNextCollapsed !== 'boolean') this.settings.upNextCollapsed = false
 		if (typeof this.settings.showComingSoon !== 'boolean') this.settings.showComingSoon = true
+		if (typeof this.settings.graphLinks !== 'boolean') this.settings.graphLinks = true
 		if (typeof this.settings.soonAt !== 'number') this.settings.soonAt = 0
 		if (typeof this.settings.upNextAt !== 'number') this.settings.upNextAt = 999
 		if (typeof this.settings.localCovers !== 'boolean') this.settings.localCovers = false
