@@ -79,6 +79,8 @@ export function parseWallets(text: string): Wallet[] {
 // ipfs.io and dweb.link time out on most files, so links to them move to Filebase too.
 export function mediaUrl(value: unknown): string {
 	const raw = typeof value === 'string' ? value.trim() : ''
+	// a picture the contract draws itself: kept as data, the import saves it to a file
+	if (/^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i.test(raw) && raw.length < 2000000) return raw
 	const ipfs = /^(?:ipfs:\/\/|https:\/\/(?:ipfs\.io|dweb\.link)\/ipfs\/)(?:ipfs\/)?(.+)$/i.exec(raw)?.[1]
 	if (ipfs) return publicHttpsUrl(`https://ipfs.filebase.io/ipfs/${ipfs.replace(/^\/+/, '')}`) ?? ''
 	const ar = /^ar:\/\/(.+)$/i.exec(raw)?.[1]

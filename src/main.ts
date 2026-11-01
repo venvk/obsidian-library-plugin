@@ -1830,7 +1830,8 @@ export default class LibraryPlugin extends Plugin {
 						const cover = toStr(known?.Cover)
 						// a picture that never loaded (none, or a remote one other than the explorer's) is replaced, and so
 						// is any picture when the token's own metadata was just read: the old one can predate a reveal
-						const recover = !!token.image && cover !== token.image && (!!token.fresh || !cover || /^https?:\/\//i.test(cover))
+						const picture = await this.nftPicture(token.image)
+						const recover = !!picture && cover !== picture && (!!token.fresh || !cover || /^https?:\/\//i.test(cover))
 						const rename = !!token.fresh && token.name !== toStr(known?.Name)
 						// spam rules grow: a note they newly catch is marked; one the wallet asked for is unmarked
 						const spam = token.spam && known?.Spam === undefined
@@ -1845,7 +1846,7 @@ export default class LibraryPlugin extends Plugin {
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
 							current.Count = token.count
 							if (rekey) current['Source ID'] = token.key
-							if (recover) current.Cover = token.image
+							if (recover) current.Cover = picture
 							if (rename) current.Name = token.name
 							if (spam) current.Spam = true
 							if (unspam) delete current.Spam
@@ -1869,7 +1870,7 @@ export default class LibraryPlugin extends Plugin {
 					}
 					if (!category) category = await this.nftCategory()
 					const meta: NormalizedMetadata = {
-						fields: { Name: token.name, Creator: [token.collection], ...(token.image ? { Cover: token.image } : {}), URL: token.url },
+						fields: { Name: token.name, Creator: [token.collection], ...(token.image ? { Cover: await this.nftPicture(token.image) } : {}), URL: token.url },
 						progressTotal: null,
 						imdbId: null,
 					}
@@ -1915,6 +1916,28 @@ export default class LibraryPlugin extends Plugin {
 			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'NFT', created, updated }))
 		} finally {
 			this.nftImporting = false
+		}
+	}
+
+	// A picture given as data (an on-chain SVG, say) becomes a file in Covers, shared by notes with the same one.
+	private async nftPicture(image: string): Promise<string> {
+		const data = /^data:image\/(png|jpeg|gif|webp|svg\+xml)(;base64)?,([\s\S]*)$/i.exec(image)
+		if (!data) return image
+		const ext = data[1] === 'jpeg' ? 'jpg' : data[1] === 'svg+xml' ? 'svg' : data[1] ?? 'png'
+		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
+		const path = `${dir}/nft-${urlHash(image)}.${ext}`
+		if (this.app.vault.getAbstractFileByPath(path)) return `[[${path}]]`
+		try {
+			await this.ensureFolder(dir)
+			const body = data[3] ?? ''
+			if (data[2]) {
+				const bytes = Uint8Array.from(atob(body), c => c.charCodeAt(0))
+				await this.app.vault.createBinary(path, bytes.buffer)
+			} else await this.app.vault.create(path, decodeURIComponent(body))
+			return `[[${path}]]`
+		} catch (e) {
+			console.error('Library: NFT picture not saved', e)
+			return ''
 		}
 	}
 
