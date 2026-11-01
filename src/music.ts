@@ -59,7 +59,7 @@ export async function titleAwards(sourceId: string): Promise<Award[]> {
 }
 
 // "Award received" (P166) with its year (P585), named in the note's language.
-async function awardsOf(entity: WikidataEntity | undefined): Promise<Award[]> {
+export async function awardsOf(entity: WikidataEntity | undefined): Promise<Award[]> {
 	const won = entity?.claims?.P166 ?? []
 	if (won.length === 0) return []
 	const awardIds: string[] = []

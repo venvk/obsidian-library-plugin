@@ -120,7 +120,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `www.omdbapi.com`, `m.media-amazon.com` | Movie search with a key, posters | Title or IMDb id, key |
 | `v3-cinemeta.strem.io`, `images.metahub.space`, `episodes.metahub.space` | Movies, series, stills, air dates | Title or IMDb id, genre |
 | `api.themoviedb.org`, `image.tmdb.org` | Movie and series details, with a key | IMDb id, key |
-| `www.wikidata.org`, `en.wikipedia.org`, `upload.wikimedia.org` | Search, Rotten Tomatoes, trailers, covers, matching Netflix titles, album awards | Search text, ids, Netflix ids, album title and artist |
+| `www.wikidata.org`, `en.wikipedia.org`, `commons.wikimedia.org`, `upload.wikimedia.org` | Search, Rotten Tomatoes, trailers, covers, matching Netflix titles, awards of albums, titles and people, photos on a person's canvas | Search text, ids, Netflix ids, album title and artist |
 | `openlibrary.org`, `covers.openlibrary.org` | Books, chapters, covers | Title, author, ISBN, genres |
 | `www.googleapis.com`, `books.google.com` | Book search with a key, covers | Title, key |
 | `api.rawg.io`, `media.rawg.io` | Games, with a key | Title or id, genre, key |

@@ -59,6 +59,7 @@ import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
 import { libraryMap, linkCanvas } from './libraryMap'
 import { albumAwards, titleAwards, type Award } from './music'
+import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
 import { refreshTraktTokens, traktChanges, traktData, traktExpired, traktHistory, traktRemove, traktSend, type TraktEcho } from './trakt'
@@ -213,6 +214,7 @@ export default class LibraryPlugin extends Plugin {
 	private recommendations = new Map<string, Promise<Recommendation[]>>()
 	// an album's awards, looked up once a session
 	private albumAwards = new Map<string, Promise<Award[]>>()
+	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
 	private refreshCooldowns = new Map<string, number>()
@@ -970,6 +972,9 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		const sections = new Map<string, { path: string; name: string; cover: string }[]>()
+		// a person is named in Creator or Cast; their titles' IMDb ids find them on Wikidata
+		let person = false
+		const imdbIds: string[] = []
 		for (const note of this.app.vault.getMarkdownFiles()) {
 			if (isTemplateFile(note.path)) continue
 			const fm = this.app.metadataCache.getFileCache(note)?.frontmatter
@@ -977,6 +982,11 @@ export default class LibraryPlugin extends Plugin {
 			if (!fm || !category) continue
 			const named = NAME_FIELDS.some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))
 			if (!named) continue
+			if (['Creator', 'Cast'].some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))) {
+				person = true
+				const id = toStr(fm['Source ID'])
+				if (/^tt\d+$/.test(id)) imdbIds.push(id)
+			}
 			const list = sections.get(category.name) ?? []
 			list.push(this.poster(note, fm))
 			sections.set(category.name, list)
@@ -985,7 +995,17 @@ export default class LibraryPlugin extends Plugin {
 		const ordered = this.settings.categories
 			.filter(c => sections.has(c.name))
 			.map(c => ({ label: c.name, titles: (sections.get(c.name) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
-		const fresh = JSON.stringify(linkCanvas(file.basename, ordered), null, '\t')
+		let card = ''
+		if (person && imdbIds.length > 0) {
+			let pending = this.people.get(file.basename)
+			if (!pending) {
+				pending = personInfo(file.basename, imdbIds).catch(() => null)
+				this.people.set(file.basename, pending)
+			}
+			const info = await pending
+			if (info) card = personCard(file.basename, info, tr('header.awards'))
+		}
+		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)
 		// one a link click just made moves out of the vault root into the library
 		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`

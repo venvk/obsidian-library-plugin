@@ -130,12 +130,14 @@ export function libraryMap(titles: MapTitle[], maxPeople = 40): Canvas {
 // A genre's or a person's canvas: a heading, then the titles that credit them
 // in a grid per category. Every node id starts with lib-, so a canvas holding
 // nothing else is still Library's to redraw.
-export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[]): Canvas {
+export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[], card = ''): Canvas {
 	// as many columns as keep the whole grid about as wide as a 16:9 screen
 	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
 	const cols = Math.max(1, Math.round(Math.sqrt((total * 16 * (POSTER.height + GAP)) / (9 * (POSTER.width + GAP)))))
-	const nodes: CanvasNode[] = [{ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: 80 }]
-	let y = 140
+	// a person's card (photo, years, awards) is taller than the plain heading
+	const head = card ? 620 : 80
+	const nodes: CanvasNode[] = [{ id: 'lib-h', type: 'text', text: card || `# ${name}`, x: 0, y: 0, width: 600, height: head }]
+	let y = head + 60
 	sections.forEach((section, i) => {
 		const rows = Math.ceil(section.titles.length / cols)
 		const width = Math.min(section.titles.length, cols) * (POSTER.width + GAP) + GAP
