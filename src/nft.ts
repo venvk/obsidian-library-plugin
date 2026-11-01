@@ -42,6 +42,16 @@ export interface HeldNft {
 	fresh?: boolean
 	// the wallet asked for it: its own transaction brought it, or it came from someone the wallet pays or calls
 	trusted?: boolean
+	// the token's contract (a TON or Solana collection), and when the token was minted and reached the wallet (ISO)
+	contract?: string
+	minted?: string
+	acquired?: string
+}
+
+// What a note already knows of its token, so an import does not ask again.
+export interface KnownToken {
+	uri?: string
+	minted?: string
 }
 
 // The chains a read covered: a token missing from one of them has left the wallet.
@@ -156,6 +166,7 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 			name,
 			standard: typeof item.token_type === 'string' ? item.token_type : '',
 			tokenId: id,
+			contract,
 			// Blockscout's own cached preview first: IPFS gateways often time out
 			image: mediaUrl(item.thumbnails?.['500x500']) || mediaUrl(item.media_url) || mediaUrl(item.image_url) || mediaUrl(item.metadata?.image),
 			url: `https://${host}/token/${contract}/instance/${id}`,
@@ -194,10 +205,10 @@ const PUBLIC_RPC: Record<string, string> = {
 
 // What the wallet asked for: the hashes of its own transactions, and everyone it sent one to.
 // ponytail: the newest 500 of each; an older purchase from a quiet seller may still read as a stranger's
-async function walletTrust(host: string, address: string): Promise<{ own: Set<string>; peers: Set<string>; incoming: Map<string, { tx: string; from: string }> }> {
+async function walletTrust(host: string, address: string, withOwn: boolean): Promise<{ own: Set<string>; peers: Set<string>; incoming: Map<string, { tx: string; from: string; time: string }> }> {
 	const own = new Set<string>()
 	const peers = new Set<string>()
-	const incoming = new Map<string, { tx: string; from: string }>()
+	const incoming = new Map<string, { tx: string; from: string; time: string }>()
 	const walk = async (path: string, take: (item: Record<string, unknown>) => void): Promise<void> => {
 		let next = ''
 		for (let page = 0; page < 10; page++) {
@@ -208,26 +219,39 @@ async function walletTrust(host: string, address: string): Promise<{ own: Set<st
 			next = '&' + new URLSearchParams(Object.entries(data.next_page_params).map(([k, v]) => [k, String(v)])).toString()
 		}
 	}
-	const hashOf = (value: unknown): string => {
-		const hash = (value as { hash?: unknown } | null)?.hash
-		return typeof hash === 'string' ? hash.toLowerCase() : ''
-	}
-	await walk('transactions?filter=from', item => {
-		if (typeof item.hash === 'string') own.add(item.hash.toLowerCase())
-		const to = hashOf(item.to)
-		if (to) peers.add(to)
-	})
+	// the newest transfer in comes first: that is when the wallet got the token
 	await walk('token-transfers?type=ERC-721,ERC-1155&filter=to', item => {
 		const address = (item.token as { address_hash?: unknown } | null)?.address_hash
 		const contract = typeof address === 'string' ? address.toLowerCase() : ''
 		const id = (item.total as { token_id?: unknown } | null)?.token_id
 		const tx = typeof item.transaction_hash === 'string' ? item.transaction_hash : typeof item.tx_hash === 'string' ? item.tx_hash : ''
-		if (contract && typeof id === 'string' && !incoming.has(`${contract}:${id}`)) incoming.set(`${contract}:${id}`, { tx: tx.toLowerCase(), from: hashOf(item.from) })
+		const time = typeof item.timestamp === 'string' ? item.timestamp : ''
+		if (contract && typeof id === 'string' && !incoming.has(`${contract}:${id}`)) incoming.set(`${contract}:${id}`, { tx: tx.toLowerCase(), from: hashOf(item.from), time })
 	})
+	if (withOwn) {
+		await walk('transactions?filter=from', item => {
+			if (typeof item.hash === 'string') own.add(item.hash.toLowerCase())
+			const to = hashOf(item.to)
+			if (to) peers.add(to)
+		})
+	}
 	return { own, peers, incoming }
 }
 
-async function blockscoutHeld(chain: string, host: string, address: string, knownUri: (key: string) => string | undefined): Promise<NftRead> {
+function hashOf(value: unknown): string {
+	const hash = (value as { hash?: unknown } | null)?.hash
+	return typeof hash === 'string' ? hash.toLowerCase() : ''
+}
+
+// When a token was minted: its transfer from the zero address, or the oldest one the explorer lists.
+async function mintedAt(host: string, contract: string, id: string): Promise<string> {
+	const data = await explorerJson(`https://${host}/api/v2/tokens/${contract}/instances/${id}/transfers`) as { items?: Record<string, unknown>[]; next_page_params?: unknown } | null
+	const items = data?.items ?? []
+	const mint = items.find(item => /^0x0{40}$/i.test(hashOf(item.from))) ?? (data?.next_page_params ? undefined : items[items.length - 1])
+	return typeof mint?.timestamp === 'string' ? mint.timestamp : ''
+}
+
+async function blockscoutHeld(chain: string, host: string, address: string, known: (key: string) => KnownToken | undefined): Promise<NftRead> {
 	const held: HeldNft[] = []
 	let next = ''
 	for (let page = 0; page < 40; page++) {
@@ -248,13 +272,20 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 			}
 			// a token the wallet asked for is not spam, whatever its name or contract says; the wallet's
 			// history is read only on a network where something looks like spam
-			const trust = held.some(token => token.spam) ? await walletTrust(host, address) : { own: new Set<string>(), peers: new Set<string>(), incoming: new Map<string, { tx: string; from: string }>() }
+			const trust = await walletTrust(host, address, held.some(token => token.spam))
 			for (const token of held) {
-				if (!token.spam) continue
-				const contract = (/\/token\/(0x[0-9a-fA-F]{40})\//.exec(token.url)?.[1] ?? '').toLowerCase()
+				const contract = (token.contract ?? '').toLowerCase()
 				const came = trust.incoming.get(`${contract}:${token.tokenId ?? ''}`)
+				if (came?.time) token.acquired = came.time
+				if (!token.spam) continue
 				token.trusted = trust.peers.has(contract) || (!!came && (trust.own.has(came.tx) || trust.peers.has(came.from)))
 				if (token.trusted) token.spam = false
+			}
+			// the mint date is asked once per token: a note that has it keeps it
+			for (const token of held) {
+				if (token.spam || !token.contract || !token.tokenId) continue
+				const minted = known(token.key)?.minted
+				token.minted = minted || await mintedAt(host, token.contract, token.tokenId)
 			}
 			// the token's own metadata from its tokenURI on the chain: the explorer's copy can predate a reveal.
 			// A URI the note already knows is not fetched again; spam is not worth the requests.
@@ -265,7 +296,7 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 				const uri = await tokenUri(rpc, where[1] ?? '', where[2] ?? '')
 				if (!uri) continue
 				token.tokenUri = uri
-				if (knownUri(token.key) === uri && token.image) continue
+				if (known(token.key)?.uri === uri && token.image) continue
 				const meta = await tokenMeta(uri)
 				if (meta.image) token.image = meta.image
 				if (meta.name) token.name = meta.name
@@ -507,7 +538,7 @@ export function tonTokens(items: TonItem[]): HeldNft[] {
 		const collection = typeof item.collection?.name === 'string' && item.collection.name.trim() ? item.collection.name.trim() : 'TON'
 		const name = typeof item.metadata?.name === 'string' && item.metadata.name.trim() ? item.metadata.name.trim() : collection
 		const preview = (item.previews ?? []).find(p => p.resolution === '500x500')?.url
-		out.push({ key: nftKey('TON', address), chain: 'TON', collection, name, image: mediaUrl(preview) || mediaUrl(item.metadata?.image), url: `https://tonviewer.com/${address}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), standard: 'TEP-62', tokenId: address })
+		out.push({ key: nftKey('TON', address), chain: 'TON', collection, name, contract: typeof item.collection?.address === 'string' ? item.collection.address : '', image: mediaUrl(preview) || mediaUrl(item.metadata?.image), url: `https://tonviewer.com/${address}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), standard: 'TEP-62', tokenId: address })
 	}
 	return out
 }
@@ -577,7 +608,7 @@ export function solanaTokens(items: SolanaItem[]): HeldNft[] {
 		const name = typeof item.name === 'string' && item.name.trim() ? item.name.trim() : collection
 		// Metaplex: compressed (Bubblegum), programmable, Core, or the classic token metadata standard
 		const standard = item.isCompressed === true ? 'Metaplex cNFT' : item.isProgrammable === true || item.tokenStandard === 4 ? 'Metaplex pNFT' : typeof item.tokenStandard === 'string' && /core/i.test(item.tokenStandard) ? 'Metaplex Core' : 'Metaplex'
-		out.push({ key: nftKey('Solana', mint), chain: 'Solana', collection, name, image: mediaUrl(item.image), url: `https://solscan.io/token/${mint}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), standard, tokenId: mint })
+		out.push({ key: nftKey('Solana', mint), chain: 'Solana', collection, name, contract: typeof item.collection === 'string' ? item.collection : '', image: mediaUrl(item.image), url: `https://solscan.io/token/${mint}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), standard, tokenId: mint })
 	}
 	return out
 }
@@ -625,14 +656,14 @@ export function walletPairs(fields: Record<string, string>): WalletPair[] {
 
 // Every wallet's tokens, grouped. A network counts as read only when all its wallets read in full:
 // only then may a token missing from it be taken as gone. BNB and Taiko need the Etherscan key.
-export async function nftHoldings(pairs: WalletPair[], etherscanKey: string, hasCover: (key: string) => boolean = () => false, knownUri: (key: string) => string | undefined = () => undefined): Promise<NftRead> {
+export async function nftHoldings(pairs: WalletPair[], etherscanKey: string, hasCover: (key: string) => boolean = () => false, known: (key: string) => KnownToken | undefined = () => undefined): Promise<NftRead> {
 	const held: HeldNft[] = []
 	const done = new Map<string, number>()
 	const wanted = new Map<string, number>()
 	for (const { chain, address } of pairs) {
 		const host = BLOCKSCOUT[chain]
 		let read: NftRead | null = null
-		if (host) read = await blockscoutHeld(chain, host, address, knownUri)
+		if (host) read = await blockscoutHeld(chain, host, address, known)
 		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : await pageScanHeld(chain, address, hasCover)
 		else if (chain === 'TON') read = await tonAllHeld(address)
 		else if (chain === 'Solana') read = await solanaHeld(address)

@@ -43,7 +43,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, nftHoldings, parseWallets, walletPairs } from './nft'
+import { NFT_SOURCE, NFT_TYPE, nftHoldings, type KnownToken, parseWallets, walletPairs } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -123,7 +123,7 @@ import {
 
 // Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
 // the name, or to a note of that name when there is one; the graph draws them.
-const LINK_FIELDS = ['Genre', 'Creator', 'Cast']
+const LINK_FIELDS = ['Genre', 'Creator', 'Cast', 'Wallet']
 
 // let the vault settle before the walk starts
 const ENRICH_START_DELAY = 10 * 1000
@@ -1786,14 +1786,15 @@ export default class LibraryPlugin extends Plugin {
 		try {
 			if (loud) new Notice(tr('notice.site.importing', { site: 'NFT' }))
 			const covered = new Set<string>()
-			const uris = new Map<string, string>()
+			const known = new Map<string, KnownToken>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 				if (!fm || toStr(fm.Source) !== NFT_SOURCE) continue
 				if (toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
-				if (toStr(fm['Token URI'])) uris.set(toStr(fm['Source ID']), toStr(fm['Token URI']))
+				// a note keeps its dates as dd.mm.yyyy; known only needs to say the mint date is there
+				known.set(toStr(fm['Source ID']), { uri: toStr(fm['Token URI']) || undefined, minted: toStr(fm.Minted) || undefined })
 			}
-			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'), key => covered.has(key), key => uris.get(key))
+			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'), key => covered.has(key), key => known.get(key))
 			if (read.chains.length === 0 && read.held.length === 0) {
 				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
 				return
@@ -1835,9 +1836,10 @@ export default class LibraryPlugin extends Plugin {
 						const spam = token.spam && known?.Spam === undefined
 						const unspam = !!token.trusted && known?.Spam === true
 						const checkbox = known?.Favorite === undefined
-						const wallets = token.wallets ?? []
+						const wallets = this.toLinks(token.wallets ?? [])
 						const kind = token.oat ? 'OAT' : 'NFT'
-						const facts = toStrArray(known?.Wallet).join() !== wallets.join() || toStr(known?.Standard) !== (token.standard ?? '') || toStr(known?.['Token ID']) !== (token.tokenId ?? '') || (!!token.tokenUri && toStr(known?.['Token URI']) !== token.tokenUri) || known?.Kind === undefined
+						const dates = this.nftDates(token)
+						const facts = toStrArray(known?.Wallet).join() !== wallets.join() || toStr(known?.Contract) !== (token.contract ?? '') || (!!dates.Acquired && toStr(known?.Acquired) !== dates.Acquired) || (!!dates.Minted && !toStr(known?.Minted)) || toStr(known?.Standard) !== (token.standard ?? '') || toStr(known?.['Token ID']) !== (token.tokenId ?? '') || (!!token.tokenUri && toStr(known?.['Token URI']) !== token.tokenUri) || known?.Kind === undefined
 						const rekey = toStr(known?.['Source ID']) !== token.key
 						if (Number(known?.Count) === token.count && !recover && !rename && !spam && !unspam && !checkbox && !facts && !rekey) continue
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
@@ -1848,6 +1850,9 @@ export default class LibraryPlugin extends Plugin {
 							if (spam) current.Spam = true
 							if (unspam) delete current.Spam
 							if (wallets.length > 0) current.Wallet = wallets
+							if (token.contract) current.Contract = token.contract
+							if (dates.Acquired) current.Acquired = dates.Acquired
+							if (dates.Minted && !toStr(current.Minted)) current.Minted = dates.Minted
 							if (token.standard) current.Standard = token.standard
 							if (token.tokenId) current['Token ID'] = token.tokenId
 							if (token.tokenUri) current['Token URI'] = token.tokenUri
@@ -1871,7 +1876,9 @@ export default class LibraryPlugin extends Plugin {
 					// Spam and OAT are set once; you can change them, and the next import leaves them
 					const facts: Record<string, unknown> = {
 						Kind: token.oat ? 'OAT' : 'NFT',
-						...(token.wallets?.length ? { Wallet: token.wallets } : {}),
+						...(token.wallets?.length ? { Wallet: this.toLinks(token.wallets) } : {}),
+						...(token.contract ? { Contract: token.contract } : {}),
+						...this.nftDates(token),
 						...(token.standard ? { Standard: token.standard } : {}),
 						...(token.tokenId ? { 'Token ID': token.tokenId } : {}),
 						...(token.tokenUri ? { 'Token URI': token.tokenUri } : {}),
@@ -1909,6 +1916,13 @@ export default class LibraryPlugin extends Plugin {
 		} finally {
 			this.nftImporting = false
 		}
+	}
+
+	// when the token was minted and reached the wallet, as the note's dd.mm.yyyy; a known mint date passes through
+	private nftDates(token: { minted?: string; acquired?: string }): { Minted?: string; Acquired?: string } {
+		const minted = token.minted && /^\d{2}\.\d{2}\.\d{4}$/.test(token.minted) ? token.minted : token.minted ? dmyOf(token.minted) : ''
+		const acquired = token.acquired ? dmyOf(token.acquired) : ''
+		return { ...(minted ? { Minted: minted } : {}), ...(acquired ? { Acquired: acquired } : {}) }
 	}
 
 	private trackNft(file: TFile): void {
@@ -4477,8 +4491,22 @@ export default class LibraryPlugin extends Plugin {
 			const short = (value: string): string => value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value
 			const tokenId = toStr(fm['Token ID'])
 			if (tokenId) addRow(tr('header.tokenId'), short(tokenId))
+			const contract = toStr(fm.Contract)
+			if (contract) addRow(tr('header.contract'), short(contract))
+			// a wallet is a link like a person: its canvas holds its tokens, and the graph joins them
 			const wallets = toStrArray(fm.Wallet)
-			if (wallets.length > 0) addRow(tr('header.wallet'), wallets.map(short).join(', '))
+			if (wallets.length > 0) {
+				const row = infoSide.createDiv({ cls: 'note-header-row' })
+				row.createEl('b', { text: tr('header.wallet') + ': ' })
+				wallets.forEach((wallet, i) => {
+					if (i > 0) row.appendText(', ')
+					this.linkName(row.createSpan({ text: short(linkLabel(wallet)) }), linkLabel(wallet))
+				})
+			}
+			const minted = toStr(fm.Minted)
+			if (minted) addRow(tr('header.minted'), minted)
+			const acquired = toStr(fm.Acquired)
+			if (acquired) addRow(tr('header.acquired'), acquired)
 			if (Number(fm.Count) > 1) addRow(tr('header.count'), String(Number(fm.Count)))
 		}
 		// the channel: its canvas by name, the channel itself on YouTube, and the subscription

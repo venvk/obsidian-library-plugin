@@ -367,7 +367,7 @@ export function linkLabel(value: string): string {
 }
 
 // What a name's canvas gathers: the link properties and the plain names older notes keep.
-export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist']
+export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist', 'Wallet']
 
 // The file a link property points at, without .canvas: [[Drama.canvas|Drama]] gives Drama.
 export function linkTarget(value: string): string {
