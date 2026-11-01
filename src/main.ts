@@ -74,8 +74,9 @@ import { SIGNER_PROJECT, codeFromRedirect as nintendoCode, exchangeNintendoCode,
 import { renderTrophies, TROPHY_GRADES, trophyIcon } from './ui/trophyIcons'
 import { renderPlatformLabels } from './ui/platformIcons'
 import { createEmbedPlayer, toEmbed } from './trailer'
-import { applyEpisodeChange, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, type EpisodeChange, type TrackKind } from './episodes'
+import { applyEpisodeChange, chapterNotes, editChapters, setChapterNotes, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, type EpisodeChange, type TrackKind } from './episodes'
 import { ChaptersModal } from './ui/chaptersModal'
+import { ChapterNotesModal } from './ui/chapterNotesModal'
 import { TrailerModal } from './ui/trailerModal'
 import { Lightbox } from './ui/lightbox'
 import {
@@ -4604,6 +4605,14 @@ export default class LibraryPlugin extends Plugin {
 			if (trackable) {
 				// a season rated through its episodes shows their average, no hand-typed rating
 				if (!flat) row.appendChild(this.ratingInput(season.rating, season.ratedByEpisodes, (rating) => change({ season: index, rating })))
+				if (book) {
+					const edit = row.createEl('button', { cls: 'note-header-season-toggle clickable-icon', attr: { 'aria-label': tr('header.editChapters') } })
+					setIcon(edit, 'pencil')
+					edit.addEventListener('click', (e) => {
+						e.preventDefault()
+						new ChaptersModal(this.app, (chapters) => { void this.editChapterList(file, chapters) }, season.episodes.map(ep => ep.title)).open()
+					})
+				}
 				const toggle = createEl('button')
 				toggle.classList.add('note-header-season-toggle', 'clickable-icon')
 				toggle.setAttribute('aria-label', tr('header.episodeList'))
@@ -4622,6 +4631,8 @@ export default class LibraryPlugin extends Plugin {
 			if (!trackable || !open.has(index)) return
 			const list = createDiv()
 			list.classList.add('note-header-episodes')
+			const labels = season.episodes.map((episode, e) => episode.title ? `${String(e + 1)}. ${episode.title}` : tr('header.chapter', { number: String(e + 1) }))
+			const headings = new Set((this.app.metadataCache.getFileCache(file)?.headings ?? []).map(h => h.heading))
 			season.episodes.forEach((episode, e) => {
 				const item = createDiv()
 				item.classList.add('note-header-episode')
@@ -4637,6 +4648,14 @@ export default class LibraryPlugin extends Plugin {
 					item.createDiv({ cls: 'note-header-episode-date', text: airingDate(at) })
 				}
 				item.appendChild(this.ratingInput(episode.rating, false, (rating) => change({ season: index, episode: e, rating })))
+				if (book) {
+					const notes = item.createEl('button', { cls: `note-header-chapter-notes clickable-icon${headings.has(labels[e] ?? '') ? ' is-filled' : ''}`, attr: { 'aria-label': tr('header.chapterNotes') } })
+					setIcon(notes, 'notebook-pen')
+					notes.addEventListener('click', (ev) => {
+						ev.preventDefault()
+						void this.openChapterNotes(file, labels, e)
+					})
+				}
 				list.appendChild(item)
 			})
 			block.appendChild(list)
@@ -4835,6 +4854,29 @@ export default class LibraryPlugin extends Plugin {
 		}
 		new Notice(tr('notice.noChapters'))
 		new ChaptersModal(this.app, (chapters) => { void this.addChapters(file, chapters) }).open()
+	}
+
+	private async editChapterList(file: TFile, chapters: string[] | number): Promise<void> {
+		// a bare number keeps the old titles out: that many untitled chapters
+		const titles = typeof chapters === 'number' ? Array.from({ length: chapters }, () => '') : chapters
+		try {
+			await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => { editChapters(fm, titles) })
+		} catch (e) {
+			console.error('Library: chapters update error', file.path, e)
+		}
+	}
+
+	// thoughts and quotes on a chapter: typed in a dialog, kept in the note body under the chapter's
+	// heading; the note stays in reading view, where its header lives
+	private async openChapterNotes(file: TFile, labels: string[], index: number): Promise<void> {
+		const label = labels[index]
+		if (!label) return
+		const initial = chapterNotes(await this.app.vault.read(file), label)
+		new ChapterNotesModal(this.app, label, initial, (notes) => {
+			void this.app.vault.process(file, (data) => setChapterNotes(data, labels, index, notes)).catch((e: unknown) => {
+				console.error('Library: chapter notes error', file.path, e)
+			})
+		}).open()
 	}
 
 	private async addChapters(file: TFile, chapters: string[] | number): Promise<void> {

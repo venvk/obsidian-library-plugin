@@ -858,7 +858,7 @@ export class LibraryView extends ItemView {
 		toolbar?.insertBefore(row, toolbar.querySelector('.library-toolbar-spacer'))
 	}
 
-	// Only values some card has; a filter shows with 2+ values or a chosen one.
+	// Only values some card has; a filter shows with 2+ values (a format with 1) or a chosen one.
 	private sectionFilters(toolbar: HTMLElement, filters: NonNullable<SectionSpec['filters']>): void {
 		const groups = FACETS.map(({ facet, label }) => {
 			const counts = new Map<string, number>()
@@ -867,7 +867,8 @@ export class LibraryView extends ItemView {
 			}
 			const values = [...counts.keys()].sort((a, b) => facet === 'year' ? Number(b) - Number(a) : a.localeCompare(b))
 			return { facet, label, counts, values, chosen: filters.chosen[facet] ?? '' }
-		}).filter(group => group.counts.size >= 2 || group.chosen)
+		// a book's format shows from its first value: the other formats are simply not marked yet
+		}).filter(group => group.counts.size >= (group.facet === 'format' ? 1 : 2) || group.chosen)
 		if (groups.length === 0) return
 		const active = groups.filter(group => group.chosen).length
 		const dropdown = toolbar.createDiv({ cls: 'library-sort-dropdown library-filter-dropdown' })
