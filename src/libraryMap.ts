@@ -144,6 +144,10 @@ export function textHeight(text: string, width: number): number {
 	return height
 }
 
+// the person card's width and its photo's, the photo sized to the thumbnail Commons sends
+const CARD = 560
+const PHOTO = 260
+
 export interface PersonCard {
 	text: string
 	photo: string
@@ -154,15 +158,13 @@ export function linkCanvas(name: string, sections: { label: string; titles: Omit
 	// as many columns as keep the whole grid about as wide as a 16:9 screen
 	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
 	const cols = Math.max(1, Math.round(Math.sqrt((total * 16 * (POSTER.height + GAP)) / (9 * (POSTER.width + GAP)))))
-	// a person: the photo in a node sized to it, the text beside it in one as tall as its lines
+	// a person: one card, the photo on top at its own height, then the text as tall as its lines
 	const nodes: CanvasNode[] = []
 	let head = 80
 	if (card) {
-		const photo = card.photo ? 300 : 0
-		if (card.photo) nodes.push({ id: 'lib-p', type: 'text', text: `![](${card.photo})`, x: 0, y: 0, width: photo, height: card.photoHeight + 48 })
-		const textHeightPx = textHeight(card.text, 520)
-		nodes.push({ id: 'lib-h', type: 'text', text: card.text, x: photo ? photo + 40 : 0, y: 0, width: 520, height: textHeightPx })
-		head = Math.max(textHeightPx, card.photo ? card.photoHeight + 48 : 0)
+		const text = card.photo ? `![|${String(PHOTO)}](${card.photo})\n\n${card.text}` : card.text
+		head = textHeight(card.text, CARD) + (card.photo ? card.photoHeight + 32 : 0)
+		nodes.push({ id: 'lib-h', type: 'text', text, x: 0, y: 0, width: CARD, height: head })
 	} else {
 		nodes.push({ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: head })
 	}
