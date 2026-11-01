@@ -130,12 +130,53 @@ export function libraryMap(titles: MapTitle[], maxPeople = 40): Canvas {
 // A genre's or a person's canvas: a heading, then the titles that credit them
 // in a grid per category. Every node id starts with lib-, so a canvas holding
 // nothing else is still Library's to redraw.
-export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[]): Canvas {
+// A text node's height for its markdown at a width: lines wrapped at about 7.5 px a character,
+// a heading line taller, the node's padding around; a little more than needed, so nothing scrolls.
+export function textHeight(text: string, width: number): number {
+	const perLine = Math.max(10, Math.floor((width - 48) / 7.5))
+	let height = 40
+	for (const para of text.split('\n\n')) {
+		const heading = para.startsWith('# ')
+		const visible = para.replace(/\]\([^)]*\)/g, ']').replace(/[#*\\]/g, '')
+		const lines = Math.max(1, Math.ceil(visible.length / (heading ? perLine / 2 : perLine)))
+		height += lines * (heading ? 44 : 26) + 16
+	}
+	return height
+}
+
+// the person card's width and its photo's, the photo sized to the thumbnail Commons sends
+export const PERSON_CARD_WIDTH = 560
+const CARD = PERSON_CARD_WIDTH
+const PHOTO = 260
+
+export interface PersonCard {
+	text: string
+	photo: string
+	photoHeight: number
+	// the card's height as rendered, when it could be measured
+	height?: number
+}
+
+// The card's markdown: the photo at its exact size, so the layout is known before it loads, then the text.
+export function personCardText(card: PersonCard): string {
+	return card.photo ? `![|${String(PHOTO)}x${String(card.photoHeight)}](${card.photo})\n\n${card.text}` : card.text
+}
+
+
+export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[], card?: PersonCard): Canvas {
 	// as many columns as keep the whole grid about as wide as a 16:9 screen
 	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
 	const cols = Math.max(1, Math.round(Math.sqrt((total * 16 * (POSTER.height + GAP)) / (9 * (POSTER.width + GAP)))))
-	const nodes: CanvasNode[] = [{ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: 80 }]
-	let y = 140
+	// a person: one card, the photo on top at its own height, then the text as tall as its lines
+	const nodes: CanvasNode[] = []
+	let head = 80
+	if (card) {
+		head = card.height ?? textHeight(card.text, CARD) + (card.photo ? card.photoHeight + 32 : 0)
+		nodes.push({ id: 'lib-h', type: 'text', text: personCardText(card), x: 0, y: 0, width: CARD, height: head })
+	} else {
+		nodes.push({ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: head })
+	}
+	let y = head + 60
 	sections.forEach((section, i) => {
 		const rows = Math.ceil(section.titles.length / cols)
 		const width = Math.min(section.titles.length, cols) * (POSTER.width + GAP) + GAP

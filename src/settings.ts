@@ -328,6 +328,20 @@ export class LibrarySettingTab extends PluginSettingTab {
 						},
 					},
 					{
+						name: tr("settings.graphLinks.name"),
+						desc: tr("settings.graphLinks.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(this.plugin.settings.graphLinks).onChange(async (value) => {
+									this.plugin.settings.graphLinks = value;
+									await this.plugin.saveSettings();
+									// every library note follows at once
+									await this.plugin.rebuildGraphLinks();
+								}),
+							);
+						},
+					},
+					{
 						name: tr("settings.remoteDelete.name"),
 						desc: tr("settings.remoteDelete.desc"),
 						render: (row) => {

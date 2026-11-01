@@ -152,6 +152,10 @@ Notes from older versions can have another `Source`, such as `rawg` or `steam`. 
 
 `Genre`, `Creator`, and `Cast` hold links to canvases, such as `[[Drama.canvas|Drama]]`. Opening one, or clicking the name in the note header, in a statistics top, or among your favourite genres, draws the covers of every title with that genre or person, grouped by category, and a canvas made from a link moves to a Canvases folder in your library folder. The canvas is drawn again each time you open it, until you add a card of your own; then Library leaves it as it is. A name that already has a note of its own, not a title's, links that note instead. Names you type by hand become links the next time the note changes. `Rebuild graph links` converts the whole library at once, older `[[Drama]]` links included.
 
+A person's canvas starts with a card from Wikidata: their photo, birth and death years, awards, and their name linked to their IMDb page. Library finds the person through the titles that credit them, so a namesake isn't picked.
+
+Settings > Library > General > Links for the graph turns the links off: `Genre`, `Creator` and `Cast` are then written as plain names in every library note, and the graph no longer connects titles through them. Turning it back on writes the links again.
+
 ## Cover
 
 Settings > Library > General > Cover property renames the cover field, for example to `image` if you already use that name. Notes keep working after a rename, because Library also reads `Cover` and `Image`. A cover can be an image address, or an image in your vault written as a path or an internal link.

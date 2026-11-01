@@ -1,6 +1,6 @@
 import { entities, languages, searchItems, textIn, type WikidataEntity } from './providers/wikidata'
 
-// A music note's awards, looked up on Wikidata when the note is opened.
+// A note's awards, looked up on Wikidata when the note is opened.
 
 // Wikidata "album"; Deezer's album id (P2722) is too rarely set to match on.
 const ALBUM = 'Q482994'
@@ -46,7 +46,21 @@ export async function albumAwards(name: string, artist: string): Promise<Award[]
 			const id = (claim.mainsnak?.datavalue?.value as { id?: unknown } | undefined)?.id
 			return typeof id === 'string' && labels(people[id]).some(label => sameName(label, artist))
 		}))
-	const won = album?.claims?.P166 ?? []
+	return awardsOf(album)
+}
+
+// The Wikidata item of a title, found by the id the note keeps: IMDb, Wikidata or Steam.
+export async function titleAwards(sourceId: string): Promise<Award[]> {
+	const id = sourceId.trim()
+	const filter = /^tt\d+$/.test(id) ? `haswbstatement:P345=${id}` : /^steam:\d+$/.test(id) ? `haswbstatement:P1733=${id.slice(6)}` : ''
+	const item = /^Q\d+$/.test(id) ? id : filter ? (await searchItems('', filter, 1))[0] : undefined
+	if (!item) return []
+	return awardsOf((await entities([item], 'claims'))[item])
+}
+
+// "Award received" (P166) with its year (P585), named in the note's language.
+export async function awardsOf(entity: WikidataEntity | undefined): Promise<Award[]> {
+	const won = entity?.claims?.P166 ?? []
 	if (won.length === 0) return []
 	const awardIds: string[] = []
 	const years: (number | null)[] = []

@@ -1,6 +1,6 @@
 ## The Library tab
 
-Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, Soon, one section per category in the order you set in Settings > Library > Categories, and Up next.
+Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, then the sections in the order you set in Settings > Library > Categories: one per category, with Soon and Up next among them. While they are on, Soon and Up next are listed there like categories, and you can drag them anywhere in the list, or move them with arrows on a phone. By default Soon comes first and Up next last.
 
 The buttons in the tab's header add a title (+), search your whole library, run every import now (Update), build the [[library map|Library-blocks-and-map]], and open the plugin's settings.
 
@@ -45,7 +45,11 @@ Soon lists the next episodes of the series and anime you are watching, with thei
 
 ## The note header
 
-A library note shows a header above its text: the cover, creator, cast, years, seasons, the next episode's air date, genres, an album's awards from Wikidata, runtime, last played, ratings, your score, and your progress. The header is drawn on screen; the text of the note stays as you wrote it.
+A library note shows a header above its text: the cover, creator, cast, years, seasons, the next episode's air date, genres, awards from Wikidata, runtime, last played, ratings, your score, and your progress. The header is drawn on screen; the text of the note stays as you wrote it.
+
+Your score is set with five stars in the header. Each half star is one point out of 10, written to `My Rating`; click your current score again to clear it.
+
+Awards come from Wikidata for albums, movies, series, anime and games. Library finds the title by the IMDb, Wikidata or Steam id in its note, or an album by its title and artist. A long list shows the first six; point at it to see the rest.
 
 Depending on the note it also has:
 
