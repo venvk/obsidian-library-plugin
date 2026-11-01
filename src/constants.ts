@@ -34925,6 +34925,8 @@ export interface ILibrarySettings {
 	nftWallets: Record<string, string>
 	etherscanApiKey: string
 	nftLastImport: number
+	// tokens whose note you deleted: an import brings them back as spam
+	nftHidden: string[]
 	showNftSpam: boolean
 	showNftOat: boolean
 	// API keys taken from Obsidian's Keychain instead of these fields: the secret's id per key
@@ -35024,6 +35026,7 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	nftWallets: {},
 	etherscanApiKey: '',
 	nftLastImport: 0,
+	nftHidden: [],
 	showNftSpam: false,
 	showNftOat: true,
 	keySecrets: {},

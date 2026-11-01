@@ -220,6 +220,9 @@ export default class LibraryPlugin extends Plugin {
 	private recommendations = new Map<string, Promise<Recommendation[]>>()
 	// an album's awards, looked up once a session
 	private albumAwards = new Map<string, Promise<Award[]>>()
+	// NFT notes by path, to know the token of a note once it is deleted; and the ones the import trashes itself
+	private nftPaths = new Map<string, string>()
+	private nftTrashing = new Set<string>()
 	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
@@ -312,9 +315,27 @@ export default class LibraryPlugin extends Plugin {
 		this.registerEvent(this.app.workspace.on('layout-change', () => { banner() }))
 		this.app.workspace.onLayoutReady(() => {
 			if (this.unloaded) return
+			for (const file of this.app.vault.getMarkdownFiles()) this.trackNft(file)
+			// a token note you delete marks its token as spam for later imports; the import's own trashing does not count
+			this.registerEvent(this.app.vault.on('delete', (file) => {
+				const key = this.nftPaths.get(file.path)
+				this.nftPaths.delete(file.path)
+				if (!key || this.nftTrashing.delete(file.path)) return
+				if (this.settings.nftHidden.indexOf(key) < 0) {
+					this.settings.nftHidden.push(key)
+					void this.saveSettings()
+				}
+			}))
+			this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
+				const key = this.nftPaths.get(oldPath)
+				if (!key) return
+				this.nftPaths.delete(oldPath)
+				this.nftPaths.set(file.path, key)
+			}))
 			// registered on layout-ready: startup re-indexes every note changed while the app was closed
 			this.registerEvent(
 				this.app.metadataCache.on('changed', (file) => {
+					this.trackNft(file)
 					if (this.app.workspace.getActiveFile()?.path === file.path) banner()
 					if (this.syncingLinks.has(file.path)) return
 					if (isTemplateFile(file.path)) return
@@ -1791,9 +1812,15 @@ export default class LibraryPlugin extends Plugin {
 			let created = 0
 			let updated = 0
 			const seen = new Set<string>()
+			// a token whose note you deleted comes back as spam, hidden while spam is
+			const deleted = new Set(this.settings.nftHidden)
 			for (const token of read.held) {
 				if (this.unloaded) return
 				seen.add(token.key)
+				if (deleted.has(token.key)) {
+					token.spam = true
+					token.trusted = false
+				}
 				const existing = notes.get(token.key) ?? byUrl.get(token.url.toLowerCase())
 				if (existing) kept.add(existing)
 				try {
@@ -1809,7 +1836,8 @@ export default class LibraryPlugin extends Plugin {
 						const unspam = !!token.trusted && known?.Spam === true
 						const checkbox = known?.Favorite === undefined
 						const wallets = token.wallets ?? []
-						const facts = toStrArray(known?.Wallet).join() !== wallets.join() || toStr(known?.Standard) !== (token.standard ?? '') || toStr(known?.['Token ID']) !== (token.tokenId ?? '') || (!!token.tokenUri && toStr(known?.['Token URI']) !== token.tokenUri)
+						const kind = token.oat ? 'OAT' : 'NFT'
+						const facts = toStrArray(known?.Wallet).join() !== wallets.join() || toStr(known?.Standard) !== (token.standard ?? '') || toStr(known?.['Token ID']) !== (token.tokenId ?? '') || (!!token.tokenUri && toStr(known?.['Token URI']) !== token.tokenUri) || known?.Kind === undefined
 						const rekey = toStr(known?.['Source ID']) !== token.key
 						if (Number(known?.Count) === token.count && !recover && !rename && !spam && !unspam && !checkbox && !facts && !rekey) continue
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
@@ -1823,6 +1851,8 @@ export default class LibraryPlugin extends Plugin {
 							if (token.standard) current.Standard = token.standard
 							if (token.tokenId) current['Token ID'] = token.tokenId
 							if (token.tokenUri) current['Token URI'] = token.tokenUri
+							// set once like Spam and OAT, so a kind you change by hand stays
+							if (current.Kind === undefined) current.Kind = kind
 							if (checkbox) {
 								if (isEmptyValue(current['My Rating'])) delete current['My Rating']
 								current.Favorite = false
@@ -1840,6 +1870,7 @@ export default class LibraryPlugin extends Plugin {
 					}
 					// Spam and OAT are set once; you can change them, and the next import leaves them
 					const facts: Record<string, unknown> = {
+						Kind: token.oat ? 'OAT' : 'NFT',
 						...(token.wallets?.length ? { Wallet: token.wallets } : {}),
 						...(token.standard ? { Standard: token.standard } : {}),
 						...(token.tokenId ? { 'Token ID': token.tokenId } : {}),
@@ -1868,6 +1899,7 @@ export default class LibraryPlugin extends Plugin {
 				const chain = key.split(':')[0] ?? ''
 				if (seen.has(key) || kept.has(file) || read.chains.indexOf(chain) < 0 || !live.has(chain)) continue
 				if (this.app.metadataCache.getFileCache(file)?.frontmatter?.Favorite === true) continue
+				this.nftTrashing.add(file.path)
 				await this.app.fileManager.trashFile(file)
 				updated++
 			}
@@ -1877,6 +1909,11 @@ export default class LibraryPlugin extends Plugin {
 		} finally {
 			this.nftImporting = false
 		}
+	}
+
+	private trackNft(file: TFile): void {
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		if (fm && toStr(fm.Source) === NFT_SOURCE && toStr(fm['Source ID'])) this.nftPaths.set(file.path, toStr(fm['Source ID']))
 	}
 
 	private async nftCategory(): Promise<ICategory> {
@@ -5059,6 +5096,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.etherscanApiKey !== 'string') this.settings.etherscanApiKey = ''
 		if (typeof this.settings.nftLastImport !== 'number') this.settings.nftLastImport = 0
 		if (typeof this.settings.showNftSpam !== 'boolean') this.settings.showNftSpam = false
+		if (!Array.isArray(this.settings.nftHidden)) this.settings.nftHidden = []
 		if (typeof this.settings.showNftOat !== 'boolean') this.settings.showNftOat = true
 		const secrets = (this.settings.keySecrets && typeof this.settings.keySecrets === 'object' ? this.settings.keySecrets : {}) as Record<string, unknown>
 		this.settings.keySecrets = {}

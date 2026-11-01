@@ -124,6 +124,7 @@ export const BLOCKSCOUT: Record<string, string> = {
 	Mode: 'explorer.mode.network',
 	'Arbitrum Nova': 'arbitrum-nova.blockscout.com',
 	Shape: 'shapescan.xyz',
+	Robinhood: 'robinhoodchain.blockscout.com',
 }
 
 interface BlockscoutItem {
@@ -188,6 +189,7 @@ const PUBLIC_RPC: Record<string, string> = {
 	Arbitrum: 'https://arb1.arbitrum.io/rpc',
 	Polygon: 'https://polygon-bor-rpc.publicnode.com',
 	Gnosis: 'https://rpc.gnosischain.com',
+	Robinhood: 'https://rpc.mainnet.chain.robinhood.com',
 }
 
 // What the wallet asked for: the hashes of its own transactions, and everyone it sent one to.
@@ -597,7 +599,7 @@ async function solanaHeld(address: string): Promise<NftRead> {
 }
 
 // The networks a wallet list can name; "EVM" stands for every EVM network at once.
-export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko', 'Gnosis', 'Celo', 'zkSync', 'Scroll', 'Ink', 'Soneium', 'Unichain', 'Mode', 'Arbitrum Nova', 'Shape']
+export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko', 'Gnosis', 'Celo', 'zkSync', 'Scroll', 'Ink', 'Soneium', 'Unichain', 'Mode', 'Arbitrum Nova', 'Shape', 'Robinhood']
 export const WALLET_FIELDS = ['EVM', 'TON', 'Solana']
 
 export interface WalletPair {
