@@ -130,13 +130,42 @@ export function libraryMap(titles: MapTitle[], maxPeople = 40): Canvas {
 // A genre's or a person's canvas: a heading, then the titles that credit them
 // in a grid per category. Every node id starts with lib-, so a canvas holding
 // nothing else is still Library's to redraw.
-export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[], card = ''): Canvas {
+// A text node's height for its markdown at a width: lines wrapped at about 7.5 px a character,
+// a heading line taller, the node's padding around; a little more than needed, so nothing scrolls.
+export function textHeight(text: string, width: number): number {
+	const perLine = Math.max(10, Math.floor((width - 48) / 7.5))
+	let height = 40
+	for (const para of text.split('\n\n')) {
+		const heading = para.startsWith('# ')
+		const visible = para.replace(/\]\([^)]*\)/g, ']').replace(/[#*\\]/g, '')
+		const lines = Math.max(1, Math.ceil(visible.length / (heading ? perLine / 2 : perLine)))
+		height += lines * (heading ? 44 : 26) + 16
+	}
+	return height
+}
+
+export interface PersonCard {
+	text: string
+	photo: string
+	photoHeight: number
+}
+
+export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[], card?: PersonCard): Canvas {
 	// as many columns as keep the whole grid about as wide as a 16:9 screen
 	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
 	const cols = Math.max(1, Math.round(Math.sqrt((total * 16 * (POSTER.height + GAP)) / (9 * (POSTER.width + GAP)))))
-	// a person's card is as tall as what it holds: a photo, a line of years, the awards
-	const head = card ? 100 + (card.includes('![') ? 330 : 0) + Math.ceil(card.length / 70) * 22 : 80
-	const nodes: CanvasNode[] = [{ id: 'lib-h', type: 'text', text: card || `# ${name}`, x: 0, y: 0, width: 600, height: head }]
+	// a person: the photo in a node sized to it, the text beside it in one as tall as its lines
+	const nodes: CanvasNode[] = []
+	let head = 80
+	if (card) {
+		const photo = card.photo ? 300 : 0
+		if (card.photo) nodes.push({ id: 'lib-p', type: 'text', text: `![](${card.photo})`, x: 0, y: 0, width: photo, height: card.photoHeight + 48 })
+		const textHeightPx = textHeight(card.text, 520)
+		nodes.push({ id: 'lib-h', type: 'text', text: card.text, x: photo ? photo + 40 : 0, y: 0, width: 520, height: textHeightPx })
+		head = Math.max(textHeightPx, card.photo ? card.photoHeight + 48 : 0)
+	} else {
+		nodes.push({ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: head })
+	}
 	let y = head + 60
 	sections.forEach((section, i) => {
 		const rows = Math.ceil(section.titles.length / cols)

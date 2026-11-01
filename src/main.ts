@@ -57,7 +57,7 @@ import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKit
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
-import { libraryMap, linkCanvas } from './libraryMap'
+import { libraryMap, linkCanvas, type PersonCard } from './libraryMap'
 import { albumAwards, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
@@ -995,7 +995,7 @@ export default class LibraryPlugin extends Plugin {
 		const ordered = this.settings.categories
 			.filter(c => sections.has(c.name))
 			.map(c => ({ label: c.name, titles: (sections.get(c.name) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
-		let card = ''
+		let card: PersonCard | undefined
 		if (person && imdbIds.length > 0) {
 			let pending = this.people.get(file.path)
 			if (!pending) {
@@ -1008,7 +1008,7 @@ export default class LibraryPlugin extends Plugin {
 			const info = await Promise.race([pending, new Promise<typeof late>(resolve => { timer = window.setTimeout(() => resolve(late), 1500) })])
 			window.clearTimeout(timer)
 			if (info === late) void pending.then(found => { if (found && !this.unloaded) void this.fillLinkCanvas(file) })
-			else if (info) card = personCard(file.basename, info, tr('header.awards'))
+			else if (info) card = { text: personCard(file.basename, info, tr('header.awards')), photo: info.image, photoHeight: info.imageHeight }
 		}
 		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)

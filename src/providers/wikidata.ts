@@ -245,3 +245,18 @@ export async function idsForNetflix(netflixIds: number[]): Promise<Map<number, N
 	}
 	return out
 }
+
+// A Commons file's thumbnail at a given width, with its real height, so a canvas can size the card to it.
+export async function commonsThumb(file: string, width: number): Promise<{ url: string; width: number; height: number } | null> {
+	try {
+		const query = new URLSearchParams({ action: 'query', titles: `File:${file}`, prop: 'imageinfo', iiprop: 'url', iiurlwidth: String(width), format: 'json', origin: '*' })
+		const resp = await requestUrl({ url: `https://commons.wikimedia.org/w/api.php?${query.toString()}`, headers: HEADERS, throw: false })
+		if (resp.status !== 200) return null
+		const pages = (resp.json as { query?: { pages?: Record<string, { imageinfo?: { thumburl?: unknown; thumbwidth?: unknown; thumbheight?: unknown }[] }> } }).query?.pages ?? {}
+		const info = Object.values(pages)[0]?.imageinfo?.[0]
+		if (!info || typeof info.thumburl !== 'string' || typeof info.thumbwidth !== 'number' || typeof info.thumbheight !== 'number') return null
+		return { url: info.thumburl, width: info.thumbwidth, height: info.thumbheight }
+	} catch {
+		return null
+	}
+}
