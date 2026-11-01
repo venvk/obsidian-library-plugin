@@ -2275,3 +2275,8 @@ sort trigger, the chosen one in the accent colour. */
 	color: var(--text-muted);
 	font-variant-numeric: tabular-nums;
 }
+
+.note-header-wrap .note-header-star-half:focus-visible {
+	outline: 2px solid var(--interactive-accent);
+	outline-offset: -2px;
+}
