@@ -2043,3 +2043,77 @@ sort trigger, the chosen one in the accent colour. */
 	background-color: var(--interactive-accent);
 	color: var(--text-on-accent);
 }
+
+/* My Rating: five stars, each half a point out of 10 */
+.note-header-wrap .note-header-stars {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin-top: 6px;
+}
+
+.note-header-wrap .note-header-stars-label {
+	font-weight: bold;
+}
+
+.note-header-wrap .note-header-stars-row {
+	display: inline-flex;
+	gap: 2px;
+}
+
+.note-header-wrap .note-header-star {
+	position: relative;
+	display: inline-flex;
+	width: 22px;
+	height: 22px;
+	font-size: 22px;
+	line-height: 22px;
+	color: var(--background-modifier-border);
+}
+
+.note-header-wrap .note-header-star::before {
+	content: "★";
+}
+
+.note-header-wrap .note-header-star::after {
+	content: "★";
+	position: absolute;
+	inset: 0;
+	width: 0;
+	overflow: hidden;
+	color: #f5c518;
+}
+
+.note-header-wrap .note-header-star.is-half::after {
+	width: 50%;
+}
+
+.note-header-wrap .note-header-star.is-full::after {
+	width: 100%;
+}
+
+.note-header-wrap .note-header-star-half {
+	position: absolute;
+	top: 0;
+	bottom: 0;
+	width: 50%;
+	padding: 0;
+	border: none;
+	background: transparent;
+	box-shadow: none;
+	cursor: pointer;
+	z-index: 1;
+}
+
+.note-header-wrap .note-header-star-half.is-left {
+	left: 0;
+}
+
+.note-header-wrap .note-header-star-half.is-right {
+	right: 0;
+}
+
+.note-header-wrap .note-header-stars-value {
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}

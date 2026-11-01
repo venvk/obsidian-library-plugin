@@ -10,6 +10,8 @@ import {
 	getLanguage,
 	requestUrl,
 	requireApiVersion,
+	MarkdownRenderer,
+	Component,
 	type CachedMetadata,
 } from 'obsidian'
 import { API_KEY_NAMES, progressPattern, RATING_RT_ICON, type ApiKeyName, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
@@ -57,8 +59,9 @@ import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKit
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
-import { libraryMap, linkCanvas } from './libraryMap'
-import { albumAwards, type Award } from './music'
+import { libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type PersonCard } from './libraryMap'
+import { albumAwards, titleAwards, type Award } from './music'
+import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
 import { refreshTraktTokens, traktChanges, traktData, traktExpired, traktHistory, traktRemove, traktSend, type TraktEcho } from './trakt'
@@ -213,6 +216,7 @@ export default class LibraryPlugin extends Plugin {
 	private recommendations = new Map<string, Promise<Recommendation[]>>()
 	// an album's awards, looked up once a session
 	private albumAwards = new Map<string, Promise<Award[]>>()
+	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
 	private refreshCooldowns = new Map<string, number>()
@@ -931,6 +935,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// A name links its own note when there is one that isn't a title's.
 	private toLinks(value: unknown): string[] {
+		// graph links off: the same names as plain text
+		if (!this.settings.graphLinks) return toStrArray(value).map(linkLabel).filter((name, i, all) => name && all.indexOf(name) === i)
 		return toLinks(value, name => {
 			const dest = this.app.metadataCache.getFirstLinkpathDest(name, '')
 			const fm = dest?.extension === 'md' ? this.app.metadataCache.getFileCache(dest)?.frontmatter : undefined
@@ -968,6 +974,9 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		const sections = new Map<string, { path: string; name: string; cover: string }[]>()
+		// a person is named in Creator or Cast; their titles' IMDb ids find them on Wikidata
+		let person = false
+		const imdbIds: string[] = []
 		for (const note of this.app.vault.getMarkdownFiles()) {
 			if (isTemplateFile(note.path)) continue
 			const fm = this.app.metadataCache.getFileCache(note)?.frontmatter
@@ -975,6 +984,11 @@ export default class LibraryPlugin extends Plugin {
 			if (!fm || !category) continue
 			const named = NAME_FIELDS.some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))
 			if (!named) continue
+			if (['Creator', 'Cast'].some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))) {
+				person = true
+				const id = toStr(fm['Source ID'])
+				if (/^tt\d+$/.test(id)) imdbIds.push(id)
+			}
 			const list = sections.get(category.name) ?? []
 			list.push(this.poster(note, fm))
 			sections.set(category.name, list)
@@ -983,13 +997,58 @@ export default class LibraryPlugin extends Plugin {
 		const ordered = this.settings.categories
 			.filter(c => sections.has(c.name))
 			.map(c => ({ label: c.name, titles: (sections.get(c.name) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
-		const fresh = JSON.stringify(linkCanvas(file.basename, ordered), null, '\t')
+		let card: PersonCard | undefined
+		if (person && imdbIds.length > 0) {
+			let pending = this.people.get(file.path)
+			if (!pending) {
+				pending = personInfo(file.basename, imdbIds).catch(() => null)
+				this.people.set(file.path, pending)
+			}
+			// a slow Wikidata answer does not hold the canvas back: it is drawn now, the card added when it comes
+			const late = Symbol('late')
+			let timer = 0
+			const info = await Promise.race([pending, new Promise<typeof late>(resolve => { timer = window.setTimeout(() => resolve(late), 1500) })])
+			window.clearTimeout(timer)
+			if (info === late) void pending.then(found => { if (found && !this.unloaded) void this.fillLinkCanvas(file) })
+			else if (info) {
+				card = { text: personCard(file.basename, info, tr('header.awards')), photo: info.image, photoHeight: info.imageHeight }
+				card.height = await this.canvasTextHeight(personCardText(card), PERSON_CARD_WIDTH) ?? undefined
+			}
+		}
+		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)
 		// one a link click just made moves out of the vault root into the library
 		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`
 		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
 			await this.ensureFolder(folder)
 			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
+		}
+	}
+
+	// A canvas text node's height for its markdown, rendered off screen in the same classes the canvas
+	// uses, so the card is exactly as tall as what it holds; null when the layout gives nothing.
+	private async canvasTextHeight(markdown: string, width: number): Promise<number | null> {
+		const doc = activeDocument
+		const node = doc.body.createDiv({ cls: 'canvas-node' })
+		node.setCssStyles({ position: 'absolute', left: '-100000px', top: '0', width: `${String(width)}px`, visibility: 'hidden' })
+		const container = node.createDiv({ cls: 'canvas-node-container' })
+		const content = container.createDiv({ cls: 'canvas-node-content markdown-embed' })
+		const embed = content.createDiv({ cls: 'markdown-embed-content' })
+		const view = embed.createDiv({ cls: 'markdown-preview-view markdown-rendered' })
+		// the canvas sizes these to the node (contain: strict, height 100%): here they grow to their content
+		for (const el of [container, content, embed, view]) el.setCssStyles({ height: 'auto', contain: 'none' })
+		const component = new Component()
+		component.load()
+		try {
+			await MarkdownRenderer.render(this.app, markdown, view, '', component)
+			const height = container.getBoundingClientRect().height
+			// a pixel over, so rounding never leaves a scrollbar
+			return height > 0 ? Math.ceil(height) + 2 : null
+		} catch {
+			return null
+		} finally {
+			component.unload()
+			node.remove()
 		}
 	}
 
@@ -1117,7 +1176,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	private async rebuildGraphLinks(): Promise<void> {
+	async rebuildGraphLinks(): Promise<void> {
 		const types = new Set(this.settings.categories.map(c => c.typeValue))
 		const files = this.app.vault.getMarkdownFiles().filter(f => {
 			if (isTemplateFile(f.path)) return false
@@ -4233,7 +4292,7 @@ export default class LibraryPlugin extends Plugin {
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
 		addNames(tr('header.genre'), toStrArray(fm.Genre))
-		if (kind === 'music') this.addAwards(infoSide, fm, name)
+		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 
@@ -4246,7 +4305,7 @@ export default class LibraryPlugin extends Plugin {
 		if (ratingRT) addRow(RATING_RT_ICON, ratingRT, ' ')
 		if (ratingRawg) addRow('RAWG', ratingRawg)
 		if (ratingMc) addRow('MC', ratingMc)
-		if (myRating) addRow(tr('header.myRating'), myRating)
+		infoSide.appendChild(this.ratingStars(file, Number(myRating) || 0))
 
 		if (progressPercent !== null) {
 			const progRow = createDiv()
@@ -4292,21 +4351,27 @@ export default class LibraryPlugin extends Plugin {
 		return wrap
 	}
 
-	// an album's awards from Wikidata, a row that appears once they arrive
-	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string): void {
+	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and
+	// artist, anything else by the IMDb, Wikidata or Steam id it was made from
+	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string, kind: string | undefined): void {
 		const artist = linkLabel(toStrArray(fm.Creator)[0] ?? '')
-		if (!artist) return
-		const key = `${name}\u0000${artist}`
+		const sourceId = toStr(fm['Source ID'])
+		const key = kind === 'music' ? `${name}\u0000${artist}` : sourceId
+		if (!key || (kind === 'music' && !artist)) return
 		let pending = this.albumAwards.get(key)
 		if (!pending) {
-			pending = albumAwards(name, artist).catch(() => [] as Award[])
+			pending = (kind === 'music' ? albumAwards(name, artist) : titleAwards(sourceId)).catch(() => [] as Award[])
 			this.albumAwards.set(key, pending)
 		}
 		const row = infoSide.createDiv({ cls: 'note-header-row' })
 		void pending.then(awards => {
 			if (awards.length === 0 || this.unloaded) { row.remove(); return }
+			const all = awards.map(award => award.year ? `${award.name} (${String(award.year)})` : award.name)
+			// a film can have dozens: the first few, the rest on hover
+			const shown = all.slice(0, 6).join(', ') + (all.length > 6 ? ` +${String(all.length - 6)}` : '')
 			row.createEl('b', { text: tr('header.awards') + ': ' })
-			row.appendText(awards.map(award => award.year ? `${award.name} (${String(award.year)})` : award.name).join(', '))
+			row.appendText(shown)
+			if (all.length > 6) row.setAttr('title', all.join('\n'))
 		})
 	}
 
@@ -4640,6 +4705,40 @@ export default class LibraryPlugin extends Plugin {
 		return box
 	}
 
+	// My Rating out of 10 as five stars: each half is a point. The same rating again clears it.
+	private ratingStars(file: TFile, value: number): HTMLElement {
+		const row = createDiv({ cls: 'note-header-stars', attr: { role: 'group', 'aria-label': tr('header.myRating') } })
+		row.createSpan({ cls: 'note-header-stars-label', text: tr('header.myRating') })
+		const stars = row.createSpan({ cls: 'note-header-stars-row' })
+		const text = row.createSpan({ cls: 'note-header-stars-value' })
+		const show = (points: number): void => {
+			stars.querySelectorAll<HTMLElement>('.note-header-star').forEach((star, i) => {
+				const fill = Math.max(0, Math.min(2, Math.round(points) - i * 2))
+				star.toggleClass('is-half', fill === 1)
+				star.toggleClass('is-full', fill === 2)
+			})
+			text.setText(points > 0 ? `${String(Math.round(points * 10) / 10)}/10` : '—')
+		}
+		for (let i = 0; i < 5; i++) {
+			const star = stars.createSpan({ cls: 'note-header-star' })
+			for (const half of [1, 2]) {
+				const points = i * 2 + half
+				const button = star.createEl('button', { cls: `note-header-star-half is-${half === 1 ? 'left' : 'right'}`, attr: { 'aria-label': `${String(points)}/10` } })
+				button.addEventListener('mouseenter', () => show(points))
+				button.addEventListener('click', (e) => {
+					e.preventDefault()
+					// only the exact rating clears it: a 7.5 from IMDb clicked as 8 becomes 8
+					const next = value === points ? null : points
+					this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next })
+						.catch((err: unknown) => console.error('Library: rating not saved', file.path, err))
+				})
+			}
+		}
+		stars.addEventListener('mouseleave', () => show(value))
+		show(value)
+		return row
+	}
+
 	private ratingInput(value: number | null, computed: boolean, onChange: (rating: number | null) => void): HTMLElement {
 		const input = createEl('input')
 		input.type = 'number'
@@ -4729,6 +4828,9 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
 		if (typeof this.settings.upNextCollapsed !== 'boolean') this.settings.upNextCollapsed = false
 		if (typeof this.settings.showComingSoon !== 'boolean') this.settings.showComingSoon = true
+		if (typeof this.settings.graphLinks !== 'boolean') this.settings.graphLinks = true
+		if (typeof this.settings.soonAt !== 'number') this.settings.soonAt = 0
+		if (typeof this.settings.upNextAt !== 'number') this.settings.upNextAt = 999
 		if (typeof this.settings.localCovers !== 'boolean') this.settings.localCovers = false
 		if (!['english', 'romaji', 'native'].includes(this.settings.titleLanguage)) this.settings.titleLanguage = 'english'
 		if (typeof this.settings.adultTitles !== 'boolean') this.settings.adultTitles = false

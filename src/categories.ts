@@ -26,6 +26,39 @@ export function isBuiltInCategory(cat: ICategory): boolean {
 	return isVideo(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
 }
 
+// The library's sections in order: the categories, with Soon and Up next placed among them.
+export type SectionEntry = ICategory | '@soon' | '@upNext'
+
+export function sectionOrder(categories: ICategory[], soonAt: number, upNextAt: number): SectionEntry[] {
+	const out: SectionEntry[] = []
+	const clamp = (at: number): number => Math.max(0, Math.min(categories.length, Math.floor(at)))
+	// two blocks between the same categories keep their own order: the smaller value first
+	const blocks: [SectionEntry, number][] = soonAt <= upNextAt ? [['@soon', soonAt], ['@upNext', upNextAt]] : [['@upNext', upNextAt], ['@soon', soonAt]]
+	for (let i = 0; i <= categories.length; i++) {
+		for (const [block, at] of blocks) if (clamp(at) === i) out.push(block)
+		const cat = categories[i]
+		if (cat) out.push(cat)
+	}
+	return out
+}
+
+// Back from an order to the settings: the categories, and how many come before each block.
+export function splitOrder(entries: SectionEntry[]): { categories: ICategory[]; soonAt: number; upNextAt: number } {
+	const categories: ICategory[] = []
+	let soonAt = 0
+	let upNextAt = 0
+	let seen = 0
+	for (const entry of entries) {
+		// the second block between the same two categories sits half a step later
+		if (entry === '@soon') soonAt = categories.length + (seen++ > 0 && upNextAt === categories.length ? 0.5 : 0)
+		else if (entry === '@upNext') upNextAt = categories.length + (seen++ > 0 && soonAt === categories.length ? 0.5 : 0)
+		else categories.push(entry)
+	}
+	// a block after the last category stays last when a category is added
+	const end = (at: number): number => at >= categories.length ? 999 + (at % 1) : at
+	return { categories, soonAt: end(soonAt), upNextAt: end(upNextAt) }
+}
+
 export function categoryLabel(cat: ICategory): string {
 	if (isVideo(cat)) return tr('settings.default.video')
 	return isBuiltInCategory(cat) ? tr(`settings.default.${cat.contentType}`) : cat.name

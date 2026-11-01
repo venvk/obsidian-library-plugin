@@ -16,7 +16,7 @@ import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constant
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
 import type { WatchSite } from "./watchSites";
-import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory, ownCreators } from "./categories";
+import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory, ownCreators, sectionOrder, splitOrder, type SectionEntry } from "./categories";
 import { tr } from "./i18n";
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, tokenFromInput } from "./anilistSync";
 import { codeFromInput, exchangeCode, makeVerifier, malAuthUrl, malClientPair } from "./malSync";
@@ -93,7 +93,7 @@ function note(text: string): Row {
 export class LibrarySettingTab extends PluginSettingTab {
 	private plugin: LibraryPlugin;
 	private expanded = new Set<ICategory>();
-	private dragging: ICategory | null = null;
+	private dragging: SectionEntry | null = null;
 	// the tab open
 	private page: Page = "general";
 	// Edits in progress, by starting value: notes move on blur/tab close, not per keystroke.
@@ -201,9 +201,13 @@ export class LibrarySettingTab extends PluginSettingTab {
 		const categories: Section[] = [
 			{ page: "categories", heading: tr("settings.section.categories"), rows: [note(tr("settings.categories.desc")), this.libraryFolderRow()] },
 		];
-		settings.categories.forEach((cat, index) => {
-			categories.push({ page: "categories", group: true, rows: this.categoryRows(cat, index) });
-		});
+		for (const entry of sectionOrder(settings.categories, settings.soonAt, settings.upNextAt)) {
+			if (entry === "@soon" || entry === "@upNext") {
+				const name = tr(entry === "@soon" ? "soon.title" : "upNext.title");
+				const on = (): boolean => entry === "@soon" ? settings.showComingSoon : settings.showUpNext;
+				categories.push({ page: "categories", group: true, rows: [{ name, visible: on, render: (row) => this.orderControls(row, entry) }] });
+			} else categories.push({ page: "categories", group: true, rows: this.categoryRows(entry, settings.categories.indexOf(entry)) });
+		}
 		categories.push({ page: "categories", group: true, rows: [{ name: tr("settings.addCategory"), render: (row) => this.addCategory(row) }] });
 
 		const statsRows: Row[] = [
@@ -316,6 +320,20 @@ export class LibrarySettingTab extends PluginSettingTab {
 								toggle.setValue(this.plugin.settings.showComingSoon).onChange(async (value) => {
 									this.plugin.settings.showComingSoon = value;
 									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+					{
+						name: tr("settings.graphLinks.name"),
+						desc: tr("settings.graphLinks.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(this.plugin.settings.graphLinks).onChange(async (value) => {
+									this.plugin.settings.graphLinks = value;
+									await this.plugin.saveSettings();
+									// every library note follows at once
+									await this.plugin.rebuildGraphLinks();
 								}),
 							);
 						},
@@ -823,6 +841,63 @@ export class LibrarySettingTab extends PluginSettingTab {
 		});
 	}
 
+	// The library shows its sections in this order: an entry dropped on another
+	// takes its place. Soon and Up next move like categories, while they are on.
+	private orderControls(row: Setting, entry: SectionEntry): void {
+		const settings = this.plugin.settings;
+		const shown = (e: SectionEntry): boolean => e === "@soon" ? settings.showComingSoon : e === "@upNext" ? settings.showUpNext : true;
+		const place = (moved: SectionEntry, target: SectionEntry): void => {
+			const all = sectionOrder(settings.categories, settings.soonAt, settings.upNextAt);
+			const from = all.indexOf(moved);
+			const to = all.indexOf(target);
+			if (from < 0 || to < 0 || from === to) return;
+			all.splice(from, 1);
+			all.splice(to, 0, moved);
+			const next = splitOrder(all);
+			settings.categories.splice(0, settings.categories.length, ...next.categories);
+			settings.soonAt = next.soonAt;
+			settings.upNextAt = next.upNextAt;
+			void this.plugin.saveSettings();
+			this.refresh();
+		};
+		// Obsidian 1.13 renders a row again into the same element: one handle,
+		// and handlers assigned rather than added.
+		row.settingEl.querySelector(".library-settings-drag")?.remove();
+		const handle = createDiv({ cls: "library-settings-drag", attr: { draggable: "true", "aria-label": tr("settings.category.drag") } });
+		setIcon(handle, "grip-vertical");
+		row.settingEl.prepend(handle);
+		handle.addEventListener("dragstart", (event) => {
+			this.dragging = entry;
+			if (!event.dataTransfer) return;
+			event.dataTransfer.effectAllowed = "move";
+			event.dataTransfer.setDragImage(row.settingEl, 16, 16);
+		});
+		handle.addEventListener("dragend", () => { this.dragging = null; });
+		const target = (on: boolean): void => { row.settingEl.toggleClass("is-drop-target", on); };
+		row.settingEl.ondragover = (event): void => {
+			if (!this.dragging || this.dragging === entry) return;
+			event.preventDefault();
+			target(true);
+		};
+		row.settingEl.ondragleave = (): void => target(false);
+		row.settingEl.ondrop = (event): void => {
+			event.preventDefault();
+			target(false);
+			const dragged = this.dragging;
+			this.dragging = null;
+			if (dragged) place(dragged, entry);
+		};
+		// Touch screens have no drag and drop: arrows there, past the entries that are off.
+		if (Platform.isMobile) {
+			const visible = sectionOrder(settings.categories, settings.soonAt, settings.upNextAt).filter(shown);
+			const at = visible.indexOf(entry);
+			const before = visible[at - 1];
+			const after = visible[at + 1];
+			if (before) row.addExtraButton((button) => button.setIcon("arrow-up").setTooltip(tr("settings.category.up")).onClick(() => place(entry, before)));
+			if (after) row.addExtraButton((button) => button.setIcon("arrow-down").setTooltip(tr("settings.category.down")).onClick(() => place(entry, after)));
+		}
+	}
+
 	private categoryControls(row: Setting, cat: ICategory, label: () => string): void {
 		const settings = this.plugin.settings;
 		const builtIn = isBuiltInCategory(cat);
@@ -849,50 +924,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				if (retype) this.refresh();
 			});
 		});
-		// The library shows its sections in this order: a category dropped on
-		// another takes its place.
-		const list = settings.categories;
-		const place = (moved: ICategory, to: number): void => {
-			const from = list.indexOf(moved);
-			if (from < 0 || to < 0 || to >= list.length || from === to) return;
-			list.splice(from, 1);
-			list.splice(to, 0, moved);
-			void this.plugin.saveSettings();
-			this.refresh();
-		};
-		// Obsidian 1.13 renders a row again into the same element: one handle,
-		// and handlers assigned rather than added.
-		row.settingEl.querySelector(".library-settings-drag")?.remove();
-		const handle = createDiv({ cls: "library-settings-drag", attr: { draggable: "true", "aria-label": tr("settings.category.drag") } });
-		setIcon(handle, "grip-vertical");
-		row.settingEl.prepend(handle);
-		handle.addEventListener("dragstart", (event) => {
-			this.dragging = cat;
-			if (!event.dataTransfer) return;
-			event.dataTransfer.effectAllowed = "move";
-			event.dataTransfer.setDragImage(row.settingEl, 16, 16);
-		});
-		handle.addEventListener("dragend", () => { this.dragging = null; });
-		const target = (on: boolean): void => { row.settingEl.toggleClass("is-drop-target", on); };
-		row.settingEl.ondragover = (event): void => {
-			if (!this.dragging || this.dragging === cat) return;
-			event.preventDefault();
-			target(true);
-		};
-		row.settingEl.ondragleave = (): void => target(false);
-		row.settingEl.ondrop = (event): void => {
-			event.preventDefault();
-			target(false);
-			const dragged = this.dragging;
-			this.dragging = null;
-			if (dragged) place(dragged, list.indexOf(cat));
-		};
-		// Touch screens have no drag and drop: arrows there.
-		if (Platform.isMobile) {
-			const at = list.indexOf(cat);
-			if (at > 0) row.addExtraButton((button) => button.setIcon("arrow-up").setTooltip(tr("settings.category.up")).onClick(() => place(cat, at - 1)));
-			if (at < list.length - 1) row.addExtraButton((button) => button.setIcon("arrow-down").setTooltip(tr("settings.category.down")).onClick(() => place(cat, at + 1)));
-		}
+		this.orderControls(row, cat);
 		if (!builtIn) row.addExtraButton((button) => {
 			const setIcon = (): void => {
 				button.setIcon(this.expanded.has(cat) ? "chevron-up" : "chevron-down");
