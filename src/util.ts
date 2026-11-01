@@ -352,6 +352,14 @@ function titleKey(value: string): string {
 		.trim()
 }
 
+// a book's medium, stored in Format as these English words; any other value a user wrote shows as is
+export const BOOK_FORMATS: [string, string][] = [['Paper', 'format.paper'], ['eBook', 'format.ebook'], ['Audiobook', 'format.audiobook']]
+
+export function formatLabel(value: string): string {
+	const known = BOOK_FORMATS.find(([v]) => v.toLowerCase() === value.toLowerCase())
+	return known ? tr(known[1]) : value
+}
+
 // Genre/Cast/Creator hold [[links]]; the UI shows names: [[T|Alias]] shows Alias.
 export function linkLabel(value: string): string {
 	const match = value.match(/^\[\[([^\]|]*)(?:\|([^\]]*))?\]\]$/)

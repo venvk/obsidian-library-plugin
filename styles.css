@@ -113,6 +113,16 @@
 	height: 14px;
 }
 
+.note-header-formats .note-header-pill {
+	margin-left: 0;
+	margin-right: 6px;
+}
+
+.note-header-formats .note-header-pill.is-on {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
 .note-header-pill.is-subscribe {
 	background: #ff0000;
 	color: #ffffff;

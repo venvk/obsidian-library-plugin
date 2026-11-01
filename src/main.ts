@@ -115,7 +115,8 @@ import {
 	coverKey,
 	imageExtension,
 	publicHttpsUrl,
-	plainCopy
+	plainCopy,
+	BOOK_FORMATS
 } from './util'
 
 // Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
@@ -4295,6 +4296,7 @@ export default class LibraryPlugin extends Plugin {
 		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
+		if (kind === 'book') this.addFormats(infoSide, file, fm)
 
 		const runtime = runtimeMinutes(fm.Runtime)
 		if (runtime !== null) addRow(tr('header.runtime'), formatRuntime(totalRuntimeMinutes(fm, runtime, kind)))
@@ -4350,6 +4352,27 @@ export default class LibraryPlugin extends Plugin {
 		this.buildTrophiesBlock(wrap, fm, file)
 		this.buildRecommendations(wrap, fm)
 		return wrap
+	}
+
+	// paper, ebook, audiobook: a book can be owned in several, each pill toggles its own
+	private addFormats(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
+		const current = toStrArray(fm.Format).map(v => v.toLowerCase())
+		const row = infoSide.createDiv({ cls: 'note-header-row note-header-formats' })
+		row.createEl('b', { text: tr('header.format') + ': ' })
+		for (const [value, key] of BOOK_FORMATS) {
+			const on = current.indexOf(value.toLowerCase()) >= 0
+			const pill = row.createEl('button', { cls: `note-header-pill${on ? ' is-on' : ''}`, text: tr(key), attr: { 'aria-pressed': on ? 'true' : 'false' } })
+			pill.addEventListener('click', (e) => {
+				e.preventDefault()
+				pill.disabled = true
+				void this.app.fileManager.processFrontMatter(file, (front: Record<string, unknown>) => {
+					const kept = toStrArray(front.Format).filter(v => v.toLowerCase() !== value.toLowerCase())
+					const next = on ? kept : kept.concat(value)
+					if (next.length === 0) delete front.Format
+					else front.Format = next.length === 1 ? next[0] : next
+				})
+			})
+		}
 	}
 
 	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and

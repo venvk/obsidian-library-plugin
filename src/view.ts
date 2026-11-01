@@ -32,7 +32,8 @@ import {
 	exactHours,
 	runtimeParts,
 	propertyValues,
-	topLabel
+	topLabel,
+	formatLabel
 } from './util'
 
 export const LIBRARY_VIEW_TYPE = 'library-view'
@@ -81,7 +82,7 @@ interface SortChoice {
 	asc: boolean
 }
 
-type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform'
+type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform' | 'format'
 
 const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'year', label: 'sort.year' },
@@ -89,6 +90,7 @@ const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'artist', label: 'header.creator' },
 	{ facet: 'country', label: 'filter.country' },
 	{ facet: 'platform', label: 'settings.stats.groupPlatforms' },
+	{ facet: 'format', label: 'header.format' },
 ]
 
 function facetValues(card: CardData, facet: Facet): string[] {
@@ -99,6 +101,7 @@ function facetValues(card: CardData, facet: Facet): string[] {
 		case 'artist': return card.kind === 'music' ? toStrArray(card.fm.Creator).map(linkLabel).filter(Boolean) : []
 		case 'country': return toStrArray(card.fm.Country)
 		case 'platform': return toStrArray(card.fm.Platforms)
+		case 'format': return toStrArray(card.fm.Format)
 	}
 }
 
@@ -887,14 +890,14 @@ export class LibraryView extends ItemView {
 		for (const group of groups) {
 			const head = menu.createEl('button', { cls: 'library-filter-group', attr: { 'aria-expanded': 'false' } })
 			head.createSpan({ cls: 'library-filter-group-name', text: tr(group.label) })
-			if (group.chosen) head.createSpan({ cls: 'library-filter-group-value', text: group.chosen })
+			if (group.chosen) head.createSpan({ cls: 'library-filter-group-value', text: group.facet === 'format' ? formatLabel(group.chosen) : group.chosen })
 			const chevron = head.createSpan({ cls: 'library-filter-group-chevron' })
 			setIcon(chevron, 'chevron-right')
 			const list = menu.createDiv({ cls: 'library-filter-values' })
 			for (const value of ['', ...group.values]) {
 				const item = list.createEl('button', {
 					cls: 'library-sort-menu-item',
-					text: value ? `${value} · ${formatNumber(group.counts.get(value) ?? 0)}` : tr('filter.all')
+					text: value ? `${group.facet === 'format' ? formatLabel(value) : value} · ${formatNumber(group.counts.get(value) ?? 0)}` : tr('filter.all')
 				})
 				if (value === group.chosen) item.addClass('active')
 				item.addEventListener('click', e => {
