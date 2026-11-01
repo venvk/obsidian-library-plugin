@@ -4305,7 +4305,8 @@ export default class LibraryPlugin extends Plugin {
 		if (ratingRT) addRow(RATING_RT_ICON, ratingRT, ' ')
 		if (ratingRawg) addRow('RAWG', ratingRawg)
 		if (ratingMc) addRow('MC', ratingMc)
-		infoSide.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		// a video is liked or disliked on YouTube, not scored
+		if (!video) infoSide.appendChild(this.ratingStars(file, Number(myRating) || 0))
 
 		if (progressPercent !== null) {
 			const progRow = createDiv()
@@ -4721,16 +4722,27 @@ export default class LibraryPlugin extends Plugin {
 		}
 		for (let i = 0; i < 5; i++) {
 			const star = stars.createSpan({ cls: 'note-header-star' })
-			for (const half of [1, 2]) {
-				const points = i * 2 + half
-				const button = star.createEl('button', { cls: `note-header-star-half is-${half === 1 ? 'left' : 'right'}`, attr: { 'aria-label': `${String(points)}/10` } })
-				button.addEventListener('mouseenter', () => show(points))
-				button.addEventListener('click', (e) => {
-					e.preventDefault()
+			for (const halfIndex of [1, 2]) {
+				const points = i * 2 + halfIndex
+				// not a <button>: themes paint buttons grey, and that box would cover the star
+				const half = star.createSpan({ cls: `note-header-star-half is-${halfIndex === 1 ? 'left' : 'right'}`, attr: { role: 'button', tabindex: '0', 'aria-label': `${String(points)}/10` } })
+				const rate = (): void => {
 					// only the exact rating clears it: a 7.5 from IMDb clicked as 8 becomes 8
 					const next = value === points ? null : points
 					this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next })
 						.catch((err: unknown) => console.error('Library: rating not saved', file.path, err))
+				}
+				half.addEventListener('mouseenter', () => show(points))
+				half.addEventListener('focus', () => show(points))
+				half.addEventListener('blur', () => show(value))
+				half.addEventListener('click', (e) => {
+					e.preventDefault()
+					rate()
+				})
+				half.addEventListener('keydown', (e) => {
+					if (e.key !== 'Enter' && e.key !== ' ') return
+					e.preventDefault()
+					rate()
 				})
 			}
 		}
