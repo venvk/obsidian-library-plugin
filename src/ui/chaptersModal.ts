@@ -3,20 +3,24 @@ import { tr } from '../i18n'
 
 export class ChaptersModal extends Modal {
 	private onSubmit: (chapters: string[] | number) => void
+	private initial: string[]
 
-	constructor(app: App, onSubmit: (chapters: string[] | number) => void) {
+	// initial: the chapters already there, one per line, to edit instead of typing anew
+	constructor(app: App, onSubmit: (chapters: string[] | number) => void, initial: string[] = []) {
 		super(app)
 		this.onSubmit = onSubmit
+		this.initial = initial
 	}
 
 	onOpen(): void {
 		const { contentEl } = this
-		this.setTitle(tr('header.addChapters'))
+		this.setTitle(tr(this.initial.length > 0 ? 'header.editChapters' : 'header.addChapters'))
 		contentEl.createEl('p', { text: tr('modal.chaptersHint') })
 		const input = contentEl.createEl('textarea', { cls: 'library-chapters-input', attr: { rows: '8' } })
+		input.value = this.initial.join('\n')
 		new Setting(contentEl).addButton((button) =>
 			button
-				.setButtonText(tr('modal.manualCreate'))
+				.setButtonText(tr(this.initial.length > 0 ? 'modal.save' : 'modal.manualCreate'))
 				.setCta()
 				.onClick(() => {
 					const lines = input.value.split('\n').map((line) => line.trim()).filter(Boolean)
