@@ -23,9 +23,9 @@
 
 ## What it does
 
-- One note per title. The cover, year, genres, creators, cast, ratings and trailer sit in its properties (frontmatter), where Bases, Dataview and other plugins can read them.
+- One note per title. The cover, year, genres, creators, cast, ratings and trailer sit in its properties (frontmatter), where Bases, Dataview and other plugins can read them. Set your own rating with five stars: each half star is one point out of 10, written to `My Rating`; click the same rating again to clear it.
 - Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs.
-- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes.
+- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order.
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
 - Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
@@ -93,7 +93,7 @@ Source ID: tt4574334
 ---
 ```
 
-`Progress: 8/42` means 8 of 42 episodes watched. Genre, creator and cast are written as links to their canvases. Refreshing a note fills in empty fields and updates ratings from the source. It never overwrites your own rating or progress.
+`Progress: 8/42` means 8 of 42 episodes watched. Genre, creator and cast are written as links to their canvases when Settings > General > Links for the graph is on; when it is off, they stay plain names in every library note. Refreshing a note fills in empty fields and updates ratings from the source. It never overwrites your own rating or progress.
 
 <details>
 <summary><b>Commands</b></summary>
