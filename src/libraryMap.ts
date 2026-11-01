@@ -134,8 +134,8 @@ export function linkCanvas(name: string, sections: { label: string; titles: Omit
 	// as many columns as keep the whole grid about as wide as a 16:9 screen
 	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
 	const cols = Math.max(1, Math.round(Math.sqrt((total * 16 * (POSTER.height + GAP)) / (9 * (POSTER.width + GAP)))))
-	// a person's card (photo, years, awards) is taller than the plain heading
-	const head = card ? 620 : 80
+	// a person's card is as tall as what it holds: a photo, a line of years, the awards
+	const head = card ? 100 + (card.includes('![') ? 330 : 0) + Math.ceil(card.length / 70) * 22 : 80
 	const nodes: CanvasNode[] = [{ id: 'lib-h', type: 'text', text: card || `# ${name}`, x: 0, y: 0, width: 600, height: head }]
 	let y = head + 60
 	sections.forEach((section, i) => {

@@ -997,13 +997,18 @@ export default class LibraryPlugin extends Plugin {
 			.map(c => ({ label: c.name, titles: (sections.get(c.name) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
 		let card = ''
 		if (person && imdbIds.length > 0) {
-			let pending = this.people.get(file.basename)
+			let pending = this.people.get(file.path)
 			if (!pending) {
 				pending = personInfo(file.basename, imdbIds).catch(() => null)
-				this.people.set(file.basename, pending)
+				this.people.set(file.path, pending)
 			}
-			const info = await pending
-			if (info) card = personCard(file.basename, info, tr('header.awards'))
+			// a slow Wikidata answer does not hold the canvas back: it is drawn now, the card added when it comes
+			const late = Symbol('late')
+			let timer = 0
+			const info = await Promise.race([pending, new Promise<typeof late>(resolve => { timer = window.setTimeout(() => resolve(late), 1500) })])
+			window.clearTimeout(timer)
+			if (info === late) void pending.then(found => { if (found && !this.unloaded) void this.fillLinkCanvas(file) })
+			else if (info) card = personCard(file.basename, info, tr('header.awards'))
 		}
 		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)
@@ -4690,8 +4695,10 @@ export default class LibraryPlugin extends Plugin {
 				button.addEventListener('mouseenter', () => show(points))
 				button.addEventListener('click', (e) => {
 					e.preventDefault()
-					const next = Math.round(value) === points ? null : points
-					void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next })
+					// only the exact rating clears it: a 7.5 from IMDb clicked as 8 becomes 8
+					const next = value === points ? null : points
+					this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next })
+						.catch((err: unknown) => console.error('Library: rating not saved', file.path, err))
 				})
 			}
 		}
