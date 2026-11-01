@@ -10,6 +10,8 @@ import {
 	getLanguage,
 	requestUrl,
 	requireApiVersion,
+	MarkdownRenderer,
+	Component,
 	type CachedMetadata,
 } from 'obsidian'
 import { API_KEY_NAMES, progressPattern, RATING_RT_ICON, type ApiKeyName, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
@@ -57,7 +59,7 @@ import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKit
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
-import { libraryMap, linkCanvas, type PersonCard } from './libraryMap'
+import { libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type PersonCard } from './libraryMap'
 import { albumAwards, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
@@ -1008,7 +1010,10 @@ export default class LibraryPlugin extends Plugin {
 			const info = await Promise.race([pending, new Promise<typeof late>(resolve => { timer = window.setTimeout(() => resolve(late), 1500) })])
 			window.clearTimeout(timer)
 			if (info === late) void pending.then(found => { if (found && !this.unloaded) void this.fillLinkCanvas(file) })
-			else if (info) card = { text: personCard(file.basename, info, tr('header.awards')), photo: info.image, photoHeight: info.imageHeight }
+			else if (info) {
+				card = { text: personCard(file.basename, info, tr('header.awards')), photo: info.image, photoHeight: info.imageHeight }
+				card.height = await this.canvasTextHeight(personCardText(card), PERSON_CARD_WIDTH) ?? undefined
+			}
 		}
 		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)
@@ -1017,6 +1022,33 @@ export default class LibraryPlugin extends Plugin {
 		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
 			await this.ensureFolder(folder)
 			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
+		}
+	}
+
+	// A canvas text node's height for its markdown, rendered off screen in the same classes the canvas
+	// uses, so the card is exactly as tall as what it holds; null when the layout gives nothing.
+	private async canvasTextHeight(markdown: string, width: number): Promise<number | null> {
+		const doc = activeDocument
+		const node = doc.body.createDiv({ cls: 'canvas-node' })
+		node.setCssStyles({ position: 'absolute', left: '-100000px', top: '0', width: `${String(width)}px`, visibility: 'hidden' })
+		const container = node.createDiv({ cls: 'canvas-node-container' })
+		const content = container.createDiv({ cls: 'canvas-node-content markdown-embed' })
+		const embed = content.createDiv({ cls: 'markdown-embed-content' })
+		const view = embed.createDiv({ cls: 'markdown-preview-view markdown-rendered' })
+		// the canvas sizes these to the node (contain: strict, height 100%): here they grow to their content
+		for (const el of [container, content, embed, view]) el.setCssStyles({ height: 'auto', contain: 'none' })
+		const component = new Component()
+		component.load()
+		try {
+			await MarkdownRenderer.render(this.app, markdown, view, '', component)
+			const height = container.getBoundingClientRect().height
+			// a pixel over, so rounding never leaves a scrollbar
+			return height > 0 ? Math.ceil(height) + 2 : null
+		} catch {
+			return null
+		} finally {
+			component.unload()
+			node.remove()
 		}
 	}
 

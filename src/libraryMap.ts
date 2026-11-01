@@ -145,14 +145,23 @@ export function textHeight(text: string, width: number): number {
 }
 
 // the person card's width and its photo's, the photo sized to the thumbnail Commons sends
-const CARD = 560
+export const PERSON_CARD_WIDTH = 560
+const CARD = PERSON_CARD_WIDTH
 const PHOTO = 260
 
 export interface PersonCard {
 	text: string
 	photo: string
 	photoHeight: number
+	// the card's height as rendered, when it could be measured
+	height?: number
 }
+
+// The card's markdown: the photo at its exact size, so the layout is known before it loads, then the text.
+export function personCardText(card: PersonCard): string {
+	return card.photo ? `![|${String(PHOTO)}x${String(card.photoHeight)}](${card.photo})\n\n${card.text}` : card.text
+}
+
 
 export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[], card?: PersonCard): Canvas {
 	// as many columns as keep the whole grid about as wide as a 16:9 screen
@@ -162,9 +171,8 @@ export function linkCanvas(name: string, sections: { label: string; titles: Omit
 	const nodes: CanvasNode[] = []
 	let head = 80
 	if (card) {
-		const text = card.photo ? `![|${String(PHOTO)}](${card.photo})\n\n${card.text}` : card.text
-		head = textHeight(card.text, CARD) + (card.photo ? card.photoHeight + 32 : 0)
-		nodes.push({ id: 'lib-h', type: 'text', text, x: 0, y: 0, width: CARD, height: head })
+		head = card.height ?? textHeight(card.text, CARD) + (card.photo ? card.photoHeight + 32 : 0)
+		nodes.push({ id: 'lib-h', type: 'text', text: personCardText(card), x: 0, y: 0, width: CARD, height: head })
 	} else {
 		nodes.push({ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: head })
 	}
