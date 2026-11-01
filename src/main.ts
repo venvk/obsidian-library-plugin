@@ -1765,20 +1765,28 @@ export default class LibraryPlugin extends Plugin {
 		try {
 			if (loud) new Notice(tr('notice.site.importing', { site: 'NFT' }))
 			const covered = new Set<string>()
+			const uris = new Map<string, string>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-				if (fm && toStr(fm.Source) === NFT_SOURCE && toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
+				if (!fm || toStr(fm.Source) !== NFT_SOURCE) continue
+				if (toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
+				if (toStr(fm['Token URI'])) uris.set(toStr(fm['Source ID']), toStr(fm['Token URI']))
 			}
-			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'), key => covered.has(key))
+			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'), key => covered.has(key), key => uris.get(key))
 			if (read.chains.length === 0 && read.held.length === 0) {
 				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
 				return
 			}
 			const notes = new Map<string, TFile>()
+			// notes made before tokens were keyed by id are found by their link, which has the token id
+			const byUrl = new Map<string, TFile>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-				if (fm && toStr(fm.Source) === NFT_SOURCE && !isTemplateFile(file.path)) notes.set(toStr(fm['Source ID']), file)
+				if (!fm || toStr(fm.Source) !== NFT_SOURCE || isTemplateFile(file.path)) continue
+				notes.set(toStr(fm['Source ID']), file)
+				if (toStr(fm.URL)) byUrl.set(toStr(fm.URL).toLowerCase(), file)
 			}
+			const kept = new Set<TFile>()
 			let category = this.settings.categories.find(c => c.typeValue === NFT_TYPE)
 			let created = 0
 			let updated = 0
@@ -1786,21 +1794,35 @@ export default class LibraryPlugin extends Plugin {
 			for (const token of read.held) {
 				if (this.unloaded) return
 				seen.add(token.key)
-				const existing = notes.get(token.key)
+				const existing = notes.get(token.key) ?? byUrl.get(token.url.toLowerCase())
+				if (existing) kept.add(existing)
 				try {
 					if (existing) {
-						// a picture that never loaded (none, or a remote one other than the explorer's) is replaced
 						const known = this.app.metadataCache.getFileCache(existing)?.frontmatter
 						const cover = toStr(known?.Cover)
-						const recover = !!token.image && (!cover || (/^https?:\/\//i.test(cover) && cover !== token.image))
-						// spam rules grow: a note they newly catch is marked, never unmarked
+						// a picture that never loaded (none, or a remote one other than the explorer's) is replaced, and so
+						// is any picture when the token's own metadata was just read: the old one can predate a reveal
+						const recover = !!token.image && cover !== token.image && (!!token.fresh || !cover || /^https?:\/\//i.test(cover))
+						const rename = !!token.fresh && token.name !== toStr(known?.Name)
+						// spam rules grow: a note they newly catch is marked; one the wallet asked for is unmarked
 						const spam = token.spam && known?.Spam === undefined
+						const unspam = !!token.trusted && known?.Spam === true
 						const checkbox = known?.Favorite === undefined
-						if (Number(known?.Count) === token.count && !recover && !spam && !checkbox) continue
+						const wallets = token.wallets ?? []
+						const facts = toStrArray(known?.Wallet).join() !== wallets.join() || toStr(known?.Standard) !== (token.standard ?? '') || toStr(known?.['Token ID']) !== (token.tokenId ?? '') || (!!token.tokenUri && toStr(known?.['Token URI']) !== token.tokenUri)
+						const rekey = toStr(known?.['Source ID']) !== token.key
+						if (Number(known?.Count) === token.count && !recover && !rename && !spam && !unspam && !checkbox && !facts && !rekey) continue
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
 							current.Count = token.count
+							if (rekey) current['Source ID'] = token.key
 							if (recover) current.Cover = token.image
+							if (rename) current.Name = token.name
 							if (spam) current.Spam = true
+							if (unspam) delete current.Spam
+							if (wallets.length > 0) current.Wallet = wallets
+							if (token.standard) current.Standard = token.standard
+							if (token.tokenId) current['Token ID'] = token.tokenId
+							if (token.tokenUri) current['Token URI'] = token.tokenUri
 							if (checkbox) {
 								if (isEmptyValue(current['My Rating'])) delete current['My Rating']
 								current.Favorite = false
@@ -1817,7 +1839,13 @@ export default class LibraryPlugin extends Plugin {
 						imdbId: null,
 					}
 					// Spam and OAT are set once; you can change them, and the next import leaves them
-					const file = await this.newNote(category, NFT_SOURCE, token.key, token.name, meta, { Platforms: [token.chain], Count: token.count, ...(token.spam ? { Spam: true } : {}), ...(token.oat ? { OAT: true } : {}) })
+					const facts: Record<string, unknown> = {
+						...(token.wallets?.length ? { Wallet: token.wallets } : {}),
+						...(token.standard ? { Standard: token.standard } : {}),
+						...(token.tokenId ? { 'Token ID': token.tokenId } : {}),
+						...(token.tokenUri ? { 'Token URI': token.tokenUri } : {}),
+					}
+					const file = await this.newNote(category, NFT_SOURCE, token.key, token.name, meta, { Platforms: [token.chain], Count: token.count, ...facts, ...(token.spam ? { Spam: true } : {}), ...(token.oat ? { OAT: true } : {}) })
 					// a collectible is held, not watched: no progress, no Complete
 					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 						delete current.Progress
@@ -1838,7 +1866,7 @@ export default class LibraryPlugin extends Plugin {
 			seen.forEach(key => live.add(key.split(':')[0] ?? ''))
 			for (const [key, file] of notes) {
 				const chain = key.split(':')[0] ?? ''
-				if (seen.has(key) || read.chains.indexOf(chain) < 0 || !live.has(chain)) continue
+				if (seen.has(key) || kept.has(file) || read.chains.indexOf(chain) < 0 || !live.has(chain)) continue
 				if (this.app.metadataCache.getFileCache(file)?.frontmatter?.Favorite === true) continue
 				await this.app.fileManager.trashFile(file)
 				updated++
@@ -4406,6 +4434,14 @@ export default class LibraryPlugin extends Plugin {
 		if (nft) {
 			const chains = toStrArray(fm.Platforms)
 			if (chains.length > 0) addRow(tr('header.chain'), chains.join(', '))
+			const standard = toStr(fm.Standard)
+			if (standard) addRow(tr('header.standard'), standard)
+			// a long id or address is shortened to its ends; the whole value is in the properties
+			const short = (value: string): string => value.length > 18 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value
+			const tokenId = toStr(fm['Token ID'])
+			if (tokenId) addRow(tr('header.tokenId'), short(tokenId))
+			const wallets = toStrArray(fm.Wallet)
+			if (wallets.length > 0) addRow(tr('header.wallet'), wallets.map(short).join(', '))
 			if (Number(fm.Count) > 1) addRow(tr('header.count'), String(Number(fm.Count)))
 		}
 		// the channel: its canvas by name, the channel itself on YouTube, and the subscription
