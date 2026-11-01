@@ -58,7 +58,7 @@ import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
 import { libraryMap, linkCanvas } from './libraryMap'
-import { albumAwards, type Award } from './music'
+import { albumAwards, titleAwards, type Award } from './music'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
 import { refreshTraktTokens, traktChanges, traktData, traktExpired, traktHistory, traktRemove, traktSend, type TraktEcho } from './trakt'
@@ -4235,7 +4235,7 @@ export default class LibraryPlugin extends Plugin {
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
 		addNames(tr('header.genre'), toStrArray(fm.Genre))
-		if (kind === 'music') this.addAwards(infoSide, fm, name)
+		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 
@@ -4294,21 +4294,27 @@ export default class LibraryPlugin extends Plugin {
 		return wrap
 	}
 
-	// an album's awards from Wikidata, a row that appears once they arrive
-	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string): void {
+	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and
+	// artist, anything else by the IMDb, Wikidata or Steam id it was made from
+	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string, kind: string | undefined): void {
 		const artist = linkLabel(toStrArray(fm.Creator)[0] ?? '')
-		if (!artist) return
-		const key = `${name}\u0000${artist}`
+		const sourceId = toStr(fm['Source ID'])
+		const key = kind === 'music' ? `${name}\u0000${artist}` : sourceId
+		if (!key || (kind === 'music' && !artist)) return
 		let pending = this.albumAwards.get(key)
 		if (!pending) {
-			pending = albumAwards(name, artist).catch(() => [] as Award[])
+			pending = (kind === 'music' ? albumAwards(name, artist) : titleAwards(sourceId)).catch(() => [] as Award[])
 			this.albumAwards.set(key, pending)
 		}
 		const row = infoSide.createDiv({ cls: 'note-header-row' })
 		void pending.then(awards => {
 			if (awards.length === 0 || this.unloaded) { row.remove(); return }
+			const all = awards.map(award => award.year ? `${award.name} (${String(award.year)})` : award.name)
+			// a film can have dozens: the first few, the rest on hover
+			const shown = all.slice(0, 6).join(', ') + (all.length > 6 ? ` +${String(all.length - 6)}` : '')
 			row.createEl('b', { text: tr('header.awards') + ': ' })
-			row.appendText(awards.map(award => award.year ? `${award.name} (${String(award.year)})` : award.name).join(', '))
+			row.appendText(shown)
+			if (all.length > 6) row.setAttr('title', all.join('\n'))
 		})
 	}
 
