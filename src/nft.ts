@@ -312,8 +312,8 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 }
 
 // BNB and Taiko: the transfers Etherscan lists, replayed into what the wallet holds now.
-const ETHERSCAN_CHAINS: Record<string, { id: number; rpc: string; site: string }> = {
-	BNB: { id: 56, rpc: 'https://bsc-dataseed.binance.org', site: 'bscscan.com' },
+const ETHERSCAN_CHAINS: Record<string, { id: number; rpc: string; site: string; nftscan?: string }> = {
+	BNB: { id: 56, rpc: 'https://bsc-dataseed.binance.org', site: 'bscscan.com', nftscan: 'bnb.nftscan.com' },
 	Taiko: { id: 167000, rpc: 'https://rpc.mainnet.taiko.xyz', site: 'taikoscan.io' },
 }
 
@@ -485,6 +485,18 @@ export function pageHeld(chain: string, site: string, rows: PageTransfer[]): Arr
 	return out
 }
 
+// Runs on an NFTScan token page: the token's picture once the page has drawn it.
+const NFTSCAN_PAGE = "(async () => {\n\tconst sleep = (ms) => new Promise((r) => setTimeout(r, ms))\n\tconst pick = () => [...document.querySelectorAll('img')].map((i) => i.currentSrc || i.src).find((s) => /^https:/.test(s) && s !== location.href && !s.startsWith(location.origin + '/0x') && !/\\/static\\/|loading|logo|avatar|icon|\\.svg/i.test(s))\n\tfor (let i = 0; i < 30; i++) { const src = pick(); if (src) return src; await sleep(500) }\n\treturn ''\n})()"
+
+// NFTScan keeps copies of pictures whose own servers are gone (Galxe, SecondLive); its page is read like a visitor's.
+async function nftscanImage(host: string, contract: string, id: string): Promise<string> {
+	try {
+		return publicHttpsUrl(await readPage(`https://${host}/${contract}/${id}`, NFTSCAN_PAGE, 30000)) ?? ''
+	} catch {
+		return ''
+	}
+}
+
 // BscScan and TaikoScan show a cached preview on the token's page.
 async function explorerImage(page: string): Promise<string> {
 	try {
@@ -509,17 +521,21 @@ async function pageScanHeld(chain: string, address: string, hasCover: (key: stri
 	}
 	if (!Array.isArray(rows)) return { held: [], chains: [] }
 	const held = pageHeld(chain, info.site, rows)
-	// a collection whose metadata server is gone (Galxe, SecondLive) is dropped at its first miss, so the
-	// budget reaches every collection; the next import asks again, in case the server is back
+	// a collection whose metadata server is gone (Galxe, SecondLive) skips tokenURI after its first miss, so the
+	// budget reaches every collection; NFTScan, which kept copies of their pictures, is asked per token
 	let budget = 60
 	const misses = new Map<string, number>()
 	for (const token of held.sort((a, b) => Number(a.spam || a.oat) - Number(b.spam || b.oat))) {
 		if (budget <= 0) break
-		if (token.spam || hasCover(token.key) || misses.has(token.contract)) continue
+		if (token.spam || hasCover(token.key)) continue
 		budget--
 		// the explorer keeps its own copy of some pictures, even when the token's server is gone
-		token.image = await explorerImage(token.url) || await tokenImage(info.rpc, token.contract, token.id)
-		if (!token.image) misses.set(token.contract, (misses.get(token.contract) ?? 0) + 1)
+		token.image = await explorerImage(token.url)
+		if (!token.image && !misses.has(token.contract)) {
+			token.image = await tokenImage(info.rpc, token.contract, token.id)
+			if (!token.image) misses.set(token.contract, 1)
+		}
+		if (!token.image && info.nftscan) token.image = await nftscanImage(info.nftscan, token.contract, token.id)
 	}
 	return { held, chains: [chain] }
 }

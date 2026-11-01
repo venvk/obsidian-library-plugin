@@ -133,6 +133,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
 | `ethereum-rpc.publicnode.com`, `mainnet.optimism.io`, `mainnet.base.org`, `arb1.arbitrum.io`, `polygon-bor-rpc.publicnode.com`, `rpc.gnosischain.com`, `rpc.mainnet.chain.robinhood.com` | NFT pictures the explorer lacks | Token contract and id |
 | `bscscan.com`, `taikoscan.io` token pages, `cdn*.assetquay.com` | Explorer's cached NFT picture | Token contract and id |
+| `bnb.nftscan.com` token pages and the image hosts they show (`i.seadn.io`, `cdn-2.galxe.com`) | BNB NFT pictures whose own servers are gone | Token contract and id |
 | `ipfs.filebase.io`, `arweave.net`, and the hosts a token's metadata names | NFT images and metadata | Token id or file path |
 | `tonviewer.com`, `solscan.io`, `bscscan.com`, `taikoscan.io` | Links in NFT notes, opened only when you click them | Nothing until you click |
 | `api.trakt.tv`, `auth.trakt.tv` | Trakt connector | Sign-in code; history, ratings and watchlist are read, scores, watched and unwatched episodes, watchlist titles and removals of deleted notes are sent |
