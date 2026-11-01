@@ -4391,6 +4391,10 @@ export default class LibraryPlugin extends Plugin {
 			const img = createEl('img')
 			img.src = headerCover
 			imgSide.appendChild(img)
+			// a token's picture can be a video at an address with no extension
+			if (toStr(fm.Source) === NFT_SOURCE) img.addEventListener('error', () => {
+				img.replaceWith(createEl('video', { attr: { src: headerCover, muted: '', loop: '', autoplay: '', playsinline: '' } }))
+			}, { once: true })
 		}
 		header.appendChild(imgSide)
 

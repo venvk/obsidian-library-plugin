@@ -613,7 +613,12 @@ export class LibraryRenderer {
 		if (cardCover && /\.(mp4|webm|mov)(\?|$)/i.test(cardCover)) {
 			imgDiv.createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } })
 		} else if (cardCover) {
-			imgDiv.createEl('img', { attr: { src: cardCover, alt: card.name, loading: 'lazy', decoding: 'async' } })
+			const img = imgDiv.createEl('img', { attr: { src: cardCover, alt: card.name, loading: 'lazy', decoding: 'async' } })
+			// a token's "image" can be a video at an address with no extension: tried as one when it won't load
+			img.addEventListener('error', () => {
+				if (!isCollectible(fm)) return
+				img.replaceWith(createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } }))
+			}, { once: true })
 		} else {
 			const type = toStr(fm.Type).toLowerCase()
 			const emoji = type === 'anime' ? '🎌'

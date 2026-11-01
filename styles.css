@@ -438,7 +438,8 @@ sort trigger, the chosen one in the accent colour. */
 	max-width: 40%;
 }
 
-.note-header-wrap .note-header-cover img {
+.note-header-wrap .note-header-cover img,
+.note-header-wrap .note-header-cover video {
 	width: 100%;
 	border-radius: 10px;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
