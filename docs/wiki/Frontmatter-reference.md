@@ -115,10 +115,10 @@ Settings > Library > General > Skip properties keeps any of these out of notes; 
 
 | Property | Content | Written by |
 | --- | --- | --- |
-| `Platforms` | Where you have the title: `PS5`, `PS4`, `Steam`, `Switch`, `Netflix`, `YouTube` | PlayStation, Steam, Nintendo, Netflix, YouTube |
-| `Playtime PS5`, `Playtime Steam`, `Playtime Switch`, … | Hours played on that platform | PlayStation, Steam, Nintendo |
-| `Playtime` | Hours played on all platforms together | PlayStation, Steam, Nintendo |
-| `Last Played` | The day you last played, as `dd.mm.yyyy` | PlayStation, Steam |
+| `Platforms` | Where you have the title: `PS5`, `PS4`, `Steam`, `Switch`, `Epic Games`, `EA App`, `Netflix`, `YouTube` | PlayStation, Steam, Nintendo, Epic Games, EA App, Netflix, YouTube |
+| `Playtime PS5`, `Playtime Steam`, `Playtime Switch`, `Playtime EA App`, … | Hours played on that platform | PlayStation, Steam, Nintendo, EA App |
+| `Playtime` | Hours played on all platforms together | PlayStation, Steam, Nintendo, EA App |
+| `Last Played` | The day you last played, as `dd.mm.yyyy` | PlayStation, Steam, EA App |
 | `Platinum`, `Gold`, `Silver`, `Bronze` | Trophies you earned, by grade | PlayStation |
 | `Achievements` | Achievements unlocked out of all, such as `30/42` | Steam |
 | `PSN ID` | The game's PlayStation id | PlayStation |
@@ -140,7 +140,7 @@ These can't be skipped. See [[Connected accounts|Connected-accounts]] for what e
 | --- | --- | --- |
 | Movies, series | `omdb` | The IMDb id, such as `tt4574334` |
 | Books | `books` | An Open Library work, such as `/works/OL45883W`, or a Google Books volume id |
-| Games | `games` | `steam:` and the Steam app id, a Wikidata item such as `Q20060917`, a RAWG id, `psn:` and the PlayStation id, or `nintendo:` and the Nintendo id |
+| Games | `games` | `steam:` and the Steam app id, a Wikidata item such as `Q20060917`, a RAWG id, `psn:` and the PlayStation id, `nintendo:` and the Nintendo id, `epic:` and the Epic item id, or `ea:` and the EA offer id |
 | Comics | `comics` | A Wikidata item, `manga:` and an AniList id, or a Comic Vine id |
 | Anime | `anilist` | The AniList id, or `mal:` and the MyAnimeList id |
 | Music | `deezer` | The Deezer album id |

@@ -1,4 +1,4 @@
-import { App, normalizePath } from 'obsidian'
+import { App, normalizePath, TFile } from 'obsidian'
 import { progressPattern, dmyDatePattern, type ICategory, type IStatsTop, type TitleLanguage } from './constants'
 import { formatNumber, tr } from './i18n'
 import { categoryLabel, NFT_CATEGORY } from './categories'
@@ -345,18 +345,75 @@ export function toStrArray(val: unknown): string[] {
 	return []
 }
 
-// Loose match: source titles differ ("Dune (2021)" vs "Дюна").
+const ROMAN_NUMERALS: Record<string, string> = {
+	i: '1', ii: '2', iii: '3', iv: '4', v: '5',
+	vi: '6', vii: '7', viii: '8', ix: '9', x: '10'
+}
+
+// Loose match: source titles differ ("Dune (2021)" vs "Дюна", "Grand Theft Auto V" vs "Grand Theft Auto V Enhanced").
 export function sameTitle(a: string, b: string): boolean {
 	const left = titleKey(a)
 	return left !== '' && left === titleKey(b)
 }
 
 function titleKey(value: string): string {
-	return value
+	let s = value
 		.toLowerCase()
 		.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
+		.replace(/\s+(?:на|для|for|on)\s+(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, ' ')
+		.replace(/\s*[-–—:]?\s*(?:cloud\s+version|pc\s+edition|ps[45]\s*&\s*ps[45])\b.*$/i, ' ')
+		.replace(/^(?:sid meier'?s|tom clancy'?s|ea sports)\s+/i, '')
+		.replace(/\s*[-–—:]?\s*(?:standard|digital deluxe|deluxe|enhanced|definitive|goty|game of the year|complete|director'?s cut|anniversary|special|collector'?s|gold|premium|ultimate|remastered|remaster|legendary|legacy|redux|обновленная версия|обновлённая версия|полное издание|золотое издание)\s*(?:edition|cut|bundle|version)?\s*$/i, ' ')
+		.replace(/\s+(?:remastered|goty|redux)\s*$/i, ' ')
 		.replace(/[^\p{L}\p{N}]+/gu, ' ')
 		.trim()
+
+	if (s) {
+		s = s.split(/\s+/).map((word, idx) => (word === 'i' && idx === 0 ? 'i' : (ROMAN_NUMERALS[word] || word))).join(' ')
+	}
+	return s
+}
+
+// Drops trademark marks and platform tags from note names.
+export function cleanGameTitle(title: string): string {
+	return title
+		.replace(/[™®©]/g, '')
+		.replace(/\s*\((?:PlayStation\s*\d?|PS[45](?:\s*[&/]\s*PS[45])?|Nintendo\s*Switch|Switch|PC|Xbox(?:\s*One|\s*Series\s*[xs]?)?)\)/i, '')
+		.replace(/\s+(?:на|для|for|on)\s+(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, '')
+		.replace(/\s+/g, ' ')
+		.trim()
+}
+
+export function findGameNote(
+	notes: TFile[],
+	app: App,
+	query: {
+		name: string
+		url?: string
+		psnId?: string
+		nintendoId?: string
+		sourceId?: string
+	}
+): TFile | undefined {
+	return notes.find((file) => {
+		const fm = app.metadataCache.getFileCache(file)?.frontmatter
+		if (!fm) return false
+		if (query.psnId && toStr(fm['PSN ID']) === query.psnId) return true
+		if (query.nintendoId && toStr(fm['Nintendo ID']) === query.nintendoId) return true
+		if (query.sourceId && toStr(fm['Source ID']) === query.sourceId) return true
+		if (query.url && toStr(fm.URL) && toStr(fm.URL) === query.url) return true
+		const noteName = toStr(fm.Name)
+		if (noteName && sameTitle(noteName, query.name)) return true
+		return sameTitle(file.basename, query.name)
+	})
+}
+
+// a book's medium, stored in Format as these English words; any other value a user wrote shows as is
+export const BOOK_FORMATS: [string, string][] = [['Paper', 'format.paper'], ['eBook', 'format.ebook'], ['Audiobook', 'format.audiobook']]
+
+export function formatLabel(value: string): string {
+	const known = BOOK_FORMATS.find(([v]) => v.toLowerCase() === value.toLowerCase())
+	return known ? tr(known[1]) : value
 }
 
 // Genre/Cast/Creator hold [[links]]; the UI shows names: [[T|Alias]] shows Alias.

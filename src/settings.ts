@@ -493,6 +493,8 @@ export class LibrarySettingTab extends PluginSettingTab {
 					{ name: "PlayStation", desc: tr("settings.psn.desc"), render: (row) => this.psnAccount(row) },
 					{ name: "Steam", desc: tr("settings.steam.desc"), render: (row) => this.steamAccount(row) },
 					{ name: "Nintendo Switch", desc: tr("settings.nintendo.desc"), render: (row) => this.nintendoAccount(row) },
+					{ name: "Epic Games", desc: tr("settings.epic.desc"), render: (row) => this.epicAccount(row) },
+					{ name: "EA App", desc: tr("settings.ea.desc"), render: (row) => this.eaAccount(row) },
 				],
 			},
 			...categories,
@@ -805,6 +807,52 @@ export class LibrarySettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				} else {
 					await this.plugin.connectSteam();
+				}
+				this.refresh();
+			});
+		});
+	}
+
+	private epicAccount(row: Setting): void {
+		const connected = this.plugin.settings.epicTokens !== null;
+		row.settingEl.addClass("library-platform-row");
+		const icon = createSpan({ cls: "library-platform-row-icon is-epic" });
+		icon.appendChild(platformMark("epic"));
+		row.nameEl.prepend(icon);
+		const status = row.nameEl.createSpan({ cls: `library-platform-status${connected ? " is-connected" : ""}` });
+		status.setText(tr(connected ? "settings.connected" : "settings.notConnected"));
+		row.addButton((button) => {
+			button.setButtonText(tr(connected ? "settings.disconnect" : "settings.connect"));
+			if (!connected) button.setCta();
+			button.onClick(async () => {
+				if (connected) {
+					this.plugin.settings.epicTokens = null;
+					await this.plugin.saveSettings();
+				} else {
+					await this.plugin.connectEpic();
+				}
+				this.refresh();
+			});
+		});
+	}
+
+	private eaAccount(row: Setting): void {
+		const connected = this.plugin.settings.eaTokens !== null;
+		row.settingEl.addClass("library-platform-row");
+		const icon = createSpan({ cls: "library-platform-row-icon is-ea" });
+		icon.appendChild(platformMark("ea"));
+		row.nameEl.prepend(icon);
+		const status = row.nameEl.createSpan({ cls: `library-platform-status${connected ? " is-connected" : ""}` });
+		status.setText(tr(connected ? "settings.connected" : "settings.notConnected"));
+		row.addButton((button) => {
+			button.setButtonText(tr(connected ? "settings.disconnect" : "settings.connect"));
+			if (!connected) button.setCta();
+			button.onClick(async () => {
+				if (connected) {
+					this.plugin.settings.eaTokens = null;
+					await this.plugin.saveSettings();
+				} else {
+					await this.plugin.connectEa();
 				}
 				this.refresh();
 			});

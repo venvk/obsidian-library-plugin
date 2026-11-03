@@ -24,8 +24,8 @@
 ## What it does
 
 - One note per title. The cover, year, genres, creators, cast, ratings and trailer sit in its properties (frontmatter), where Bases, Dataview and other plugins can read them. Set your own rating with five stars: each half star is one point out of 10, written to `My Rating`; click the same rating again to clear it.
-- Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs.
-- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order.
+- Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs. A book's chapter list can be edited with the pencil, and each chapter's notes button opens a section with its name in the note body for quotes and thoughts.
+- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order. A book note marks its format (paper, ebook, audiobook) with buttons under the title, saved to `Format`, and the Books filter can show one format.
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
 - Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
@@ -56,8 +56,10 @@ Connect an account in the plugin settings. Your lists arrive as notes, and anime
 - <img src="assets/connectors/playstation.svg" width="18" height="18" alt=""> **PlayStation**: played games, playtime and trophies
 - <img src="assets/connectors/steam.svg" width="18" height="18" alt=""> **Steam**: library, playtime and achievements
 - <img src="assets/connectors/nintendo.svg" width="18" height="18" alt=""> **Nintendo Switch**: played games and playtime
+- <img src="assets/connectors/epic.svg" width="18" height="18" alt=""> **Epic Games**: library and store links
+- <img src="assets/connectors/ea.svg" width="18" height="18" alt=""> **EA App**: library and playtime from your sessions
 
-Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam and Nintendo work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
+Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games and EA App work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
 
 ## Sources
 
@@ -102,7 +104,7 @@ Source ID: tt4574334
 - Refresh metadata for current note · Refresh metadata of all notes
 - Rebuild graph links · Find & remove duplicates · Share current note
 - Import from AniList, MyAnimeList or Kitsu · Push and pull progress for each
-- Import Steam library · Import PlayStation games and trophies · Import Nintendo games
+- Import Steam library · Import PlayStation games and trophies · Import Nintendo games · Import Epic Games library · Import EA App library
 - Import from Trakt · Build library map
 </details>
 
@@ -144,6 +146,8 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `kitsu.io`, `kitsu.app` | Anime search, sign-in, import, sync | Search text; token, progress, status, score |
 | `ca.account.sony.com`, `my.account.sony.com`, `m.np.playstation.com`, `web.np.playstation.com`, `image.api.playstation.com`, `psnobj.prod.dl.playstation.net` | PlayStation sign-in, games, trophies, covers | Token |
 | `accounts.nintendo.com`, `api.accounts.nintendo.com`, `api-lp1.znc.srv.nintendo.net`, `atum-img-lp1.cdn.nintendo.net` | Nintendo sign-in, play activity, covers | Session token |
+| `www.epicgames.com`, `account-public-service-prod03.ol.epicgames.com`, `library-service.live.use1a.on.epicgames.com`, `catalog-public-service-prod06.ol.epicgames.com`, `store.epicgames.com` | Epic Games sign-in and library import | Token |
+| `accounts.ea.com`, `www.ea.com`, `gateway.ea.com`, `service-aggregation-layer.juno.ea.com` | EA App sign-in and library import | Token |
 | `nxapi-auth.fancy.org.uk`, `nxapi-znca-api.fancy.org.uk` | Signing service for Nintendo requests | Nintendo Account id token, account id, the app's requests and answers |
 | `comicvine.gamespot.com` | Comic search, with a key | Title, key |
 | `www.youtube.com`, `www.youtube-nocookie.com`, `i.ytimg.com`, `player.vimeo.com`, `www.dailymotion.com` | Trailers | Video id |

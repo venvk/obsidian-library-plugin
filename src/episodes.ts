@@ -231,6 +231,27 @@ export function setChapters(fm: Record<string, unknown>, chapters: string[] | nu
 	writeBack(fm, states, 'book')
 }
 
+// The table of contents edited by hand: chapter i keeps its tick, rating and other keys, only its title changes.
+export function editChapters(fm: Record<string, unknown>, titles: string[]): void {
+	if (titles.length === 0) return
+	const before = seasonsOf(fm, 'book')[0]?.episodes ?? []
+	const old = Array.isArray(fm.Chapters) ? (fm.Chapters as unknown[]) : []
+	fm.Chapters = titles.map((title, i) => {
+		const entry: Record<string, unknown> = { ...(record(old[i]) ?? {}) }
+		if (title.trim()) entry.title = title.trim()
+		else delete entry.title
+		return entry
+	})
+	const states = seasonsOf(fm, 'book')
+	states.forEach((state) => state.episodes.forEach((episode, i) => {
+		const was = before[i]
+		episode.watched = was ? was.watched : false
+		episode.rating = was ? was.rating : null
+	}))
+	states.forEach(recompute)
+	writeBack(fm, states, 'book')
+}
+
 export function hasChapters(fm: Record<string, unknown>): boolean {
 	return Array.isArray(fm.Chapters) && (fm.Chapters as unknown[]).length > 0
 }
@@ -266,4 +287,81 @@ export function mergeSeasons(existing: unknown, fetched: unknown): unknown[] {
 		out.push(merged)
 	}
 	return out
+}
+
+// A chapter's own notes live in the note body under a heading with its label ("3. Title"), up to the
+// next heading of the same or a higher level. Pure text in, text out: no vault access here.
+function headingOf(line: string): { level: number; text: string } | null {
+	const match = /^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/.exec(line)
+	return match ? { level: (match[1] ?? '').length, text: match[2] ?? '' } : null
+}
+
+function bodyStart(lines: string[]): number {
+	if ((lines[0] ?? '').trim() !== '---') return 0
+	let end = -1
+	for (let i = 1; i < lines.length; i++) {
+		if ((lines[i] ?? '').trim() === '---') {
+			end = i
+			break
+		}
+	}
+	return end < 0 ? 0 : end + 1
+}
+
+function chapterSection(lines: string[], label: string): { heading: number; end: number } | null {
+	const start = bodyStart(lines)
+	for (let i = start; i < lines.length; i++) {
+		const heading = headingOf(lines[i] ?? '')
+		if (!heading || heading.text !== label) continue
+		let end = i + 1
+		while (end < lines.length) {
+			const next = headingOf(lines[end] ?? '')
+			if (next && next.level <= heading.level) break
+			end++
+		}
+		return { heading: i, end }
+	}
+	return null
+}
+
+export function chapterNotes(data: string, label: string): string {
+	const lines = data.split('\n')
+	const section = chapterSection(lines, label)
+	return section ? lines.slice(section.heading + 1, section.end).join('\n').trim() : ''
+}
+
+// Replaces a chapter's notes, or adds its section before the next chapter that has one, so the
+// sections keep chapter order; empty notes on a chapter without a section change nothing.
+export function setChapterNotes(data: string, labels: string[], index: number, notes: string): string {
+	const label = labels[index]
+	if (!label) return data
+	const lines = data.split('\n')
+	const body = notes.trim()
+	const section = chapterSection(lines, label)
+	if (section) {
+		if (!body) {
+			lines.splice(section.heading, section.end - section.heading)
+			while (lines.length > bodyStart(lines) && (lines[lines.length - 1] ?? '').trim() === '') lines.pop()
+			if (lines.length > bodyStart(lines)) lines.push('')
+			return lines.join('\n')
+		}
+		lines.splice(section.heading + 1, section.end - section.heading - 1, '', body, '')
+		return lines.join('\n')
+	}
+	if (!body) return data
+	let at = lines.length
+	for (let i = index + 1; i < labels.length; i++) {
+		const later = chapterSection(lines, labels[i] ?? '')
+		if (later) { at = later.heading; break }
+	}
+	const block = [`## ${label}`, '', body, '']
+	if (at === lines.length) {
+		while (at > bodyStart(lines) && (lines[at - 1] ?? '').trim() === '') at--
+		lines.length = at
+		if (at > bodyStart(lines)) block.unshift('')
+		return lines.concat(block).join('\n')
+	}
+	if (at > bodyStart(lines) && (lines[at - 1] ?? '').trim() !== '') block.unshift('')
+	lines.splice(at, 0, ...block)
+	return lines.join('\n')
 }

@@ -33,7 +33,9 @@ import {
 	exactHours,
 	runtimeParts,
 	propertyValues,
-	topLabel
+	topLabel,
+	formatLabel,
+	BOOK_FORMATS
 } from './util'
 
 export const LIBRARY_VIEW_TYPE = 'library-view'
@@ -82,7 +84,7 @@ interface SortChoice {
 	asc: boolean
 }
 
-type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform' | 'kind'
+type Facet = 'year' | 'genre' | 'artist' | 'country' | 'platform' | 'kind' | 'format'
 
 const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'year', label: 'sort.year' },
@@ -91,6 +93,7 @@ const FACETS: { facet: Facet, label: string }[] = [
 	{ facet: 'country', label: 'filter.country' },
 	{ facet: 'platform', label: 'settings.stats.groupPlatforms' },
 	{ facet: 'kind', label: 'filter.kind' },
+	{ facet: 'format', label: 'header.format' },
 ]
 
 function facetValues(card: CardData, facet: Facet): string[] {
@@ -103,6 +106,13 @@ function facetValues(card: CardData, facet: Facet): string[] {
 		case 'platform': return toStrArray(card.fm.Platforms)
 		// a token is a collectible or an achievement (OAT)
 		case 'kind': return isCollectible(card.fm) ? [card.fm.OAT === true ? 'OAT' : 'NFT'] : []
+		case 'format': {
+			if (card.kind !== 'book') return []
+			return toStrArray(card.fm.Format).map((val) => {
+				const match = BOOK_FORMATS.find(([v]) => v.toLowerCase() === val.toLowerCase())
+				return match ? match[0] : val
+			})
+		}
 	}
 }
 
@@ -877,7 +887,7 @@ export class LibraryView extends ItemView {
 		toolbar?.insertBefore(row, toolbar.querySelector('.library-toolbar-spacer'))
 	}
 
-	// Only values some card has; a filter shows with 2+ values or a chosen one.
+	// Only values some card has; a filter shows with 2+ values (a format with 1) or a chosen one.
 	private sectionFilters(toolbar: HTMLElement, filters: NonNullable<SectionSpec['filters']>): void {
 		// an NFT's platform is its blockchain
 		const nft = filters.all.length > 0 && filters.all.every(card => card.fm.Source === 'nft')
@@ -889,7 +899,8 @@ export class LibraryView extends ItemView {
 			}
 			const values = [...counts.keys()].sort((a, b) => facet === 'year' ? Number(b) - Number(a) : a.localeCompare(b))
 			return { facet, label, counts, values, chosen: filters.chosen[facet] ?? '' }
-		}).filter(group => group.counts.size >= 2 || group.chosen)
+		// a book's format shows from its first value: the other formats are simply not marked yet
+		}).filter(group => group.counts.size >= (group.facet === 'format' ? 1 : 2) || group.chosen)
 		if (groups.length === 0) return
 		const active = groups.filter(group => group.chosen).length
 		const dropdown = toolbar.createDiv({ cls: 'library-sort-dropdown library-filter-dropdown' })
@@ -912,14 +923,14 @@ export class LibraryView extends ItemView {
 		for (const group of groups) {
 			const head = menu.createEl('button', { cls: 'library-filter-group', attr: { 'aria-expanded': 'false' } })
 			head.createSpan({ cls: 'library-filter-group-name', text: tr(group.label) })
-			if (group.chosen) head.createSpan({ cls: 'library-filter-group-value', text: group.chosen })
+			if (group.chosen) head.createSpan({ cls: 'library-filter-group-value', text: group.facet === 'format' ? formatLabel(group.chosen) : group.chosen })
 			const chevron = head.createSpan({ cls: 'library-filter-group-chevron' })
 			setIcon(chevron, 'chevron-right')
 			const list = menu.createDiv({ cls: 'library-filter-values' })
 			for (const value of ['', ...group.values]) {
 				const item = list.createEl('button', {
 					cls: 'library-sort-menu-item',
-					text: value ? `${value} · ${formatNumber(group.counts.get(value) ?? 0)}` : tr('filter.all')
+					text: value ? `${group.facet === 'format' ? formatLabel(value) : value} · ${formatNumber(group.counts.get(value) ?? 0)}` : tr('filter.all')
 				})
 				if (value === group.chosen) item.addClass('active')
 				item.addEventListener('click', e => {

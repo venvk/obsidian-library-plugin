@@ -72,11 +72,14 @@ import { PsnLoginModal, psnSilentCode } from './ui/psnLoginModal'
 import { KitsuLoginModal } from './ui/kitsuLoginModal'
 import { AuthModal } from './ui/authModal'
 import { SIGNER_PROJECT, codeFromRedirect as nintendoCode, exchangeNintendoCode, nintendoAuth, nintendoPlayLog, type NintendoPlayedGame } from './nintendo'
+import { codeFromEpicRedirect, EPIC_AUTH_PROBE, epicAuthUrl, epicExpired, exchangeEpicCode, fetchEpicLibrary, refreshEpicTokens } from './epic'
+import { eaAuthUrl, EA_AUTH_PROBE, eaExpired, eaSilentToken, exchangeEaToken, fetchEaLibrary, tokenFromEaRedirect } from './ea'
 import { renderTrophies, TROPHY_GRADES, trophyIcon } from './ui/trophyIcons'
 import { renderPlatformLabels } from './ui/platformIcons'
 import { createEmbedPlayer, toEmbed } from './trailer'
-import { applyEpisodeChange, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, type EpisodeChange, type TrackKind } from './episodes'
+import { applyEpisodeChange, chapterNotes, editChapters, setChapterNotes, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, type EpisodeChange, type TrackKind } from './episodes'
 import { ChaptersModal } from './ui/chaptersModal'
+import { ChapterNotesModal } from './ui/chapterNotesModal'
 import { TrailerModal } from './ui/trailerModal'
 import { Lightbox } from './ui/lightbox'
 import {
@@ -101,6 +104,8 @@ import {
 	coverSrc,
 	coverValue,
 	sameTitle,
+	cleanGameTitle,
+	findGameNote,
 	addPlatform,
 	dropPlatforms,
 	exactHours,
@@ -118,7 +123,8 @@ import {
 	sniffImage,
 	urlHash,
 	publicHttpsUrl,
-	plainCopy
+	plainCopy,
+	BOOK_FORMATS
 } from './util'
 
 // Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
@@ -193,8 +199,12 @@ export default class LibraryPlugin extends Plugin {
 	private settingTab: LibrarySettingTab | null = null
 	private malRefreshing: Promise<string | null> | null = null
 	private psnRefreshing: Promise<string | null> | null = null
+	private epicRefreshing: Promise<string | null> | null = null
+	private eaRefreshing: Promise<string | null> | null = null
 	private steamImporting = false
 	private nintendoImporting = false
+	private epicImporting = false
+	private eaImporting = false
 	private lookingUp = false
 	private psnImporting = false
 	private watchImporting = false
@@ -556,6 +566,16 @@ export default class LibraryPlugin extends Plugin {
 			name: tr('cmd.nintendoImport'),
 			callback: () => { void this.nintendoImport(true) }
 		})
+		this.addCommand({
+			id: 'epic-import',
+			name: tr('cmd.epicImport'),
+			callback: () => { void this.epicImport(true) }
+		})
+		this.addCommand({
+			id: 'ea-import',
+			name: tr('cmd.eaImport'),
+			callback: () => { void this.eaImport(true) }
+		})
 	}
 
 	onunload(): void {
@@ -834,11 +854,6 @@ export default class LibraryPlugin extends Plugin {
 				gameNotes.push(file)
 				if (toStr(fm.URL)) byUrl.set(toStr(fm.URL), file)
 			}
-			// one note per game across platforms: matched by name
-			const byName = (name: string): TFile | undefined => gameNotes.find((file) => {
-				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-				return sameTitle(toStr(fm?.Name) || file.basename, name)
-			})
 			let created = 0
 			let updated = 0
 			const today = dmyOf(new Date().toISOString())
@@ -847,7 +862,9 @@ export default class LibraryPlugin extends Plugin {
 				const url = `https://store.steampowered.com/app/${String(game.appId)}/`
 				const hours = playtimeHours(game.minutes)
 				const lastPlayed = game.lastPlayed > 0 ? dmyOf(new Date(game.lastPlayed * 1000).toISOString()) : ''
-				const existing = byUrl.get(url) ?? byName(game.name)
+				const sourceId = 'steam:' + String(game.appId)
+				const cleanName = cleanGameTitle(game.name)
+				const existing = byUrl.get(url) ?? findGameNote(gameNotes, this.app, { name: cleanName, url, sourceId })
 				try {
 					const fm = existing ? this.app.metadataCache.getFileCache(existing)?.frontmatter : undefined
 					const listed = existing ? toStrArray(fm?.Platforms).some(value => value.toLowerCase() === 'steam') : false
@@ -857,15 +874,20 @@ export default class LibraryPlugin extends Plugin {
 						|| lastPlayed === today
 					const stats = moved && game.minutes > 0 ? await steam.stats(game.appId) : null
 					const pairs: Array<[string, unknown]> = []
-					if (lastPlayed) pairs.push(['Last Played', lastPlayed])
+					if (lastPlayed) {
+						const existingDate = toStr(fm?.['Last Played'])
+						if (!existingDate || parseDate(lastPlayed) > parseDate(existingDate)) {
+							pairs.push(['Last Played', lastPlayed])
+						}
+					}
 					if (stats) {
 						pairs.push(['Achievements', `${String(stats.achieved)}/${String(stats.total)}`])
 						pairs.push(['Progress', `${String(Math.round((stats.achieved / stats.total) * 100))}/100`])
 						if (stats.achieved === stats.total) pairs.push(['Complete', true])
 					}
-					// a PSN-owned note keeps Progress/Last Played/Complete: the two imports never fight
+					// a note keeps completed status if already achieved
 					const psnOwned = !!fm && 'PSN ID' in fm
-					const wanted = pairs.filter(([field]) => !(psnOwned && (field === 'Progress' || field === 'Last Played' || field === 'Complete')))
+					const wanted = pairs.filter(([field]) => !(psnOwned && (field === 'Progress' || field === 'Complete')))
 					if (existing) {
 						const unchanged = listed && Number(fm?.['Playtime Steam']) === hours
 							&& wanted.every(([field, value]) => toStr(fm?.[field]) === toStr(value))
@@ -880,9 +902,8 @@ export default class LibraryPlugin extends Plugin {
 						updated++
 						continue
 					}
-					const sourceId = 'steam:' + String(game.appId)
 					const meta = await provider.fetch(sourceId, 'game') ?? {
-						fields: { Name: game.name, URL: url, Cover: `https://cdn.cloudflare.steamstatic.com/steam/apps/${String(game.appId)}/header.jpg` },
+						fields: { Name: cleanName, URL: url, Cover: `https://cdn.cloudflare.steamstatic.com/steam/apps/${String(game.appId)}/header.jpg` },
 						progressTotal: null,
 						imdbId: null
 					}
@@ -890,7 +911,7 @@ export default class LibraryPlugin extends Plugin {
 					const extra: Record<string, unknown> = {}
 					addPlatform(extra, 'Steam', hours)
 					for (const [field, value] of wanted) extra[field] = value
-					const file = await this.newNote(category, provider.id, sourceId, toStr(meta.fields.Name) || game.name, meta, extra)
+					const file = await this.newNote(category, provider.id, sourceId, toStr(meta.fields.Name) || cleanName, meta, extra)
 					byUrl.set(url, file)
 					gameNotes.push(file)
 					created++
@@ -2866,6 +2887,56 @@ export default class LibraryPlugin extends Plugin {
 		})
 	}
 
+	connectEpic(): Promise<boolean> {
+		if (!Platform.isDesktopApp) {
+			new Notice(tr('notice.epic.desktopOnly'))
+			return Promise.resolve(false)
+		}
+		return new Promise<boolean>((resolve) => {
+			new AuthModal(this.app, epicAuthUrl(), (code) => {
+				void (async () => {
+					const tokens = code ? await exchangeEpicCode(code) : null
+					if (tokens) {
+						this.settings.epicTokens = tokens
+						await this.saveSettings()
+					}
+					if (code) new Notice(tr(tokens ? 'notice.epic.connected' : 'notice.epic.failed'))
+					resolve(tokens !== null)
+					if (tokens) void this.epicImport(true)
+				})()
+			}, {
+				title: tr('epic.loginTitle'),
+				extract: codeFromEpicRedirect,
+				pageProbe: EPIC_AUTH_PROBE,
+			}).open()
+		})
+	}
+
+	connectEa(): Promise<boolean> {
+		if (!Platform.isDesktopApp) {
+			new Notice(tr('notice.ea.desktopOnly'))
+			return Promise.resolve(false)
+		}
+		return new Promise<boolean>((resolve) => {
+			new AuthModal(this.app, eaAuthUrl(), (token) => {
+				void (async () => {
+					const tokens = token ? await exchangeEaToken(token) : null
+					if (tokens) {
+						this.settings.eaTokens = tokens
+						await this.saveSettings()
+					}
+					if (token) new Notice(tr(tokens ? 'notice.ea.connected' : 'notice.ea.failed'))
+					resolve(tokens !== null)
+					if (tokens) void this.eaImport(true)
+				})()
+			}, {
+				title: tr('ea.loginTitle'),
+				extract: tokenFromEaRedirect,
+				pageProbe: EA_AUTH_PROBE,
+			}).open()
+		})
+	}
+
 	async nintendoGames(): Promise<NintendoPlayedGame[] | null> {
 		const tokens = this.settings.nintendoTokens
 		return tokens ? nintendoPlayLog(tokens) : null
@@ -2874,7 +2945,7 @@ export default class LibraryPlugin extends Plugin {
 	// One game import at a time: each looks for the notes the others write, and
 	// two at once would each create the note for a game on both platforms.
 	private gameImporting(): boolean {
-		return this.psnImporting || this.steamImporting || this.nintendoImporting
+		return this.psnImporting || this.steamImporting || this.nintendoImporting || this.epicImporting || this.eaImporting
 	}
 
 	// Switch play activity into Games: one note per game (shared with PSN/Steam); Nintendo reports minutes and only played games
@@ -2899,14 +2970,11 @@ export default class LibraryPlugin extends Plugin {
 				if (this.unloaded) return
 				// the app id in the eShop URI is the stable key
 				const titleId = (/apps\/([0-9a-f]{16})/i.exec(game.shopUri ?? '')?.[1] ?? '').toUpperCase()
-				const name = game.name.replace(/[™®©]/g, '').replace(/\s+/g, ' ').trim()
+				const name = cleanGameTitle(game.name)
 				const hours = playtimeHours(game.totalPlayTime)
 				const since = game.firstPlayedAt > 0 ? dmyOf(new Date(game.firstPlayedAt * 1000).toISOString()) : ''
 				try {
-					const existing = notes.find(file => {
-						const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-						return (titleId && toStr(fm?.['Nintendo ID']) === titleId) || sameTitle(toStr(fm?.Name) || file.basename, name)
-					})
+					const existing = findGameNote(notes, this.app, { name, nintendoId: titleId, sourceId: `nintendo:${titleId || name}` })
 					if (existing) {
 						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
 						const listed = toStrArray(fm?.Platforms).some(value => value === 'Switch')
@@ -2955,6 +3023,208 @@ export default class LibraryPlugin extends Plugin {
 		if (!Platform.isDesktopApp || !this.settings.nintendoTokens || this.gameImporting()) return
 		if (Date.now() - this.settings.nintendoLastImport < 24 * 3600000) return
 		await this.nintendoImport(false)
+	}
+
+	async epicToken(): Promise<string | null> {
+		const tokens = this.settings.epicTokens
+		if (!tokens) return null
+		if (!epicExpired(tokens)) return tokens.access
+		if (!this.epicRefreshing) {
+			this.epicRefreshing = (async () => {
+				try {
+					const next = await refreshEpicTokens(tokens.refresh)
+					if (!next && !epicExpired(tokens)) return tokens.access
+					if (!next) {
+						this.settings.epicTokens = null
+						await this.saveSettings()
+						return null
+					}
+					this.settings.epicTokens = next
+					await this.saveSettings()
+					return next.access
+				} finally {
+					this.epicRefreshing = null
+				}
+			})()
+		}
+		return this.epicRefreshing
+	}
+
+	async epicImport(loud = false): Promise<void> {
+		if (this.gameImporting()) {
+			if (loud) new Notice(tr('notice.epic.importing'))
+			return
+		}
+		if (!Platform.isDesktopApp) { new Notice(tr('notice.epic.desktopOnly')); return }
+		if (!this.settings.epicTokens) { new Notice(tr('notice.epic.notConnected')); return }
+		const token = await this.epicToken()
+		if (!token) { if (loud) new Notice(tr('notice.epic.failed')); return }
+		let category = this.settings.categories.find(c => c.contentType === 'game')
+		const provider = this.registry.forType('game')
+		if (!provider) return
+		const typeValue = category?.typeValue ?? TYPE_DEFAULTS.game ?? 'Game'
+		this.epicImporting = true
+		try {
+			if (loud) new Notice(tr('notice.epic.importing'))
+			const games = await fetchEpicLibrary(token, this.settings.epicTokens?.account)
+			if (!games) { if (loud) new Notice(tr('notice.epic.failed')); return }
+			const gameNotes = this.app.vault.getMarkdownFiles().filter(file => !isTemplateFile(file.path)
+				&& toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.Type) === typeValue)
+			let created = 0
+			let updated = 0
+			for (const game of games) {
+				if (this.unloaded) return
+				const cleanTitle = cleanGameTitle(game.title)
+				const url = game.productSlug ? `https://store.epicgames.com/p/${game.productSlug}` : ''
+				const sourceId = `epic:${game.catalogItemId || game.appName}`
+				const existing = findGameNote(gameNotes, this.app, { name: cleanTitle, url, sourceId })
+				try {
+					if (existing) {
+						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						const listed = toStrArray(fm?.Platforms).some(v => v.toLowerCase().includes('epic'))
+						const currentHours = fm?.['Playtime Epic Games'] !== undefined ? Number(fm?.['Playtime Epic Games']) : null
+						const targetHours = game.playtimeHours ?? null
+						const hoursUnchanged = targetHours === null ? currentHours === null : currentHours === targetHours
+						const urlUnchanged = !url || Boolean(fm?.URL)
+						if (listed && urlUnchanged && hoursUnchanged) continue
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+							if (url && !current.URL) current.URL = url
+							addPlatform(current, 'Epic Games', game.playtimeHours ?? null)
+						})
+						updated++
+						continue
+					}
+					if (!category) category = await this.categoryFor('game')
+					const fields: Record<string, unknown> = {}
+					if (url) fields.URL = url
+					if (game.imageUrl) fields[this.fieldTarget('Cover')] = game.imageUrl
+					addPlatform(fields, 'Epic Games', game.playtimeHours ?? null)
+					const note = { fields: { Name: cleanTitle, ...(url ? { URL: url } : {}), ...(game.imageUrl ? { Cover: game.imageUrl } : {}) }, progressTotal: null, imdbId: null }
+					const file = await this.newNote(category, provider.id, sourceId, cleanTitle, note, fields)
+					gameNotes.push(file)
+					created++
+					await this.pause(500)
+				} catch (e) {
+					console.error('Library: Epic Games import error', game.title, e)
+				}
+			}
+			this.settings.epicLastImport = Date.now()
+			await this.persistSettings()
+			if (loud || created > 0 || updated > 0) new Notice(tr('notice.epic.imported', { created, updated }))
+		} finally {
+			this.epicImporting = false
+		}
+		void this.psnLookUp(new Map())
+	}
+
+	private async epicSyncIfDue(): Promise<void> {
+		if (!Platform.isDesktopApp || !this.settings.epicTokens || this.gameImporting()) return
+		if (Date.now() - this.settings.epicLastImport < 24 * 3600000) return
+		await this.epicImport(false)
+	}
+
+	async eaToken(): Promise<string | null> {
+		const tokens = this.settings.eaTokens
+		if (!tokens) return null
+		if (!eaExpired(tokens)) return tokens.access
+		if (!this.eaRefreshing) {
+			this.eaRefreshing = (async () => {
+				try {
+					const silent = Platform.isDesktopApp ? await eaSilentToken() : null
+					const next = silent ? await exchangeEaToken(silent) : null
+					if (!next && !eaExpired(tokens)) return tokens.access
+					if (!next) {
+						this.settings.eaTokens = null
+						await this.saveSettings()
+						return null
+					}
+					this.settings.eaTokens = next
+					await this.saveSettings()
+					return next.access
+				} finally {
+					this.eaRefreshing = null
+				}
+			})()
+		}
+		return this.eaRefreshing
+	}
+
+	async eaImport(loud = false): Promise<void> {
+		if (this.gameImporting()) {
+			if (loud) new Notice(tr('notice.ea.importing'))
+			return
+		}
+		if (!Platform.isDesktopApp) { new Notice(tr('notice.ea.desktopOnly')); return }
+		const tokens = this.settings.eaTokens
+		if (!tokens) { new Notice(tr('notice.ea.notConnected')); return }
+		const token = await this.eaToken()
+		if (!token) { if (loud) new Notice(tr('notice.ea.failed')); return }
+		let category = this.settings.categories.find(c => c.contentType === 'game')
+		const provider = this.registry.forType('game')
+		if (!provider) return
+		const typeValue = category?.typeValue ?? TYPE_DEFAULTS.game ?? 'Game'
+		this.eaImporting = true
+		try {
+			if (loud) new Notice(tr('notice.ea.importing'))
+			const games = await fetchEaLibrary(token, tokens.pid)
+			if (!games) { if (loud) new Notice(tr('notice.ea.failed')); return }
+			const gameNotes = this.app.vault.getMarkdownFiles().filter(file => !isTemplateFile(file.path)
+				&& toStr(this.app.metadataCache.getFileCache(file)?.frontmatter?.Type) === typeValue)
+			let created = 0
+			let updated = 0
+			for (const game of games) {
+				if (this.unloaded) return
+				const cleanTitle = cleanGameTitle(game.title)
+				const sourceId = `ea:${game.offerId}`
+				const existing = findGameNote(gameNotes, this.app, { name: cleanTitle, sourceId })
+				try {
+					if (existing) {
+						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						const listed = toStrArray(fm?.Platforms).some(v => v.toLowerCase().includes('ea') || v.toLowerCase().includes('origin'))
+						const currentHours = fm?.['Playtime EA App'] !== undefined ? Number(fm?.['Playtime EA App']) : null
+						const targetHours = game.playtimeHours ?? null
+						const hoursUnchanged = targetHours === null ? currentHours === null : currentHours === targetHours
+						const lastPlayedUnchanged = !game.lastPlayed || toStr(fm?.['Last Played']) === game.lastPlayed
+						if (listed && hoursUnchanged && lastPlayedUnchanged) continue
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+							addPlatform(current, 'EA App', game.playtimeHours ?? null)
+							if (game.lastPlayed) {
+								const existingDate = toStr(current['Last Played'])
+								if (!existingDate || parseDate(game.lastPlayed) > parseDate(existingDate)) {
+									current['Last Played'] = game.lastPlayed
+								}
+							}
+						})
+						updated++
+						continue
+					}
+					if (!category) category = await this.categoryFor('game')
+					const fields: Record<string, unknown> = {}
+					if (game.imageUrl) fields[this.fieldTarget('Cover')] = game.imageUrl
+					addPlatform(fields, 'EA App', game.playtimeHours ?? null)
+					if (game.lastPlayed) fields['Last Played'] = game.lastPlayed
+					const note = { fields: { Name: cleanTitle, ...(game.imageUrl ? { Cover: game.imageUrl } : {}) }, progressTotal: null, imdbId: null }
+					const file = await this.newNote(category, provider.id, sourceId, cleanTitle, note, fields)
+					gameNotes.push(file)
+					created++
+					await this.pause(500)
+				} catch (e) {
+					console.error('Library: EA import error', game.title, e)
+				}
+			}
+			this.settings.eaLastImport = Date.now()
+			await this.persistSettings()
+			if (loud || created > 0 || updated > 0) new Notice(tr('notice.ea.imported', { created, updated }))
+		} finally {
+			this.eaImporting = false
+		}
+		void this.psnLookUp(new Map())
+	}
+
+	private async eaSyncIfDue(): Promise<void> {
+		if (!Platform.isDesktopApp || !this.settings.eaTokens || this.gameImporting()) return
+		if (Date.now() - this.settings.eaLastImport < 24 * 3600000) return
+		await this.eaImport(false)
 	}
 
 	async psnData(): Promise<{ owned: PsnOwnedGame[]; played: PsnPlayedGame[]; trophies: PsnTrophyTitle[]; summary: PsnTrophySummary | null } | null> {
@@ -3023,15 +3293,36 @@ export default class LibraryPlugin extends Plugin {
 					fields.Bronze = trophy.earned.bronze
 					if (trophy.earned.platinum > 0) fields.Complete = true
 				}
+				const cleanTitle = cleanGameTitle(entry.name)
+				const sourceId = `psn:${entry.titleId}`
 				try {
-					const existing = notes.find(file => {
-						const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-						return toStr(fm?.['PSN ID']) === entry.titleId || sameTitle(toStr(fm?.Name) || file.basename, entry.name)
-					})
+					const existing = findGameNote(notes, this.app, { name: cleanTitle, psnId: entry.titleId, sourceId })
 					if (existing) {
+						const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						const targetHours = entry.minutes === null ? null : playtimeHours(entry.minutes)
+						const platKey = `Playtime ${entry.platform || 'PlayStation'}`
+						const currentHours = fm?.[platKey] !== undefined ? Number(fm?.[platKey]) : null
+						const hoursUnchanged = targetHours === null ? currentHours === null : currentHours === targetHours
+						const lastPlayedStr = entry.lastPlayed ? dmyOf(entry.lastPlayed) : ''
+						const lastPlayedUnchanged = !lastPlayedStr || toStr(fm?.['Last Played']) === lastPlayedStr
+						const progressUnchanged = !trophy || toStr(fm?.Progress) === `${String(trophy.progress)}/100`
+						const platUnchanged = !trophy || Number(fm?.Platinum) === trophy.earned.platinum
+						const goldUnchanged = !trophy || Number(fm?.Gold) === trophy.earned.gold
+						const silverUnchanged = !trophy || Number(fm?.Silver) === trophy.earned.silver
+						const bronzeUnchanged = !trophy || Number(fm?.Bronze) === trophy.earned.bronze
+						const listed = toStrArray(fm?.Platforms).some(v => v.toLowerCase().includes('ps') || v.toLowerCase().includes('playstation'))
+						const idUnchanged = toStr(fm?.['PSN ID']) === entry.titleId
+						const hasLegacy = Boolean(fm?.Trophies || fm?.['Trophy Progress'] || fm?.Platform)
+						if (!hasLegacy && listed && idUnchanged && hoursUnchanged && lastPlayedUnchanged && progressUnchanged && platUnchanged && goldUnchanged && silverUnchanged && bronzeUnchanged) {
+							continue
+						}
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
 							for (const key of Object.keys(fields)) {
 								if (key === 'Complete' && current.Complete === true) continue
+								if (key === 'Last Played' && fields['Last Played']) {
+									const existingDate = toStr(current['Last Played'])
+									if (existingDate && parseDate(toStr(fields['Last Played'])) <= parseDate(existingDate)) continue
+								}
 								// a cover kept in the vault stays
 								if (key === this.fieldTarget('Cover') && !isEmptyValue(current[key]) && !/^https?:/i.test(toStr(current[key]))) continue
 								current[key] = fields[key]
@@ -3050,10 +3341,10 @@ export default class LibraryPlugin extends Plugin {
 					}
 					// the note is made at once from what PSN gave; genres/creators/trailer come later (psnLookUp)
 					if (!category) category = await this.categoryFor('game')
-					const note = { fields: { Name: entry.name }, progressTotal: null, imdbId: null }
+					const note = { fields: { Name: cleanTitle }, progressTotal: null, imdbId: null }
 					if (since) fields.Date = since
 					addPlatform(fields, entry.platform || 'PlayStation', entry.minutes === null ? null : playtimeHours(entry.minutes))
-					const file = await this.newNote(category, provider.id, `psn:${entry.titleId}`, entry.name, note, fields)
+					const file = await this.newNote(category, provider.id, sourceId, cleanTitle, note, fields)
 					notes.push(file)
 					touched.add(file.path)
 					created++
@@ -3095,7 +3386,7 @@ export default class LibraryPlugin extends Plugin {
 	private async lookUpImported(provider: ContentProvider, english: Map<string, string>): Promise<void> {
 		const pending = this.app.vault.getMarkdownFiles().filter((file) => {
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-			return fm && /^(psn|nintendo):/.test(toStr(fm['Source ID'])) && !isTemplateFile(file.path)
+			return fm && /^(psn|nintendo|epic|ea):/.test(toStr(fm['Source ID'])) && !isTemplateFile(file.path)
 		})
 		for (const file of pending) {
 			if (this.unloaded) return
@@ -3165,7 +3456,11 @@ export default class LibraryPlugin extends Plugin {
 	private gameSyncTick(): void {
 		// a failed import must not cancel the next one
 		const run = (sync: () => Promise<void>) => (): Promise<void> => sync().catch((e: unknown) => console.error('Library: game sync error', e))
-		void run(() => this.psnSyncIfDue())().then(run(() => this.steamSyncIfDue())).then(run(() => this.nintendoSyncIfDue()))
+		void run(() => this.psnSyncIfDue())()
+			.then(run(() => this.steamSyncIfDue()))
+			.then(run(() => this.nintendoSyncIfDue()))
+			.then(run(() => this.epicSyncIfDue()))
+			.then(run(() => this.eaSyncIfDue()))
 	}
 
 	async psnToken(): Promise<string | null> {
@@ -3658,6 +3953,8 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.psnTokens) await this.psnImport(true)
 		if (this.settings.steamId.trim()) await this.steamImport(true)
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
+		if (this.settings.epicTokens) await this.epicImport(true)
+		if (this.settings.eaTokens) await this.eaImport(true)
 		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
 		if (walletPairs(this.settings.nftWallets).length > 0) await this.nftImport(true)
 	}
@@ -4100,15 +4397,18 @@ export default class LibraryPlugin extends Plugin {
 				// only a fetched note is marked: a failed request (quota, outage) retries next pass.
 				// The mark goes in before the pause, so a key entered during it clears it too.
 				let ok = true
+				let changed = false
 				if (fetches && provider) {
 					for (let i = 0; i < 10 && this.isRefreshing && !this.unloaded; i++) {
 						await this.enrichSleep(500)
 					}
 					if (this.unloaded) return
-					ok = await this.enrichNote(file, category.contentType, provider, sourceId)
+					const res = await this.enrichNote(file, category.contentType, provider, sourceId)
+					ok = res.ok
+					changed = res.changed
 				}
 				if (ok) {
-					if (fetches) updated++
+					if (changed) updated++
 					this.settings.enrichMarks[file.path] = this.manifest.version
 					marked++
 					if (marked % 10 === 0) await this.persistSettings()
@@ -4148,17 +4448,21 @@ export default class LibraryPlugin extends Plugin {
 		contentType: ICategory['contentType'],
 		provider: ContentProvider,
 		sourceId: string
-	): Promise<boolean> {
+	): Promise<{ ok: boolean; changed: boolean }> {
 		try {
 			const meta = await provider.fetch(sourceId, contentType)
-			if (!meta) return false
+			if (!meta) return { ok: false, changed: false }
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
+			const changed = this.applyMetaPatch(testCurrent, meta)
+			if (!changed) return { ok: true, changed: false }
 			await this.app.fileManager.processFrontMatter(file, (current) => {
 				this.applyMetaPatch(current as Record<string, unknown>, meta)
 			})
-			return true
+			return { ok: true, changed: true }
 		} catch (e) {
 			console.error('Library: metadata pass error', e)
-			return false
+			return { ok: false, changed: false }
 		}
 	}
 
@@ -4251,11 +4555,17 @@ export default class LibraryPlugin extends Plugin {
 				return
 			}
 
-			await this.app.fileManager.processFrontMatter(file, (current) => {
-				this.applyMetaPatch(current as Record<string, unknown>, meta)
-			})
+			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
+			const changed = this.applyMetaPatch(testCurrent, meta)
+			if (changed) {
+				await this.app.fileManager.processFrontMatter(file, (current) => {
+					this.applyMetaPatch(current as Record<string, unknown>, meta)
+				})
+			}
 
-			if (force) new Notice(tr('notice.refreshed', { name: toStr(meta.fields.Name) || file.basename }))
+			if (force) {
+				new Notice(tr(changed ? 'notice.refreshed' : 'notice.notFound', { name: toStr(meta.fields.Name) || file.basename }))
+			}
 		} catch (e) {
 			console.error('Library: refresh error', e)
 			if (force) {
@@ -4318,30 +4628,64 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// refresh never overwrites a value already in the note: hand edits win
-	private applyMetaPatch(current: Record<string, unknown>, meta: NormalizedMetadata): void {
+	private applyMetaPatch(current: Record<string, unknown>, meta: NormalizedMetadata): boolean {
+		let changed = false
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
 			if (isEmptyValue(value) || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			// any known cover property counts as present, so a rename does not duplicate it
 			const present = key === 'Cover' ? coverValue(current, this.coverProperty()) : current[target]
-			if (key === 'Seasons' && !isEmptyValue(present)) current[target] = mergeSeasons(present, value)
+			if (key === 'Seasons' && !isEmptyValue(present)) {
+				const merged = mergeSeasons(present, value)
+				if (JSON.stringify(merged) !== JSON.stringify(present)) {
+					current[target] = merged
+					changed = true
+				}
+			}
 			// A Steam trailer stream gives way once a YouTube one is found.
-			else if (key === 'Trailer' && /steamstatic\.com\//.test(toStr(present)) && /youtube\.com\//.test(toStr(value))) current[target] = value
-			else if (isEmptyValue(present)) current[target] = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
+			else if (key === 'Trailer' && /steamstatic\.com\//.test(toStr(present)) && /youtube\.com\//.test(toStr(value))) {
+				if (current[target] !== value) {
+					current[target] = value
+					changed = true
+				}
+			}
+			else if (isEmptyValue(present)) {
+				const next = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
+				if (!isEmptyValue(next)) {
+					current[target] = next
+					changed = true
+				}
+			}
 			// a junk runtime from an earlier pass must not shadow a plausible one
-			else if (key === 'Runtime' && plausibleRuntime(present) === null && plausibleRuntime(value) !== null) current[target] = value
+			else if (key === 'Runtime' && plausibleRuntime(present) === null && plausibleRuntime(value) !== null) {
+				if (current[target] !== value) {
+					current[target] = value
+					changed = true
+				}
+			}
 			// a source's own score moves: refresh brings the current one, not the first
-			else if (SOURCE_SCORES.indexOf(key) >= 0) current[target] = value
+			else if (SOURCE_SCORES.indexOf(key) >= 0) {
+				if (toStr(current[target]) !== toStr(value)) {
+					current[target] = value
+					changed = true
+				}
+			}
 		}
 		if (typeof meta.fields.Season === 'number' && meta.fields.Season > Number(current.Season || 0) && !this.skipped('Season')) {
 			current.Season = meta.fields.Season
+			changed = true
 		}
 		// A PlayStation game's progress is PlayStation's own percentage.
 		if (meta.progressTotal && !hasChapters(current) && trackingOf(this.kindOf(current)) !== 'watched' && !current['PSN ID']) {
 			const watched = parseWatched(current.Progress)
-			current.Progress = `${String(watched)}/${String(meta.progressTotal)}`
+			const nextProgress = `${String(watched)}/${String(meta.progressTotal)}`
+			if (current.Progress !== nextProgress) {
+				current.Progress = nextProgress
+				changed = true
+			}
 		}
+		return changed
 	}
 
 	private refreshBanner(): void {
@@ -4568,10 +4912,18 @@ export default class LibraryPlugin extends Plugin {
 		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
+		if (kind === 'book') this.addFormats(infoSide, file, fm)
 
 		const runtime = runtimeMinutes(fm.Runtime)
 		if (runtime !== null) addRow(tr('header.runtime'), formatRuntime(totalRuntimeMinutes(fm, runtime, kind)))
-		if (typeof fm.Playtime === 'number' && fm.Playtime > 0) addRow(tr('stats.psn.time'), spentTime(fm.Playtime * 60), ': ', exactHours(fm.Playtime * 60))
+		const playtimeNum = Number(fm.Playtime)
+		if (!isNaN(playtimeNum) && playtimeNum > 0) {
+			const perPlat = Object.keys(fm)
+				.filter(k => /^Playtime .+/.test(k) && !isNaN(Number(fm[k])) && Number(fm[k]) > 0)
+				.map(k => `${k.replace(/^Playtime /, '')}: ${spentTime(Number(fm[k]) * 60)}`)
+			const platBreakdown = perPlat.length > 0 ? ` (${perPlat.join(', ')})` : ''
+			addRow(tr('stats.psn.time'), spentTime(playtimeNum * 60), ': ', exactHours(playtimeNum * 60) + platBreakdown)
+		}
 		if (fm['Last Played']) addRow(tr('header.lastPlayed'), toStr(fm['Last Played']))
 
 		if (ratingIMDB) addRow('IMDb', ratingIMDB)
@@ -4623,6 +4975,30 @@ export default class LibraryPlugin extends Plugin {
 		this.buildTrophiesBlock(wrap, fm, file)
 		this.buildRecommendations(wrap, fm)
 		return wrap
+	}
+
+	// paper, ebook, audiobook: a book can be owned in several, each pill toggles its own
+	private addFormats(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
+		const current = toStrArray(fm.Format).map(v => v.toLowerCase())
+		const row = infoSide.createDiv({ cls: 'note-header-row note-header-formats' })
+		row.createEl('b', { text: tr('header.format') + ': ' })
+		for (const [value, key] of BOOK_FORMATS) {
+			const on = current.indexOf(value.toLowerCase()) >= 0
+			const pill = row.createEl('button', { cls: `note-header-pill${on ? ' is-on' : ''}`, text: tr(key), attr: { 'aria-pressed': on ? 'true' : 'false' } })
+			pill.addEventListener('click', (e) => {
+				e.preventDefault()
+				pill.disabled = true
+				void this.app.fileManager.processFrontMatter(file, (front: Record<string, unknown>) => {
+					const kept = toStrArray(front.Format).filter(v => v.toLowerCase() !== value.toLowerCase())
+					const next = on ? kept : kept.concat(value)
+					if (next.length === 0) delete front.Format
+					else front.Format = next.length === 1 ? next[0] : next
+				}).catch((err: unknown) => {
+					pill.disabled = false
+					console.error('Library: format not saved', file.path, err)
+				})
+			})
+		}
 	}
 
 	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and
@@ -4854,6 +5230,14 @@ export default class LibraryPlugin extends Plugin {
 			if (trackable) {
 				// a season rated through its episodes shows their average, no hand-typed rating
 				if (!flat) row.appendChild(this.ratingInput(season.rating, season.ratedByEpisodes, (rating) => change({ season: index, rating })))
+				if (book) {
+					const edit = row.createEl('button', { cls: 'note-header-season-toggle clickable-icon', attr: { 'aria-label': tr('header.editChapters') } })
+					setIcon(edit, 'pencil')
+					edit.addEventListener('click', (e) => {
+						e.preventDefault()
+						new ChaptersModal(this.app, (chapters) => { void this.editChapterList(file, chapters) }, season.episodes.map(ep => ep.title)).open()
+					})
+				}
 				const toggle = createEl('button')
 				toggle.classList.add('note-header-season-toggle', 'clickable-icon')
 				toggle.setAttribute('aria-label', tr('header.episodeList'))
@@ -4872,6 +5256,8 @@ export default class LibraryPlugin extends Plugin {
 			if (!trackable || !open.has(index)) return
 			const list = createDiv()
 			list.classList.add('note-header-episodes')
+			const labels = season.episodes.map((episode, e) => episode.title ? `${String(e + 1)}. ${episode.title}` : tr('header.chapter', { number: String(e + 1) }))
+			const headings = new Set((this.app.metadataCache.getFileCache(file)?.headings ?? []).map(h => h.heading))
 			season.episodes.forEach((episode, e) => {
 				const item = createDiv()
 				item.classList.add('note-header-episode')
@@ -4887,6 +5273,14 @@ export default class LibraryPlugin extends Plugin {
 					item.createDiv({ cls: 'note-header-episode-date', text: airingDate(at) })
 				}
 				item.appendChild(this.ratingInput(episode.rating, false, (rating) => change({ season: index, episode: e, rating })))
+				if (book) {
+					const notes = item.createEl('button', { cls: `note-header-chapter-notes clickable-icon${headings.has(labels[e] ?? '') ? ' is-filled' : ''}`, attr: { 'aria-label': tr('header.chapterNotes') } })
+					setIcon(notes, 'notebook-pen')
+					notes.addEventListener('click', (ev) => {
+						ev.preventDefault()
+						void this.openChapterNotes(file, labels, e)
+					})
+				}
 				list.appendChild(item)
 			})
 			block.appendChild(list)
@@ -5087,6 +5481,29 @@ export default class LibraryPlugin extends Plugin {
 		new ChaptersModal(this.app, (chapters) => { void this.addChapters(file, chapters) }).open()
 	}
 
+	private async editChapterList(file: TFile, chapters: string[] | number): Promise<void> {
+		// a bare number keeps the old titles out: that many untitled chapters
+		const titles = typeof chapters === 'number' ? Array.from({ length: Math.max(0, Math.floor(chapters)) }, () => '') : chapters
+		try {
+			await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => { editChapters(fm, titles) })
+		} catch (e) {
+			console.error('Library: chapters update error', file.path, e)
+		}
+	}
+
+	// thoughts and quotes on a chapter: typed in a dialog, kept in the note body under the chapter's
+	// heading; the note stays in reading view, where its header lives
+	private async openChapterNotes(file: TFile, labels: string[], index: number): Promise<void> {
+		const label = labels[index]
+		if (!label) return
+		const initial = chapterNotes(await this.app.vault.read(file), label)
+		new ChapterNotesModal(this.app, label, initial, (notes) => {
+			void this.app.vault.process(file, (data) => setChapterNotes(data, labels, index, notes)).catch((e: unknown) => {
+				console.error('Library: chapter notes error', file.path, e)
+			})
+		}).open()
+	}
+
 	private async addChapters(file: TFile, chapters: string[] | number): Promise<void> {
 		try {
 			await this.app.fileManager.processFrontMatter(file, (fm) => {
@@ -5163,6 +5580,10 @@ export default class LibraryPlugin extends Plugin {
 		this.settings.youtubeBackfill = { token: typeof backfill.token === 'string' ? backfill.token : '', before: typeof backfill.before === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(backfill.before) ? backfill.before : '', done: backfill.done === true }
 		if (!this.settings.nintendoTokens || typeof this.settings.nintendoTokens !== 'object') this.settings.nintendoTokens = null
 		if (typeof this.settings.nintendoLastImport !== 'number') this.settings.nintendoLastImport = 0
+		if (!this.settings.epicTokens || typeof this.settings.epicTokens !== 'object') this.settings.epicTokens = null
+		if (typeof this.settings.epicLastImport !== 'number') this.settings.epicLastImport = 0
+		if (!this.settings.eaTokens || typeof this.settings.eaTokens !== 'object') this.settings.eaTokens = null
+		if (typeof this.settings.eaLastImport !== 'number') this.settings.eaLastImport = 0
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
 		if (!this.settings.netflixEcho || typeof this.settings.netflixEcho !== 'object') this.settings.netflixEcho = {}
 		const sites = (this.settings.watchSites && typeof this.settings.watchSites === 'object' ? this.settings.watchSites : {}) as Partial<ILibrarySettings['watchSites']>
