@@ -33,7 +33,8 @@ import {
 	runtimeParts,
 	propertyValues,
 	topLabel,
-	formatLabel
+	formatLabel,
+	BOOK_FORMATS
 } from './util'
 
 export const LIBRARY_VIEW_TYPE = 'library-view'
@@ -101,7 +102,13 @@ function facetValues(card: CardData, facet: Facet): string[] {
 		case 'artist': return card.kind === 'music' ? toStrArray(card.fm.Creator).map(linkLabel).filter(Boolean) : []
 		case 'country': return toStrArray(card.fm.Country)
 		case 'platform': return toStrArray(card.fm.Platforms)
-		case 'format': return toStrArray(card.fm.Format)
+		case 'format': {
+			if (card.kind !== 'book') return []
+			return toStrArray(card.fm.Format).map((val) => {
+				const match = BOOK_FORMATS.find(([v]) => v.toLowerCase() === val.toLowerCase())
+				return match ? match[0] : val
+			})
+		}
 	}
 }
 

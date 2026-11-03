@@ -28,7 +28,7 @@ Yes. Everything is in frontmatter, so you can filter by `Type` or `Platforms`, s
 
 ## Connect does nothing, or the sign-in window stays open
 
-The window closes by itself once the service's page shows you are signed in: IMDb's home page, Netflix's Browse page, YouTube, or the service's confirmation. Finish any extra steps the site asks for, such as a code or picking a profile. Close the window to cancel. IMDb, Netflix, YouTube, PlayStation, Steam, and Nintendo connect only on desktop.
+The window closes by itself once the service's page shows you are signed in: IMDb's home page, Netflix's Browse page, YouTube, or the service's confirmation. Finish any extra steps the site asks for, such as a code or picking a profile. Close the window to cancel. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games, and EA App connect only on desktop.
 
 ## Where are my keys and tokens?
 
@@ -46,7 +46,7 @@ When you search, refresh, sync, or share; when you open a library note, at most 
 
 ## Does it work on mobile?
 
-Yes: search, the Library tab, notes, statistics, and sharing work as on desktop. AniList and MyAnimeList connect through your browser, and Kitsu with your email or username and password. Trakt connects with a code, so it works on mobile too. IMDb, Netflix, PlayStation, Steam, and Nintendo connect only on desktop, and the daily imports run there.
+Yes: search, the Library tab, notes, statistics, and sharing work as on desktop. AniList and MyAnimeList connect through your browser, and Kitsu with your email or username and password. Trakt connects with a code, so it works on mobile too. IMDb, Netflix, PlayStation, Steam, Nintendo, Epic Games, and EA App connect only on desktop, and the daily imports run there.
 
 ## Something else is wrong
 

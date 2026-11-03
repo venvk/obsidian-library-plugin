@@ -19,14 +19,21 @@ export class ChapterNotesModal extends Modal {
 		this.setTitle(this.title)
 		const input = contentEl.createEl('textarea', { cls: 'library-chapters-input', attr: { rows: '10', placeholder: tr('header.chapterNotes') } })
 		input.value = this.initial
+		const submit = (): void => {
+			this.onSubmit(input.value)
+			this.close()
+		}
+		input.addEventListener('keydown', (e) => {
+			if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+				e.preventDefault()
+				submit()
+			}
+		})
 		new Setting(contentEl).addButton((button) =>
 			button
 				.setButtonText(tr('modal.save'))
 				.setCta()
-				.onClick(() => {
-					this.onSubmit(input.value)
-					this.close()
-				})
+				.onClick(() => submit())
 		)
 		input.focus()
 	}

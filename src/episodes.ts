@@ -292,13 +292,19 @@ export function mergeSeasons(existing: unknown, fetched: unknown): unknown[] {
 // A chapter's own notes live in the note body under a heading with its label ("3. Title"), up to the
 // next heading of the same or a higher level. Pure text in, text out: no vault access here.
 function headingOf(line: string): { level: number; text: string } | null {
-	const match = /^(#{1,6})\s+(.*?)\s*#*\s*$/.exec(line)
+	const match = /^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$/.exec(line)
 	return match ? { level: (match[1] ?? '').length, text: match[2] ?? '' } : null
 }
 
 function bodyStart(lines: string[]): number {
-	if (lines[0] !== '---') return 0
-	const end = lines.indexOf('---', 1)
+	if ((lines[0] ?? '').trim() !== '---') return 0
+	let end = -1
+	for (let i = 1; i < lines.length; i++) {
+		if ((lines[i] ?? '').trim() === '---') {
+			end = i
+			break
+		}
+	}
 	return end < 0 ? 0 : end + 1
 }
 
@@ -333,7 +339,13 @@ export function setChapterNotes(data: string, labels: string[], index: number, n
 	const body = notes.trim()
 	const section = chapterSection(lines, label)
 	if (section) {
-		lines.splice(section.heading + 1, section.end - section.heading - 1, '', ...(body ? [body, ''] : []))
+		if (!body) {
+			lines.splice(section.heading, section.end - section.heading)
+			while (lines.length > bodyStart(lines) && (lines[lines.length - 1] ?? '').trim() === '') lines.pop()
+			if (lines.length > bodyStart(lines)) lines.push('')
+			return lines.join('\n')
+		}
+		lines.splice(section.heading + 1, section.end - section.heading - 1, '', body, '')
 		return lines.join('\n')
 	}
 	if (!body) return data

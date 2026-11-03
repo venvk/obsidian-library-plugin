@@ -12,6 +12,8 @@ Connect an account in Settings > Library > Connectors. Your list arrives as note
 | PlayStation | Games you played, playtime, last played, trophies | Nothing | [[Game libraries|Game-libraries]] |
 | Steam | Your library, playtime, last played, achievements | Nothing | [[Game libraries|Game-libraries]] |
 | Nintendo Switch | Games you played and playtime | Nothing | [[Game libraries|Game-libraries]] |
+| Epic Games | Your library and store links | Nothing | [[Game libraries|Game-libraries]] |
+| EA App | Games you own, playtime from local sessions | Nothing | [[Game libraries|Game-libraries]] |
 
 No account needs a key or a developer app of your own.
 
@@ -21,13 +23,13 @@ Press Connect next to the service. On desktop, a sign-in window opens inside Obs
 
 - On mobile, AniList and MyAnimeList open your browser and ask you to paste back the address it lands on, and Kitsu asks for your email or username and password. Kitsu gets them directly; Library keeps only the sign-in token Kitsu returns.
 - Trakt shows a code to enter on trakt.tv, so it connects on mobile too.
-- IMDb, Netflix, YouTube, PlayStation, Steam, and Nintendo connect only in Obsidian on desktop, and their imports run there.
+- IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games, and EA App connect only in Obsidian on desktop, and their imports run there.
 - Nintendo asks first, because its requests pass through a third-party signing service; see [[Game libraries|Game-libraries#nintendo-switch]].
 
 ## When it syncs
 
 - Imports run on desktop once a day per service: Library checks a minute after Obsidian starts and then every hour. They also run right after you connect.
-- Run one now with the command palette: `Import from AniList`, `Import from MyAnimeList`, `Import from Kitsu`, `Import from Trakt`, `Import Steam library`, `Import PlayStation games and trophies`, `Import Nintendo games`. IMDb, Netflix, and YouTube have no command; they import when you connect, once a day, and when you press Update at the top of the Library tab.
+- Run one now with the command palette: `Import from AniList`, `Import from MyAnimeList`, `Import from Kitsu`, `Import from Trakt`, `Import Steam library`, `Import PlayStation games and trophies`, `Import Nintendo games`, `Import Epic Games library`, or `Import EA App library`. IMDb, Netflix, and YouTube have no command; they import when you connect, once a day, and when you press Update at the top of the Library tab.
 - MyAnimeList, Kitsu, IMDb, Netflix, and Trakt get your changes a moment after you edit a note. IMDb and Netflix only on desktop. AniList gets them when you run `Push current note to AniList`.
 - One import runs at a time, so two services never make the same note twice. Pressing Update while one runs says so. YouTube's older history comes in apart from the imports, so it never holds them up. A title on several services ends up in one note.
 

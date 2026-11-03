@@ -1612,6 +1612,19 @@ sort trigger, the chosen one in the accent colour. */
 	color: #e50914;
 }
 
+.library-platform-label.is-epic {
+	background-color: #2a2a2a;
+}
+
+.library-platform-label.is-ea {
+	background-color: #ff4747;
+}
+
+.library-platform-label .library-platform-time {
+	opacity: 0.85;
+	font-weight: 500;
+}
+
 /* A platform account in settings: its mark, its name and whether it is connected. */
 .library-platform-row .setting-item-name {
 	display: flex;
@@ -1670,6 +1683,16 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-platform-row-icon.is-youtube {
 	background-color: #ff0000;
+	color: #ffffff;
+}
+
+.library-platform-row-icon.is-epic {
+	background-color: #2a2a2a;
+	color: #ffffff;
+}
+
+.library-platform-row-icon.is-ea {
+	background-color: #ff4747;
 	color: #ffffff;
 }
 
