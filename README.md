@@ -56,8 +56,10 @@ Connect an account in the plugin settings. Your lists arrive as notes, and anime
 - <img src="assets/connectors/playstation.svg" width="18" height="18" alt=""> **PlayStation**: played games, playtime and trophies
 - <img src="assets/connectors/steam.svg" width="18" height="18" alt=""> **Steam**: library, playtime and achievements
 - <img src="assets/connectors/nintendo.svg" width="18" height="18" alt=""> **Nintendo Switch**: played games and playtime
+- <img src="assets/connectors/epic.svg" width="18" height="18" alt=""> **Epic Games**: library and store links
+- <img src="assets/connectors/ea.svg" width="18" height="18" alt=""> **EA App**: library and playtime from your sessions
 
-Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam and Nintendo work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
+Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games and EA App work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
 
 ## Sources
 
@@ -102,7 +104,7 @@ Source ID: tt4574334
 - Refresh metadata for current note · Refresh metadata of all notes
 - Rebuild graph links · Find & remove duplicates · Share current note
 - Import from AniList, MyAnimeList or Kitsu · Push and pull progress for each
-- Import Steam library · Import PlayStation games and trophies · Import Nintendo games
+- Import Steam library · Import PlayStation games and trophies · Import Nintendo games · Import Epic Games library · Import EA App library
 - Import from Trakt · Build library map
 </details>
 
@@ -137,6 +139,8 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `kitsu.io`, `kitsu.app` | Anime search, sign-in, import, sync | Search text; token, progress, status, score |
 | `ca.account.sony.com`, `my.account.sony.com`, `m.np.playstation.com`, `web.np.playstation.com`, `image.api.playstation.com`, `psnobj.prod.dl.playstation.net` | PlayStation sign-in, games, trophies, covers | Token |
 | `accounts.nintendo.com`, `api.accounts.nintendo.com`, `api-lp1.znc.srv.nintendo.net`, `atum-img-lp1.cdn.nintendo.net` | Nintendo sign-in, play activity, covers | Session token |
+| `www.epicgames.com`, `account-public-service-prod03.ol.epicgames.com`, `library-service.live.use1a.on.epicgames.com`, `catalog-public-service-prod06.ol.epicgames.com`, `store.epicgames.com` | Epic Games sign-in and library import | Token |
+| `accounts.ea.com`, `www.ea.com`, `gateway.ea.com`, `service-aggregation-layer.juno.ea.com` | EA App sign-in and library import | Token |
 | `nxapi-auth.fancy.org.uk`, `nxapi-znca-api.fancy.org.uk` | Signing service for Nintendo requests | Nintendo Account id token, account id, the app's requests and answers |
 | `comicvine.gamespot.com` | Comic search, with a key | Title, key |
 | `www.youtube.com`, `www.youtube-nocookie.com`, `i.ytimg.com`, `player.vimeo.com`, `www.dailymotion.com` | Trailers | Video id |

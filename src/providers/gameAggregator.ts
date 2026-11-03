@@ -38,14 +38,14 @@ export class GameAggregatorProvider implements ContentProvider {
 
 	refreshable(sourceId: string): boolean {
 		// no source has these: the enrich walk would revisit them forever
-		if (/^(psn|nintendo):/.test(sourceId)) return false
+		if (/^(psn|nintendo|epic|ea):/.test(sourceId)) return false
 		if (sourceId.startsWith(SteamProvider.PREFIX) || /^Q\d+$/.test(sourceId)) return true
 		return this.rawg.refreshable?.(sourceId) ?? true
 	}
 
 	async fetch(sourceId: string, _type: ContentType, raw?: unknown): Promise<NormalizedMetadata | null> {
-		// A PS/Nintendo game no source knew: keep what the platform gave.
-		if (/^(psn|nintendo):/.test(sourceId)) return null
+		// A PS/Nintendo/Epic/EA game no source knew: keep what the platform gave.
+		if (/^(psn|nintendo|epic|ea):/.test(sourceId)) return null
 		if (/^Q\d+$/.test(sourceId)) return this.wikidata.fetch(sourceId, 'game')
 		const steam = sourceId.startsWith(SteamProvider.PREFIX)
 		const meta = steam ? await this.steam.fetch(sourceId, 'game') : await this.rawg.fetch(sourceId, 'game', raw)

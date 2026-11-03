@@ -53,6 +53,7 @@ Awards come from Wikidata for albums, movies, series, anime and games. Library f
 
 Depending on the note it also has:
 
+- platform badges under the title (such as PlayStation, Steam, Switch, Epic Games, EA App) with each platform's playtime; pointing at the time row shows the exact total and per-platform breakdown;
 - Mark complete, for movies, videos, games, albums, comics, and manual notes: it turns `Complete` on, and pressed again, off. It works with the note's properties hidden;
 - a trailer: Watch trailer plays it inside Obsidian;
 - a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close;
