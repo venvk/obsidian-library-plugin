@@ -43,7 +43,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, type HeldContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
+import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, storefrontCreator, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, type HeldContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -186,6 +186,10 @@ function applyNftDates(cur: Record<string, unknown>, dates: { Minted?: string; A
 	if (date && date !== '-') cur.Date = date
 }
 
+function toArrayOf(value: unknown): Record<string, unknown>[] {
+	return (Array.isArray(value) ? value : []) as Record<string, unknown>[]
+}
+
 function thumbRank(score: number): number {
 	return ({ THUMBS_DOWN: 1, THUMBS_UP: 2, THUMBS_WAY_UP: 3 } as const)[thumbOf(score)]
 }
@@ -286,6 +290,8 @@ export default class LibraryPlugin extends Plugin {
 	// NFT notes by path, to know the token of a note once it is deleted; and the ones the import trashes itself
 	private nftPaths = new Map<string, NftTrackInfo>()
 	private nftTrashing = new Set<string>()
+	// tokens whose page held no transfer, not asked again this session
+	private nftNoTransfers = new Set<string>()
 	private nftImageCache = new Map<string, string>()
 	private nftImageNegative = new Set<string>()
 	private nftTokenQueue: Array<{
@@ -407,8 +413,11 @@ export default class LibraryPlugin extends Plugin {
 				if (!info || this.nftTrashing.delete(file.path)) return
 				const keysToAdd: string[] = []
 				if (info.sourceId) keysToAdd.push(info.sourceId)
-				if (info.contract) keysToAdd.push(info.contract)
-				if (info.chain && info.contract) keysToAdd.push(`${info.chain}:${info.contract}`)
+				// one creator's note in a shared contract must not hide the others'
+				if (info.contract && info.sourceId.split(':').length < 3) {
+					keysToAdd.push(info.contract)
+					if (info.chain) keysToAdd.push(`${info.chain}:${info.contract}`)
+				}
 				for (const tid of info.tokenIds) {
 					if (info.contract) keysToAdd.push(`${info.contract}:${tid}`)
 					if (info.chain && info.contract) keysToAdd.push(`${info.chain}:${info.contract}:${tid}`)
@@ -2073,6 +2082,12 @@ export default class LibraryPlugin extends Plugin {
 						}
 					}
 				}
+				// a shared storefront's note from before the split goes to the creator its link names
+				const parts = contract.key.split(':')
+				const legacy = parts.length > 2 ? notes.get(parts.slice(0, 2).join(':')) : undefined
+				const legacyUrl = legacy ? toStr(this.app.metadataCache.getFileCache(legacy)?.frontmatter?.URL) : ''
+				const split = (!existing || existing === legacy) && contract.tokenIds.some(id => legacyUrl.endsWith(id))
+				if (legacy && split) existing = legacy
 				if (contract.spam && !this.settings.showNftSpam) {
 					if (existing) {
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
@@ -2097,7 +2112,9 @@ export default class LibraryPlugin extends Plugin {
 						const cover = toStr(knownFm?.Cover)
 						const picture = await this.nftPicture(contract.image)
 						const recover = !!picture && cover !== picture && (!cover || isInvalidNftMedia(cover))
-						const rename = contract.name !== toStr(knownFm?.Name)
+						// a storefront note keeps the name its Creator link gives it
+						const named = parts.length > 2 ? linkLabel(toStrArray(knownFm?.Creator)[0] ?? '') || contract.name : contract.name
+						const rename = named !== toStr(knownFm?.Name)
 						const spam = contract.spam && knownFm?.Spam === undefined
 						const unspam = !contract.spam && knownFm?.Spam === true
 						const checkbox = knownFm?.Favorite === undefined
@@ -2110,7 +2127,17 @@ export default class LibraryPlugin extends Plugin {
 							current.Count = contract.count
 							if (rekey) current['Source ID'] = contract.key
 							if (recover) current.Cover = picture
-							if (rename) current.Name = contract.name
+							if (rename) current.Name = named
+							// what the other creators' tokens left behind goes with them
+							if (split) {
+								delete current.Minted
+								delete current.Acquired
+								delete current.Date
+								delete current.Block
+								current.Gallery = []
+								current.History = toArrayOf(current.History).filter(row => contract.tokenIds.indexOf(toStr(row.tokenId)) >= 0)
+								if (picture) current.Cover = picture
+							}
 							if (spam) current.Spam = true
 							if (unspam) delete current.Spam
 							if (walletLinks.length > 0) current.Wallet = walletLinks
@@ -2208,6 +2235,7 @@ export default class LibraryPlugin extends Plugin {
 				await this.app.fileManager.trashFile(file)
 				updated++
 			}
+			await this.fillNftTransfers()
 			await this.fillNftBlocks()
 			await this.fillNftProjects()
 			this.settings.nftLastImport = Date.now()
@@ -2303,7 +2331,8 @@ export default class LibraryPlugin extends Plugin {
 			const tokenId = toStr(fm['Token ID'])
 			const creator = toStrArray(fm.Creator)[0] || ''
 			const cleanName = cleanCollectionName(rawName, creator, tokenId)
-			const groupKey = (contract && contract !== '0') ? `${chain}:${contract}` : `${chain}:${cleanName.toLowerCase()}`
+			const sourceId = toStr(fm['Source ID'])
+			const groupKey = sourceId.split(':').length > 2 ? sourceId.toLowerCase() : (contract && contract !== '0') ? `${chain}:${contract}` : `${chain}:${cleanName.toLowerCase()}`
 
 			let g = groups.get(groupKey)
 			if (!g) {
@@ -2406,7 +2435,8 @@ export default class LibraryPlugin extends Plugin {
 					current.Name = g.cleanName
 					current.Type = NFT_TYPE
 					current.Source = NFT_SOURCE
-					current['Source ID'] = g.contract ? `${g.chain}:${g.contract}` : `${g.chain}:${g.cleanName.toLowerCase()}`
+					const shared = toStr(g.notes[0]?.fm['Source ID'])
+					current['Source ID'] = shared.split(':').length > 2 ? shared : g.contract ? `${g.chain}:${g.contract}` : `${g.chain}:${g.cleanName.toLowerCase()}`
 					current.Platforms = [g.chain]
 					current.Count = tokensArr.length || g.notes.length
 					if (tokensArr.length > 0) current.Tokens = tokensArr
@@ -2624,6 +2654,35 @@ export default class LibraryPlugin extends Plugin {
 		await this.nftImport(false)
 	}
 
+	// Tokens the wallet's list gave no transfer for: their own page has it, a few dozen per import.
+	async fillNftTransfers(): Promise<void> {
+		let budget = 40
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (this.unloaded || budget <= 0) return
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (toStr(fm?.Source) !== NFT_SOURCE) continue
+			const contract = toStr(fm?.Contract)
+			const chain = toStrArray(fm?.Platforms)[0] ?? ''
+			const wallets = toStrArray(fm?.Wallet).map(linkLabel)
+			const known = new Set(toArrayOf(fm?.History).map(row => toStr(row.tokenId)))
+			const missing = toStrArray(fm?.Tokens).filter(id => !known.has(id) && !lazyMinted(contract, id, wallets) && !this.nftNoTransfers.has(`${contract}:${id}`))
+			const rows: Record<string, unknown>[] = []
+			for (const id of missing) {
+				if (budget <= 0) break
+				budget--
+				const found = await tokenTransfers(chain, contract, id)
+				if (found === null || found.length === 0) this.nftNoTransfers.add(`${contract}:${id}`)
+				rows.push(...(found ?? []) as unknown as Record<string, unknown>[])
+				await this.pause(300)
+			}
+			if (rows.length === 0) continue
+			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+				cur.History = mergeHistory(rows, cur.History)
+				applyNftDates(cur, this.nftDates({ history: cur.History as Record<string, unknown>[] }))
+			})
+		}
+	}
+
 	// Who deployed each contract, and the project's site and socials: once per note, a few dozen per import.
 	private async fillNftProjects(): Promise<void> {
 		let budget = 40
@@ -2635,8 +2694,10 @@ export default class LibraryPlugin extends Plugin {
 			if (toStr(fm?.Source) !== NFT_SOURCE || fm?.Spam === true || (fm?.['Project Links'] !== undefined && fm?.['Contract Creator'] !== undefined)) continue
 			if (!/^0x[0-9a-fA-F]{40}$/.test(contract) || EVM_NETWORKS.indexOf(chain) < 0) continue
 			budget--
-			const creator = await contractCreator(chain, contract, this.apiKey('etherscanApiKey'))
-			const links = await openseaLinks(chain, contract, this.apiKey('openseaApiKey'))
+			// in a shared storefront the creator is the token's, the contract is OpenSea's own
+			const token = toStrArray(fm?.Tokens)[0] ?? ''
+			const creator = storefrontCreator(contract, token) || await contractCreator(chain, contract, this.apiKey('etherscanApiKey'))
+			const links = await openseaLinks(chain, contract, this.apiKey('openseaApiKey'), token)
 			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
 				// asked once: an empty value says so
 				cur['Contract Creator'] = creator
@@ -6619,6 +6680,13 @@ export default class LibraryPlugin extends Plugin {
 			history = fallbackRows
 		}
 
+		// every held token has its row, even one with no transaction to show
+		const listed = new Set(history.map(tx => toStr(tx.tokenId).trim().replace(/^#/, '')))
+		for (const id of heldTokens) {
+			if (!listed.has(id)) history = [...history, { tokenId: id, date: '-', from: '-', hash: '', blockNumber: '-' }]
+		}
+		const wallets = toStrArray(fm.Wallet).map(linkLabel)
+
 		const getTxTimestamp = (tx: Record<string, unknown>): number => {
 			if (tx.timeStamp) {
 				const t = parseDate(tx.timeStamp)
@@ -6762,7 +6830,8 @@ export default class LibraryPlugin extends Plugin {
 						attr: { target: '_blank', rel: 'noopener noreferrer' }
 					})
 				} else {
-					txTd.setText('-')
+					// a token OpenSea holds for its creator was never written to the chain
+					txTd.setText(lazyMinted(toStr(fm.Contract), tokenId, wallets) ? tr('header.notOnChain') : '-')
 				}
 
 				const blockTd = trEl.createEl('td')

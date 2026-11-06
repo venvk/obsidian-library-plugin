@@ -203,14 +203,32 @@ export function nftKey(chain: string, contract: string, id = ''): string {
 	return id ? `${chain}:${contract.toLowerCase()}:${id.trim().toLowerCase()}` : `${chain}:${contract.toLowerCase()}`
 }
 
+// OpenSea's shared storefronts hold the tokens of every creator in one contract; a token's id starts
+// with its creator's address, so one contract is many collections.
+const SHARED_STOREFRONTS = ['0x2953399124f0cbb46d2cbacd8a89cf0599974963', '0x495f947276749ce646f68ac8c248420045cb7b5e']
+
+export function storefrontCreator(contract: string, id: string): string {
+	if (SHARED_STOREFRONTS.indexOf(contract.toLowerCase()) < 0) return ''
+	return `0x${idHex(id).padStart(64, '0').slice(0, 40)}`
+}
+
+// Listed on OpenSea by its creator and never sold: the token has a balance but no transaction yet.
+export function lazyMinted(contract: string, id: string, wallets: string[]): boolean {
+	const creator = storefrontCreator(contract, id)
+	return !!creator && wallets.some(wallet => wallet.toLowerCase() === creator)
+}
+
 // A deleted note's keys. A contract counts as hidden by its own key or address, or when every token
 // held from it was deleted; a token id alone means nothing, ids repeat across contracts and chains.
 export function nftIsHidden(deleted: Set<string>, key: string, contract: string, tokenIds: string[]): boolean {
 	const own = key.toLowerCase()
 	const address = contract.trim().toLowerCase()
-	if (deleted.has(own) || (address && deleted.has(address))) return true
+	// one creator's part of a shared contract: the contract as a whole says nothing about it
+	const shared = own.split(':').length > 2
+	if (deleted.has(own) || (!shared && address && deleted.has(address))) return true
+	const base = own.split(':').slice(0, 2).join(':')
 	const ids = tokenIds.map(id => id.trim().toLowerCase().replace(/^#/, '')).filter(Boolean)
-	return ids.length > 0 && ids.every(id => deleted.has(`${own}:${id}`) || (address && deleted.has(`${address}:${id}`)))
+	return ids.length > 0 && ids.every(id => deleted.has(`${base}:${id}`) || (address && deleted.has(`${address}:${id}`)))
 }
 
 const ZERO_ADDRESS = /^0x0+(?:\.+0+)?$/i
@@ -674,6 +692,35 @@ async function tokenMetadata(uri: string): Promise<{ image?: unknown; name?: unk
 	}
 }
 
+// A list of transfers can miss one going out: the chain has the last word. A token it does not answer for stays.
+async function stillHeld<T extends { contract?: string; tokenId?: string }>(rpc: string, address: string, tokens: T[]): Promise<T[]> {
+	const word = (hex: string): string => hex.replace(/^0x/, '').padStart(64, '0')
+	const call = async (to: string, data: string): Promise<string> => {
+		const resp = await requestUrl({ url: rpc, method: 'POST', contentType: 'application/json', throw: false, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to, data }, 'latest'] }) })
+		const result = resp.status === 200 ? (resp.json as { result?: unknown }).result : ''
+		return typeof result === 'string' ? result : ''
+	}
+	const owns = async (token: T): Promise<boolean> => {
+		const hex = idHex(token.tokenId ?? '')
+		if (!token.contract || !hex) return true
+		try {
+			const owner = await call(token.contract, `0x6352211e${word(hex)}`)
+			if (owner.length >= 66) return owner.slice(-40).toLowerCase() === address.slice(2).toLowerCase()
+			const balance = await call(token.contract, `0x00fdd58e${word(address)}${word(hex)}`)
+			return balance.length < 66 || /[1-9a-f]/i.test(balance.slice(2))
+		} catch {
+			return true
+		}
+	}
+	const kept: T[] = []
+	for (let at = 0; at < tokens.length; at += 8) {
+		const part = tokens.slice(at, at + 8)
+		const answers = await Promise.all(part.map(owns))
+		part.forEach((token, i) => { if (answers[i]) kept.push(token) })
+	}
+	return kept
+}
+
 async function etherscanHeld(chain: string, address: string, key: string): Promise<NftRead> {
 	const info = ETHERSCAN_CHAINS[chain]
 	if (!info) return { held: [], chains: [] }
@@ -720,7 +767,8 @@ async function transfersHeld(chain: string, info: { rpc: string; site: string },
 		}
 	}
 	const held: HeldNft[] = []
-	for (const token of replayTransfers(address, transfers)) {
+	const owned = await stillHeld(info.rpc, address, replayTransfers(address, transfers).map(token => ({ ...token, tokenId: token.id })))
+	for (const token of owned) {
 		held.push({
 			key: nftKey(chain, token.contract, token.id),
 			tokenId: token.id,
@@ -854,7 +902,7 @@ async function pageScanHeld(chain: string, address: string, hasCover: (key: stri
 		rows = null
 	}
 	if (!Array.isArray(rows)) return { held: [], chains: [] }
-	const held = pageHeld(chain, info.site, rows)
+	const held = await stillHeld(info.rpc, address, pageHeld(chain, info.site, rows))
 	// a collection whose metadata server is gone (Galxe, SecondLive) skips tokenURI after its first miss, so the
 	// budget reaches every collection; NFTScan, which kept copies of their pictures, is asked per token
 	let budget = 60
@@ -1149,7 +1197,7 @@ export function projectLinks(collection: OpenSeaCollection, account: OpenSeaAcco
 }
 
 // A collection's site and socials from OpenSea, keyless; with a key the creator's own profile adds to them.
-export async function openseaLinks(chain: string, contract: string, apiKey = ''): Promise<string[]> {
+export async function openseaLinks(chain: string, contract: string, apiKey = '', tokenId = ''): Promise<string[]> {
 	const osChain = OPENSEA_CHAINS[chain]
 	if (!osChain) return []
 	const headers: Record<string, string> = { accept: 'application/json', ...(apiKey ? { 'x-api-key': apiKey } : {}) }
@@ -1158,7 +1206,11 @@ export async function openseaLinks(chain: string, contract: string, apiKey = '')
 		return resp.status === 200 ? resp.json as T : null
 	}
 	try {
-		const slug = (await read<{ collection?: unknown }>(`chain/${osChain}/contract/${contract.toLowerCase()}`))?.collection
+		// a shared storefront's contract answers with OpenSea's own collection: the token knows its real one, with a key
+		const shared = !!storefrontCreator(contract, tokenId)
+		if (shared && !apiKey) return []
+		const slug = shared ? (await read<{ nft?: { collection?: unknown } }>(`chain/${osChain}/contract/${contract.toLowerCase()}/nfts/${tokenId}`))?.nft?.collection
+			: (await read<{ collection?: unknown }>(`chain/${osChain}/contract/${contract.toLowerCase()}`))?.collection
 		if (typeof slug !== 'string' || !slug) return []
 		const collection = await read<OpenSeaCollection>(`collections/${encodeURIComponent(slug)}`)
 		if (!collection) return []
@@ -1239,14 +1291,17 @@ export async function openseaAccountHeld(chain: string, address: string, apiKey:
 	if (!osChain || !apiKey || !address) return []
 	const out: HeldNft[] = []
 	try {
+		let next = ''
+		for (let page = 0; page < 40; page++) {
 		const res = await requestUrl({
-			url: `https://api.opensea.io/api/v2/chain/${osChain}/account/${address.toLowerCase()}/nfts?limit=50&include_auto_hidden=true`,
+			url: `https://api.opensea.io/api/v2/chain/${osChain}/account/${address.toLowerCase()}/nfts?limit=200&include_auto_hidden=true${next ? `&next=${encodeURIComponent(next)}` : ''}`,
 			headers: { 'x-api-key': apiKey, 'accept': 'application/json' },
 			throw: false,
 		})
-		if (res.status !== 200 || !res.json) return []
-		const nfts = (res.json as { nfts?: Array<Record<string, unknown>> }).nfts
-		if (!Array.isArray(nfts)) return []
+		if (res.status !== 200 || !res.json) return out
+		const body = res.json as { nfts?: Array<Record<string, unknown>>; next?: unknown }
+		const nfts = body.nfts
+		if (!Array.isArray(nfts)) return out
 		for (const nft of nfts) {
 			const contract = typeof nft.contract === 'string' ? nft.contract : ''
 			const id = typeof nft.identifier === 'string' ? nft.identifier : ''
@@ -1275,16 +1330,50 @@ export async function openseaAccountHeld(chain: string, address: string, apiKey:
 				image: img,
 				url: typeof nft.opensea_url === 'string' ? nft.opensea_url : `https://opensea.io/assets/${osChain}/${contract}/${id}`,
 				count: 1,
-				spam: nft.is_suspicious === true,
+				// OpenSea flags quest and attendance tokens it does not know; they are not phishing
+				spam: nft.is_suspicious === true && !isOat(name, col),
 				oat: isOat(name, col),
 				standard,
 				minted,
 			})
 		}
+		next = typeof body.next === 'string' ? body.next : ''
+		if (!next) break
+		}
 	} catch {
 		// ignore
 	}
 	return out
+}
+
+interface ExplorerActivity {
+	txhash?: unknown
+	blockNumber?: unknown
+	_from?: unknown
+	dt?: unknown
+}
+
+// A token's transfers from its page on an Etherscan-family explorer, for the tokens the wallet's own
+// list missed; the page carries them as data. Null when the page could not be read at all.
+export async function tokenTransfers(chain: string, contract: string, id: string): Promise<NftTx[] | null> {
+	const site = ETHERSCAN_CHAINS[chain]?.site
+	if (!site) return null
+	const page = `https://${site}/nft/${contract}/${id}`
+	try {
+		const plain = await requestUrl({ url: page, throw: false })
+		const html = plain.status === 200 ? plain.text : await readPage(page, 'new XMLSerializer().serializeToString(document)', 30000, "!!document.querySelector('h2, h1')")
+		const data = /var dt_Data = (\[[\s\S]*?\]);/.exec(html)?.[1]
+		if (!data) return null
+		return (JSON.parse(data) as ExplorerActivity[]).map(row => ({
+			hash: typeof row.txhash === 'string' ? row.txhash : '',
+			from: typeof row._from === 'string' ? row._from : '',
+			blockNumber: typeof row.blockNumber === 'string' ? row.blockNumber : '',
+			timeStamp: typeof row.dt === 'string' ? row.dt : '',
+			tokenId: id,
+		})).filter(row => row.hash)
+	} catch {
+		return null
+	}
 }
 
 export async function nearHeld(address: string): Promise<NftRead> {
@@ -1489,9 +1578,10 @@ export function groupHeldByContract(tokens: HeldNft[]): HeldContract[] {
 	const map = new Map<string, HeldContract>()
 	for (const token of tokens) {
 		const contractAddr = (token.contract || '').trim().toLowerCase()
-		const key = contractAddr ? `${token.chain}:${contractAddr}` : `${token.chain}:${token.collection.toLowerCase()}`
-		const existing = map.get(key)
 		const tokenId = token.tokenId?.trim()
+		const storefront = contractAddr && tokenId ? storefrontCreator(contractAddr, tokenId) : ''
+		const key = contractAddr ? `${token.chain}:${contractAddr}${storefront ? `:${storefront}` : ''}` : `${token.chain}:${token.collection.toLowerCase()}`
+		const existing = map.get(key)
 		const rawImage = token.image?.trim()
 		const image = rawImage && !isInvalidNftMedia(rawImage) ? rawImage : ''
 		const cleanName = cleanCollectionName(token.collection || token.name, '', tokenId)
@@ -1758,6 +1848,19 @@ export async function nftHoldings(
 		}
 	}))
 	const held = results.reduce((all, part) => all.concat(part), [] as HeldNft[])
+	// the explorer calls every shared-storefront token "OpenSea Collections": the token's own metadata has its name
+	for (const token of held) {
+		if (!token.contract || !token.tokenId || !storefrontCreator(token.contract, token.tokenId)) continue
+		const osChain = OPENSEA_CHAINS[token.chain]
+		const meta = osChain ? await tokenMetadata(`https://api.opensea.io/api/v2/metadata/${osChain}/${token.contract}/0x${idHex(token.tokenId)}`).catch(() => null) : null
+		if (typeof meta?.name === 'string' && meta.name) {
+			token.name = meta.name
+			token.collection = meta.name.replace(/\s*#.*$/, '').trim() || meta.name
+		}
+		const image = mediaUrl(meta?.image)
+		if (image) token.image = image
+		await sleep(150)
+	}
 	const chains = [...wanted.keys()].filter(chain => done.get(chain) === wanted.get(chain))
 	if (openseaKey) {
 		let osLookups = 0

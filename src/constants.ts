@@ -106,6 +106,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	en: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -661,6 +662,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ru: {
 		'header.contractCreator': 'Создатель контракта',
 		'header.links': 'Ссылки',
+		'header.notOnChain': 'Ещё не в блокчейне',
 		'settings.wallets.name': 'Кошельки',
 		'header.txHistory': 'История транзакций',
 		'header.from': 'От кого',
@@ -1217,6 +1219,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	de: {
 		'header.contractCreator': 'Vertragsersteller',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaktionsverlauf',
 		'header.from': 'Von',
@@ -1773,6 +1776,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	es: {
 		'header.contractCreator': 'Creador del contrato',
 		'header.links': 'Enlaces',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Billeteras',
 		'header.txHistory': 'Historial de transacciones',
 		'header.from': 'De',
@@ -2329,6 +2333,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	fr: {
 		'header.contractCreator': 'Créateur du contrat',
 		'header.links': 'Liens',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portefeuilles',
 		'header.txHistory': 'Historique des transactions',
 		'header.from': 'De',
@@ -2885,6 +2890,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	zh: {
 		'header.contractCreator': '合约创建者',
 		'header.links': '链接',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': '钱包',
 		'header.txHistory': '交易记录',
 		'header.from': '来自',
@@ -3441,6 +3447,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ar: {
 		'header.contractCreator': 'منشئ العقد',
 		'header.links': 'روابط',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'المحافظ',
 		'header.txHistory': 'سجل المعاملات',
 		'header.from': 'من',
@@ -3997,6 +4004,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	he: {
 		'header.contractCreator': 'יוצר החוזה',
 		'header.links': 'קישורים',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ארנקים',
 		'header.txHistory': 'היסטוריית עסקאות',
 		'header.from': 'שולח',
@@ -4554,6 +4562,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	uk: {
 		'header.contractCreator': 'Творець контракту',
 		'header.links': 'Посилання',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Гаманці',
 		'header.txHistory': 'Історія транзакцій',
 		'header.from': 'Від',
@@ -5108,6 +5117,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ja: {
 		'header.contractCreator': 'コントラクト作成者',
 		'header.links': 'リンク',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ウォレット',
 		'header.txHistory': '取引履歴',
 		'header.from': '送信元',
@@ -5662,6 +5672,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	tl: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Mga wallet',
 		'header.txHistory': 'Istoriko ng transaksyon',
 		'header.from': 'Mula sa',
@@ -6216,6 +6227,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ko: {
 		'header.contractCreator': '컨트랙트 생성자',
 		'header.links': '링크',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': '지갑',
 		'header.txHistory': '거래 내역',
 		'header.from': '보낸 사람',
@@ -6770,6 +6782,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	nl: {
 		'header.contractCreator': 'Contractmaker',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transactiegeschiedenis',
 		'header.from': 'Van',
@@ -7324,6 +7337,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	cs: {
 		'header.contractCreator': 'Tvůrce kontraktu',
 		'header.links': 'Odkazy',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Peněženky',
 		'header.txHistory': 'Historie transakcí',
 		'header.from': 'Od',
@@ -7878,6 +7892,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	hr: {
 		'header.contractCreator': 'Autor ugovora',
 		'header.links': 'Poveznice',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Novčići',
 		'header.txHistory': 'Povijest transakcija',
 		'header.from': 'Od',
@@ -8432,6 +8447,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	hi: {
 		'header.contractCreator': 'कॉन्ट्रैक्ट निर्माता',
 		'header.links': 'लिंक',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'वॉलेट',
 		'header.txHistory': 'लेन-देन का इतिहास',
 		'header.from': 'प्रेषक',
@@ -8986,6 +9002,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	bn: {
 		'header.contractCreator': 'কন্ট্রাক্ট নির্মাতা',
 		'header.links': 'লিঙ্ক',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ওয়ালেট',
 		'header.txHistory': 'লেনদেনের ইতিহাস',
 		'header.from': 'থেকে',
@@ -9540,6 +9557,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	vi: {
 		'header.contractCreator': 'Người tạo hợp đồng',
 		'header.links': 'Liên kết',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Ví',
 		'header.txHistory': 'Lịch sử giao dịch',
 		'header.from': 'Từ',
@@ -10094,6 +10112,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	tr: {
 		'header.contractCreator': 'Sözleşme oluşturucu',
 		'header.links': 'Bağlantılar',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Cüzdanlar',
 		'header.txHistory': 'İşlem geçmişi',
 		'header.from': 'Gönderen',
@@ -10648,6 +10667,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	it: {
 		'header.contractCreator': 'Creatore del contratto',
 		'header.links': 'Link',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portafogli',
 		'header.txHistory': 'Cronologia transazioni',
 		'header.from': 'Da',
@@ -11202,6 +11222,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	jv: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Dompet',
 		'header.txHistory': 'Riwayat transaksi',
 		'header.from': 'Saka',
@@ -11756,6 +11777,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ur: {
 		'header.contractCreator': 'کنٹریکٹ بنانے والا',
 		'header.links': 'روابط',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'والٹ',
 		'header.txHistory': 'لین دین کی تاریخ',
 		'header.from': 'بھیجنے والا',
@@ -12310,6 +12332,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	pl: {
 		'header.contractCreator': 'Twórca kontraktu',
 		'header.links': 'Linki',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portfele',
 		'header.txHistory': 'Historia transakcji',
 		'header.from': 'Od',
@@ -12864,6 +12887,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	th: {
 		'header.contractCreator': 'ผู้สร้างสัญญา',
 		'header.links': 'ลิงก์',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'วอลเล็ต',
 		'header.txHistory': 'ประวัติธุรกรรม',
 		'header.from': 'จาก',
@@ -13418,6 +13442,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	az: {
 		'header.contractCreator': 'Kontraktın yaradıcısı',
 		'header.links': 'Keçidlər',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Cüzdanlar',
 		'header.txHistory': 'Tranzaksiya tarixi',
 		'header.from': 'Göndən',
@@ -13972,6 +13997,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	fa: {
 		'header.contractCreator': 'سازنده قرارداد',
 		'header.links': 'پیوندها',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'کیف پول‌ها',
 		'header.txHistory': 'تاریخچه تراکنش‌ها',
 		'header.from': 'فرستنده',
@@ -14526,6 +14552,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ro: {
 		'header.contractCreator': 'Creatorul contractului',
 		'header.links': 'Linkuri',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portofele',
 		'header.txHistory': 'Istoricul tranzacțiilor',
 		'header.from': 'De la',
@@ -15080,6 +15107,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	si: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -15634,6 +15662,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	be: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -16188,6 +16217,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kk: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -16742,6 +16772,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	uz: {
 		'header.contractCreator': 'Kontrakt yaratuvchisi',
 		'header.links': 'Havolalar',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Hamyonlar',
 		'header.txHistory': 'Tranzaksiya tarixi',
 		'header.from': 'Dan',
@@ -17295,6 +17326,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	af: {
 		'header.contractCreator': 'Kontrakskepper',
 		'header.links': 'Skakels',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallede',
 		'header.txHistory': 'Transaksiegeskiedenis',
 		'header.from': 'Van',
@@ -17847,6 +17879,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	am: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -18399,6 +18432,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	bg: {
 		'header.contractCreator': 'Създател на договора',
 		'header.links': 'Връзки',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Портьонели',
 		'header.txHistory': 'История на транзакциите',
 		'header.from': 'От',
@@ -18951,6 +18985,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ca: {
 		'header.contractCreator': 'Creador del contracte',
 		'header.links': 'Enllaços',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteres',
 		'header.txHistory': 'Historial de transaccions',
 		'header.from': 'De',
@@ -19503,6 +19538,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	da: {
 		'header.contractCreator': 'Kontraktopretter',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Tegnebøger',
 		'header.txHistory': 'Transaktionshistorik',
 		'header.from': 'Fra',
@@ -20055,6 +20091,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	dv: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -20607,6 +20644,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	el: {
 		'header.contractCreator': 'Δημιουργός συμβολαίου',
 		'header.links': 'Σύνδεσμοι',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Πορτοφόλια',
 		'header.txHistory': 'Ιστορικό συναλλαγών',
 		'header.from': 'Αποστελέας',
@@ -21159,6 +21197,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	eo: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Monedoj',
 		'header.txHistory': 'Historio de transakcioj',
 		'header.from': 'De',
@@ -21711,6 +21750,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	eu: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Zaintzak',
 		'header.txHistory': 'Transakzioen historia',
 		'header.from': 'Nontzotik',
@@ -22263,6 +22303,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	fi: {
 		'header.contractCreator': 'Sopimuksen luoja',
 		'header.links': 'Linkit',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Lompakot',
 		'header.txHistory': 'Tapahtumahistoria',
 		'header.from': 'Lähettäjä',
@@ -22815,6 +22856,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ga: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Mallanna',
 		'header.txHistory': 'Stair imeachtaí',
 		'header.from': 'Ó',
@@ -23367,6 +23409,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	gl: {
 		'header.contractCreator': 'Creador do contrato',
 		'header.links': 'Ligazóns',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteiras',
 		'header.txHistory': 'Historial de transaccións',
 		'header.from': 'Desde',
@@ -23919,6 +23962,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	hu: {
 		'header.contractCreator': 'Szerződés létrehozója',
 		'header.links': 'Hivatkozások',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Pénztárcák',
 		'header.txHistory': 'Tranzakcióelőzmények',
 		'header.from': 'Feladó',
@@ -24471,6 +24515,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	id: {
 		'header.contractCreator': 'Pembuat kontrak',
 		'header.links': 'Tautan',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Dompet',
 		'header.txHistory': 'Riwayat transaksi',
 		'header.from': 'Dari',
@@ -25023,6 +25068,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ka: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -25575,6 +25621,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kh: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -26127,6 +26174,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kn: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ವಾಲೆಟ್‌ಗಳು',
 		'header.txHistory': 'ವಹಿವಾಟಿನ ಇತಿಹಾಸ',
 		'header.from': 'ಇಂದ',
@@ -26679,6 +26727,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ky: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -27231,6 +27280,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	la: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Pelei',
 		'header.txHistory': 'Historia negotiationum',
 		'header.from': 'Ex',
@@ -27783,6 +27833,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	lt: {
 		'header.contractCreator': 'Sutarties kūrėjas',
 		'header.links': 'Nuorodos',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Piniginės',
 		'header.txHistory': 'Operacijų istorija',
 		'header.from': 'Iš',
@@ -28335,6 +28386,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	lv: {
 		'header.contractCreator': 'Līguma izveidotājs',
 		'header.links': 'Saites',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transakciju vēsture',
 		'header.from': 'No',
@@ -28887,6 +28939,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kab: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -29439,6 +29492,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ml: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'വാലറ്റ്',
 		'header.txHistory': 'വ്യവഹാര ചരിത്രം',
 		'header.from': 'അയക്കുന്നയാൾ',
@@ -29991,6 +30045,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ms: {
 		'header.contractCreator': 'Pencipta kontrak',
 		'header.links': 'Pautan',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Dompet',
 		'header.txHistory': 'Sejarah transaksi',
 		'header.from': 'Daripada',
@@ -30543,6 +30598,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ne: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'वालेटहरू',
 		'header.txHistory': 'लेनदेन इतिहास',
 		'header.from': 'बाट',
@@ -31095,6 +31151,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	nn: {
 		'header.contractCreator': 'Kontraktoppretter',
 		'header.links': 'Lenkjer',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Lommebøker',
 		'header.txHistory': 'Transaksjonarhistorikk',
 		'header.from': 'Frå',
@@ -31647,6 +31704,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	no: {
 		'header.contractCreator': 'Kontraktoppretter',
 		'header.links': 'Lenker',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Lommebøker',
 		'header.txHistory': 'Transaksjonshistorikk',
 		'header.from': 'Fra',
@@ -32199,6 +32257,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	or: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -32751,6 +32810,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	oc: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Casses',
 		'header.txHistory': 'Istòria de las transaccions',
 		'header.from': 'De',
@@ -33303,6 +33363,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	pt: {
 		'header.contractCreator': 'Criador do contrato',
 		'header.links': 'Ligações',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteiras',
 		'header.txHistory': 'Histórico de transações',
 		'header.from': 'De',
@@ -33855,6 +33916,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sa: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -34407,6 +34469,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sk: {
 		'header.contractCreator': 'Tvorca kontraktu',
 		'header.links': 'Odkazy',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Peňaženky',
 		'header.txHistory': 'Historia transakcií',
 		'header.from': 'Od',
@@ -34959,6 +35022,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sl: {
 		'header.contractCreator': 'Ustvarjalec pogodbe',
 		'header.links': 'Povezave',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Denarnice',
 		'header.txHistory': 'Zgodovina transakcij',
 		'header.from': 'Od',
@@ -35511,6 +35575,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sq: {
 		'header.contractCreator': 'Krijuesi i kontratës',
 		'header.links': 'Lidhje',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portmonedat',
 		'header.txHistory': 'Historia e transaksioneve',
 		'header.from': 'Nga',
@@ -36063,6 +36128,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sr: {
 		'header.contractCreator': 'Tvorac ugovora',
 		'header.links': 'Veze',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Novčanici',
 		'header.txHistory': 'Istorija transakcija',
 		'header.from': 'Od',
@@ -36615,6 +36681,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sv: {
 		'header.contractCreator': 'Kontraktskapare',
 		'header.links': 'Länkar',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Plånböcker',
 		'header.txHistory': 'Transaktionshistorik',
 		'header.from': 'Från',
@@ -37167,6 +37234,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sw: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -37719,6 +37787,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ta: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -38271,6 +38340,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	te: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -38823,6 +38893,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	tt: {
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
 		'header.from': 'From',
@@ -39375,6 +39446,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	'zh-TW': {
 		'header.contractCreator': '合約建立者',
 		'header.links': '連結',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': '錢包',
 		'header.txHistory': '交易記錄',
 		'header.from': '從',
@@ -39927,6 +39999,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	'pt-BR': {
 		'header.contractCreator': 'Criador do contrato',
 		'header.links': 'Links',
+		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteiras',
 		'header.txHistory': 'Histórico de transações',
 		'header.from': 'De',
