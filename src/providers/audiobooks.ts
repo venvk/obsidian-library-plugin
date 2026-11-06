@@ -158,6 +158,17 @@ export class AudiobookProvider implements ContentProvider {
 		return [...audible, ...await this.withItunesTime(unique), ...librivox, ...archive]
 	}
 
+	// The book's length in pages, for an estimate when no catalogue has the audiobook.
+	async pagesOf(title: string, author: string): Promise<number> {
+		try {
+			const params = new URLSearchParams({ title, ...(author ? { author } : {}), fields: 'number_of_pages_median', limit: '5' })
+			const data = await this.json<{ docs?: { number_of_pages_median?: number }[] }>(`https://openlibrary.org/search.json?${params.toString()}`)
+			return (data?.docs ?? []).map(doc => doc.number_of_pages_median ?? 0).find(pages => pages > 0) ?? 0
+		} catch {
+			return 0
+		}
+	}
+
 	// How long a book in the library runs and who reads it, found by its title and author.
 	async lookUp(title: string, author: string): Promise<{ minutes: number; narrators: string[] } | null> {
 		const plain = (value: string): string => value.replace(/\s*[[(].*$/, '')

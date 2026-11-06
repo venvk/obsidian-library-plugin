@@ -326,6 +326,8 @@ export default class LibraryPlugin extends Plugin {
 	private audiobooks = new AudiobookProvider()
 	// asked once a session: a book no catalogue has would be asked for ever
 	private audiobookAsked = new Set<string>()
+	private audiobookFilling = false
+	private audiobookAgain = false
 	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
@@ -1404,7 +1406,7 @@ export default class LibraryPlugin extends Plugin {
 			await this.syncLinkFields(file, fm)
 			this.queueCover(file)
 			// however the note became an audiobook, by the button or by hand in its properties
-			if (this.kindOf(fm) === 'book' && isAudiobook(fm) && runtimeMinutes(fm.Runtime) === null) void this.fillAudiobookTimes()
+			if (this.wantsListeningTime(fm) && !this.audiobookAsked.has(file.path)) void this.fillAudiobookTimes()
 		} catch (e) {
 			console.error('Library: note sync error', file.path, e)
 		}
@@ -2679,26 +2681,60 @@ export default class LibraryPlugin extends Plugin {
 		await this.nftImport(false)
 	}
 
-	// Audiobook notes with no length: found by title and author, so their time counts. Nothing to set up, a note marked
-	// by hand or made before this existed is the same to it.
+	// Audiobook notes with no exact length: looked up by title and author, once a session each, so an edition that
+	// reaches a catalogue later replaces its estimate. A note marked by hand and one made by an import are the same to it.
 	private async fillAudiobookTimes(): Promise<void> {
-		for (const file of this.app.vault.getMarkdownFiles()) {
-			if (this.unloaded) return
-			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-			if (!fm || isTemplateFile(file.path) || this.kindOf(fm) !== 'book' || !isAudiobook(fm) || runtimeMinutes(fm.Runtime) !== null || this.audiobookAsked.has(file.path)) continue
-			this.audiobookAsked.add(file.path)
-			const found = await this.audiobooks.lookUp(toStr(fm.Name) || file.basename, linkLabel(toStrArray(fm.Creator)[0] ?? ''))
-			// no catalogue has this edition: the pages give an estimate, and the note says it is one
-			const estimate = found ? 0 : listeningEstimate(hasChapters(fm) ? 0 : Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1]))
-			if (found || estimate > 0) {
-				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
-					cur.Runtime = found ? found.minutes : estimate
-					if (!found) cur['Runtime Estimated'] = estimate
-					if (found && isEmptyValue(cur.Narrator) && found.narrators.length > 0) cur.Narrator = this.toLinks(found.narrators)
-				})
-			}
-			await this.pause(500)
+		if (this.audiobookFilling) {
+			this.audiobookAgain = true
+			return
 		}
+		this.audiobookFilling = true
+		try {
+			do {
+				this.audiobookAgain = false
+				for (const file of this.app.vault.getMarkdownFiles()) {
+					if (this.unloaded) return
+					const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+					if (!fm || isTemplateFile(file.path) || !this.wantsListeningTime(fm) || this.audiobookAsked.has(file.path)) continue
+					this.audiobookAsked.add(file.path)
+					await this.fillAudiobookTime(file, fm)
+					await this.pause(500)
+				}
+			} while (this.audiobookAgain && !this.unloaded)
+		} finally {
+			this.audiobookFilling = false
+		}
+	}
+
+	// no length yet, or only an estimate
+	private wantsListeningTime(fm: Record<string, unknown>): boolean {
+		if (this.kindOf(fm) !== 'book' || !isAudiobook(fm)) return false
+		const runtime = runtimeMinutes(fm.Runtime)
+		return runtime === null || Number(fm['Runtime Estimated']) === runtime
+	}
+
+	private async fillAudiobookTime(file: TFile, fm: Record<string, unknown>): Promise<void> {
+		const title = toStr(fm.Name) || file.basename
+		const author = linkLabel(toStrArray(fm.Creator)[0] ?? '')
+		const found = await this.audiobooks.lookUp(title, author)
+		if (found) {
+			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+				cur.Runtime = found.minutes
+				delete cur['Runtime Estimated']
+				if (isEmptyValue(cur.Narrator) && found.narrators.length > 0) cur.Narrator = this.toLinks(found.narrators)
+			})
+			return
+		}
+		if (runtimeMinutes(fm.Runtime) !== null) return
+		// no catalogue has this edition: the pages give an estimate, and the note says it is one. Progress counts
+		// pages only where there are no chapters; a book with chapters asks Open Library for its pages.
+		const pages = hasChapters(fm) ? 0 : Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1])
+		const estimate = listeningEstimate(pages >= 20 ? pages : await this.audiobooks.pagesOf(title, author))
+		if (estimate <= 0) return
+		await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+			cur.Runtime = estimate
+			cur['Runtime Estimated'] = estimate
+		})
 	}
 
 	// Everything an import leaves for later, to the last note. What a closed Obsidian cuts short goes on after the next import.
