@@ -624,25 +624,6 @@ async function tokenImage(rpc: string, contract: string, id: string): Promise<st
 	return (await tokenMeta(await tokenUri(rpc, contract, id))).image
 }
 
-export async function resolveMetadataImage(uri: string): Promise<string> {
-	if (!uri) return ''
-	if (/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(uri) || uri.startsWith('data:image/')) return mediaUrl(uri)
-	const meta = await tokenMetadata(uri)
-	if (meta) {
-		const img = meta.image || meta.image_data || meta.animation_url || meta.artifactUri || meta.displayUri || meta.thumbnail_url
-		if (img) {
-			let res = mediaUrl(img)
-			if (res && (/\.json(\?|$)/i.test(res) || res.startsWith('data:application/json'))) {
-				const sub = await tokenMetadata(res)
-				const subImg = sub?.image || sub?.image_data || sub?.animation_url || sub?.artifactUri || sub?.displayUri || sub?.thumbnail_url
-				if (subImg) res = mediaUrl(subImg)
-			}
-			return res
-		}
-	}
-	return mediaUrl(uri)
-}
-
 async function tokenMetadata(uri: string): Promise<{ image?: unknown; name?: unknown; image_data?: unknown; animation_url?: unknown; artifactUri?: unknown; displayUri?: unknown; thumbnail_url?: unknown } | null> {
 	const inline = /^data:application\/json(;base64)?,(.*)$/i.exec(uri)
 	try {

@@ -486,13 +486,13 @@ function titleKey(value: string): string {
 
 // Drops trademark marks and platform tags from note names.
 export function cleanGameTitle(title: string): string {
-	return title
+	const plain = title
 		.normalize('NFC')
 		.replace(/[™®©]/g, '')
 		.replace(/\s*\((?:PlayStation\s*\d?|PS[45](?:\s*[&/]\s*PS[45])?|Nintendo\s*Switch|Switch|PC|Xbox(?:\s*One|\s*Series\s*[xs]?)?)\)/i, ' ')
-		.replace(/\s+(?:на\s+|для\s+|for\s+|on\s+)(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, ' ')
-		.replace(/\s+/g, ' ')
-		.trim()
+	// "Game for Nintendo Switch": the name ends where the platform tag starts
+	const tag = plain.search(/\s+(?:на\s+|для\s+|for\s+|on\s+)(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b/i)
+	return (tag < 0 ? plain : plain.slice(0, tag)).replace(/\s+/g, ' ').trim()
 }
 
 export function findGameNote(

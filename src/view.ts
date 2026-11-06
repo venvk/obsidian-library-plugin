@@ -372,7 +372,7 @@ export class LibraryRenderer {
 			consumed += slice.minutes
 			stops.push(`${slice.color} ${from}% ${(consumed / total) * 100}%`)
 		}
-		chart.setCssStyles({ background: `conic-gradient(${stops.join(', ')})` })
+		chart.setCssProps({ '--library-time-chart': `conic-gradient(${stops.join(', ')})` })
 		// The total switches between hours and days, months, years; the legend follows. Remembered.
 		const stats = this.plugin.settings.stats
 		const totalEl = chart.createDiv({ cls: 'library-time-hole' }).createEl('button', { cls: 'library-time-total' })
@@ -380,7 +380,7 @@ export class LibraryRenderer {
 		const values: Array<{ el: HTMLElement; minutes: number; share: number }> = []
 		for (const slice of slices) {
 			const row = legend.createDiv({ cls: 'library-time-item' })
-			row.createSpan({ cls: 'library-time-dot' }).setCssStyles({ backgroundColor: slice.color })
+			row.createSpan({ cls: 'library-time-dot' }).setCssProps({ '--library-time-dot': slice.color })
 			row.createSpan({ cls: 'library-time-name', text: slice.name })
 			values.push({ el: row.createSpan({ cls: 'library-time-value' }), minutes: slice.minutes, share: Math.round((slice.minutes / total) * 100) })
 		}
@@ -606,7 +606,7 @@ export class LibraryRenderer {
 			taste.histogram.forEach((count, i) => {
 				const bar = bars.createDiv({ cls: `library-taste-bar${count === peak ? ' is-peak' : ''}` })
 				setTooltip(bar, `${String(i + 1)} · ${trCount('stats.taste.rated', count)}`, { placement: 'top' })
-				bar.createDiv({ cls: 'library-taste-fill' }).setCssStyles({ height: `${String(Math.max(count > 0 ? 6 : 2, Math.round((count / peak) * 100)))}%` })
+				bar.createDiv({ cls: 'library-taste-fill' }).setCssProps({ '--library-taste': `${String(Math.max(count > 0 ? 6 : 2, Math.round((count / peak) * 100)))}%` })
 				bar.createDiv({ cls: 'library-taste-score', text: String(i + 1) })
 			})
 			const facts = side.createDiv({ cls: 'library-taste-facts' })
@@ -802,7 +802,7 @@ export class LibraryRenderer {
 		const isNft = toStr(fm.Source) === 'nft' || toStr(fm.Type) === 'NFT'
 		const isSpam = fm.Spam === true || (isNft && fm.Spam !== false && looksLikeSpam(card.name, toStr(fm.Contract)))
 		if (isSpam) {
-			imgDiv.createDiv({ cls: 'card-badge-spam', text: tr('nft.spamBadge') || 'SPAM' })
+			imgDiv.createDiv({ cls: 'card-badge-spam', text: tr('nft.spamBadge') })
 		}
 		if ((toStr(fm.Source) === 'nft' || isCollectible(fm)) && countNum > 1 && this.plugin.settings.nftDisplayMode !== 'all') {
 			imgDiv.createSpan({
@@ -815,7 +815,7 @@ export class LibraryRenderer {
 		const percent = shownProgress(fm, card.kind)
 		if (percent !== null && percent < 100) {
 			const posterProgress = imgDiv.createDiv({ cls: 'card-poster-progress' })
-			posterProgress.createDiv({ cls: 'card-poster-progress-fill' }).setCssStyles({ width: `${String(percent)}%` })
+			posterProgress.createDiv({ cls: 'card-poster-progress-fill' }).setCssProps({ '--library-progress': `${String(percent)}%` })
 			const label = `${String(percent)}%`
 			setTooltip(posterProgress, label, { placement: 'top' })
 			posterProgress.setAttribute('title', label)

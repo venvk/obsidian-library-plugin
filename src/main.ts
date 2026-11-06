@@ -43,7 +43,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, storefrontCreator, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, type HeldContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
+import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, storefrontCreator, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -424,7 +424,8 @@ export default class LibraryPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			if (this.unloaded) return
 			for (const file of this.app.vault.getMarkdownFiles()) this.trackNft(file)
-			this.registerInterval(window.setTimeout(() => void this.consolidateNftNotes(false), 45000))
+			// only where NFTs are read: nothing to tidy without wallets, and a phone leaves the notes to the desktop
+			if (Platform.isDesktopApp && walletPairs(this.settings.nftWallets).length > 0) this.registerInterval(window.setTimeout(() => void this.consolidateNftNotes(false), 45000))
 			this.registerInterval(window.setTimeout(() => void this.fillAudiobookTimes(), 20000))
 			// a token note you delete marks its token as spam for later imports; the import's own trashing does not count
 			this.registerEvent(this.app.vault.on('delete', (file) => {
@@ -1276,14 +1277,14 @@ export default class LibraryPlugin extends Plugin {
 	// uses, so the card is exactly as tall as what it holds; null when the layout gives nothing.
 	private async canvasTextHeight(markdown: string, width: number): Promise<number | null> {
 		const doc = activeDocument
-		const node = doc.body.createDiv({ cls: 'canvas-node' })
-		node.setCssStyles({ position: 'absolute', left: '-100000px', top: '0', width: `${String(width)}px`, visibility: 'hidden' })
+		const node = doc.body.createDiv({ cls: 'canvas-node library-measure' })
+		node.setCssProps({ '--library-measure-width': `${String(width)}px` })
 		const container = node.createDiv({ cls: 'canvas-node-container' })
 		const content = container.createDiv({ cls: 'canvas-node-content markdown-embed' })
 		const embed = content.createDiv({ cls: 'markdown-embed-content' })
 		const view = embed.createDiv({ cls: 'markdown-preview-view markdown-rendered' })
 		// the canvas sizes these to the node (contain: strict, height 100%): here they grow to their content
-		for (const el of [container, content, embed, view]) el.setCssStyles({ height: 'auto', contain: 'none' })
+		for (const el of [container, content, embed, view]) el.addClass('library-measure-grow')
 		const component = new Component()
 		component.load()
 		try {
@@ -2499,7 +2500,7 @@ export default class LibraryPlugin extends Plugin {
 
 				let effectiveTitle = safeTitle
 				const directPath = `${canonical.parent?.path ?? ''}/${safeTitle}.md`
-				const existingDirect = this.app.vault.getAbstractFileByPath(directPath) as TFile | null
+				const existingDirect = this.app.vault.getFileByPath(directPath)
 				if (existingDirect && existingDirect !== canonical) {
 					const exFm = this.app.metadataCache.getFileCache(existingDirect)?.frontmatter
 					const exContract = toStr(exFm?.Contract).toLowerCase()
@@ -2535,77 +2536,10 @@ export default class LibraryPlugin extends Plugin {
 			}
 		}
 
-		await this.pause(50)
-		if (!this.unloaded) await this.cleanVaultNftTransactionTables()
-
-		const badCover = this.app.vault.getAbstractFileByPath('Library/Covers/nft-ccce32a1baf127c5.png')
-		if (badCover instanceof TFile) {
-			try {
-				await this.app.fileManager.trashFile(badCover)
-			} catch {
-				// ignore
-			}
-		}
-
 		if (loud) {
-			new Notice(`NFT: ${consolidated} collections consolidated, ${trashed} duplicate notes removed`)
+			new Notice(tr('notice.nft.consolidated', { count: consolidated, removed: trashed }))
 		}
 		return { consolidated, trashed }
-	}
-
-	async cleanVaultNftTransactionTables(): Promise<number> {
-		const files = this.app.vault.getMarkdownFiles()
-		let cleanedCount = 0
-		let fileCount = 0
-		for (const file of files) {
-			if (this.unloaded) return cleanedCount
-			fileCount++
-			if (fileCount % 20 === 0) await this.pause(20)
-			if (isTemplateFile(file.path)) continue
-			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-			if (!fm || (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE)) continue
-
-			const content = await this.app.vault.read(file)
-			if (!content.includes('| Token ID |') && !content.includes('### Transaction History')) continue
-
-			const tableMatch = content.match(/###\s*Transaction History[\s\S]*?(?:\|[^\n]+\|\n?)+/i)
-				|| content.match(/(?:\|[^\n]+\|\n?){2,}/)
-			if (!tableMatch) continue
-
-			const tableText = tableMatch[0]
-			const lines = tableText.split('\n').filter(l => l.trim().startsWith('|') && l.trim().endsWith('|'))
-			const parsedRows: Array<Record<string, string>> = []
-			for (const line of lines) {
-				const cells = line.split('|').map(c => c.trim()).slice(1, -1)
-				const firstCell = cells[0]
-				if (cells.length < 4 || !firstCell || firstCell === 'Token ID' || /^:?-+:?$/.test(firstCell)) continue
-				const tid = firstCell.replace(/^#/, '').trim()
-				const date = cells[1] || ''
-				const from = (cells[2] || '').replace(/[`]/g, '').trim()
-				const txCell = cells[3] || ''
-				const hashMatch = txCell.match(/\[([^\]]+)\]\(([^)]+)\)/) || txCell.match(/0x[a-fA-F0-9]{40,64}/)
-				const hash = hashMatch ? (hashMatch[2] || hashMatch[0] || '') : txCell
-				const block = cells[4] || ''
-				if (tid || hash) {
-					parsedRows.push({ tokenId: tid, date, from, hash, blockNumber: block })
-				}
-			}
-
-			const newContent = content.replace(tableMatch[0], '').replace(/\n{3,}/g, '\n\n').trim() + '\n'
-			await this.app.vault.modify(file, newContent)
-
-			if (parsedRows.length > 0 && (!Array.isArray(fm.History) || (fm.History as unknown[]).length === 0)) {
-				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
-					cur.History = parsedRows
-				})
-			}
-			cleanedCount++
-		}
-		return cleanedCount
-	}
-
-	private nftBody(_contract: HeldContract): string {
-		return ''
 	}
 
 	// A picture given as data (an on-chain SVG, say) becomes a file in Covers, shared by notes with the same one.
@@ -2957,165 +2891,6 @@ export default class LibraryPlugin extends Plugin {
 			if (!tokenId || this.nftImageNegative.has(key) || this.nftImageCache.has(key)) continue
 			this.enqueueNftToken({ key, chain, contract, tokenId, file, title: toStr(fm?.Name) || file.basename })
 		}
-	}
-
-	async importGoogleBooksLibrary(): Promise<void> {
-		new PromptModal(
-			this.app,
-			'Google Books User ID',
-			userId => {
-				void (async () => {
-					this.settings.googleBooksUserId = userId
-					await this.saveSettings()
-					let created = 0
-					let category = this.settings.categories.find(c => c.contentType === 'book')
-					if (!category) return
-					new Notice(tr('notice.site.importing', { site: 'Google Books' }))
-					const shelves = [4, 3, 2, 1]
-					for (const shelf of shelves) {
-						try {
-							const url = `https://www.googleapis.com/books/v1/users/${encodeURIComponent(userId)}/bookshelves/${String(shelf)}/volumes?maxResults=40`
-							const res = await requestUrl({ url, throw: false })
-							if (res.status !== 200 || !res.json) continue
-							const items = (res.json as { items?: Array<{ id: string; volumeInfo: Record<string, unknown> }> }).items ?? []
-							for (const item of items) {
-								const info = item.volumeInfo
-								const title = typeof info.title === 'string' ? info.title : ''
-								if (!title) continue
-								const authors = Array.isArray(info.authors) ? info.authors.map(String) : []
-								const img = (info.imageLinks as { thumbnail?: string } | undefined)?.thumbnail || ''
-								const published = typeof info.publishedDate === 'string' ? info.publishedDate : ''
-								const complete = shelf === 4
-								const meta: NormalizedMetadata = {
-									fields: {
-										Name: title,
-										Creator: authors,
-										...(img ? { Cover: img.replace(/^http:\/\//i, 'https://') } : {}),
-										...(published ? { Date: published } : {}),
-									},
-									progressTotal: null,
-									imdbId: null,
-								}
-								await this.newNote(category, 'googlebooks', item.id, title, meta, { Complete: complete })
-								created++
-							}
-						} catch (e) {
-							console.error('Library: Google Books import error', e)
-						}
-					}
-					new Notice(tr('notice.site.imported', { site: 'Google Books', created, updated: 0 }))
-				})()
-			},
-			'Google Books Library Import',
-			'Import'
-		).open()
-	}
-
-	async importOpenLibraryLog(): Promise<void> {
-		new PromptModal(
-			this.app,
-			'Open Library Username',
-			username => {
-				void (async () => {
-					this.settings.openLibraryUsername = username
-					await this.saveSettings()
-					let created = 0
-					let category = this.settings.categories.find(c => c.contentType === 'book')
-					if (!category) return
-					new Notice(tr('notice.site.importing', { site: 'Open Library' }))
-					const lists = ['already-read', 'currently-reading', 'want-to-read']
-					for (const list of lists) {
-						try {
-							const url = `https://openlibrary.org/people/${encodeURIComponent(username)}/books/${list}.json`
-							const res = await requestUrl({ url, throw: false })
-							if (res.status !== 200 || !res.json) continue
-							const entries = (res.json as { reading_log_entries?: Array<{ work: Record<string, unknown>; logged_date?: string }> }).reading_log_entries ?? []
-							for (const entry of entries) {
-								const w = entry.work
-								const title = typeof w.title === 'string' ? w.title : ''
-								const key = typeof w.key === 'string' ? w.key : ''
-								if (!title || !key) continue
-								const authors = Array.isArray(w.author_names) ? w.author_names.map(String) : []
-								const coverId = typeof w.cover_id === 'number' || typeof w.cover_id === 'string' ? String(w.cover_id) : ''
-								const cover = coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg` : ''
-								const complete = list === 'already-read'
-								const meta: NormalizedMetadata = {
-									fields: {
-										Name: title,
-										Creator: authors,
-										...(cover ? { Cover: cover } : {}),
-									},
-									progressTotal: null,
-									imdbId: null,
-								}
-								await this.newNote(category, 'openlibrary', key, title, meta, { Complete: complete })
-								created++
-							}
-						} catch (e) {
-							console.error('Library: Open Library import error', e)
-						}
-					}
-					new Notice(tr('notice.site.imported', { site: 'Open Library', created, updated: 0 }))
-				})()
-			},
-			'Open Library Reading Log Import',
-			'Import'
-		).open()
-	}
-
-	async importBooksCsv(): Promise<void> {
-		new PromptModal(
-			this.app,
-			'Vault path to CSV (e.g. goodreads.csv)',
-			csvPath => {
-				void (async () => {
-					const file = this.app.vault.getFileByPath(csvPath)
-					if (!file) {
-						new Notice('File not found: ' + csvPath)
-						return
-					}
-					const text = await this.app.vault.read(file)
-					let created = 0
-					let category = this.settings.categories.find(c => c.contentType === 'book')
-					if (!category) return
-					const lines = text.split(/\r?\n/).filter(Boolean)
-					if (lines.length < 2) return
-					const header = lines[0]?.split(',').map(s => s.trim().replace(/^"|"$/g, '').toLowerCase()) ?? []
-					const titleIdx = header.indexOf('title')
-					const authorIdx = header.indexOf('author') >= 0 ? header.indexOf('author') : header.indexOf('authors')
-					const ratingIdx = header.indexOf('my rating') >= 0 ? header.indexOf('my rating') : header.indexOf('rating')
-					const shelfIdx = header.indexOf('exclusive shelf')
-					const dateIdx = header.indexOf('date read') >= 0 ? header.indexOf('date read') : header.indexOf('pubdate')
-
-					for (let i = 1; i < lines.length; i++) {
-						const line = lines[i]
-						if (!line) continue
-						const row = line.match(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)?.map(col => col.replace(/^,/, '').trim().replace(/^"|"$/g, '').replace(/""/g, '"')) ?? []
-						const title = row[titleIdx]
-						if (!title) continue
-						const author = row[authorIdx] ? [row[authorIdx]] : []
-						const rating = Number(row[ratingIdx]) || undefined
-						const shelf = row[shelfIdx]?.toLowerCase()
-						const complete = shelf === 'read' || !!row[dateIdx]
-						const meta: NormalizedMetadata = {
-							fields: {
-								Name: title,
-								Creator: author,
-							},
-							progressTotal: null,
-							imdbId: null,
-						}
-						const extra: Record<string, unknown> = { Complete: complete }
-						if (rating) extra['My Rating'] = rating
-						await this.newNote(category, 'manual', title, title, meta, extra)
-						created++
-					}
-					new Notice(tr('notice.site.imported', { site: 'CSV', created, updated: 0 }))
-				})()
-			},
-			'Import Books from CSV',
-			'Import'
-		).open()
 	}
 
 	private async youtubeCategory(): Promise<ICategory> {
@@ -5937,7 +5712,7 @@ export default class LibraryPlugin extends Plugin {
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView)
 		if (!view || !view.file) return
 		const sizer = view.containerEl.querySelector('.markdown-preview-sizer')
-		if (!(sizer instanceof HTMLElement)) return
+		if (!sizer?.instanceOf(HTMLElement)) return
 		sizer.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
 
 		const fm = this.app.metadataCache.getFileCache(view.file)?.frontmatter
@@ -6019,7 +5794,7 @@ export default class LibraryPlugin extends Plugin {
 		const renderHeaderMedia = (targetUrl: string, candidateIndex = 0) => {
 			imgSide.empty()
 			if (isNft && (fm.Spam === true || (fm.Spam !== false && looksLikeSpam(name, toStr(fm.Contract))))) {
-				imgSide.createDiv({ cls: 'note-header-spam-badge', text: tr('nft.spamBadge') || 'SPAM' })
+				imgSide.createDiv({ cls: 'note-header-spam-badge', text: tr('nft.spamBadge') })
 			}
 			if (!targetUrl) {
 				if (isNft) {
@@ -6359,7 +6134,7 @@ export default class LibraryPlugin extends Plugin {
 			bar.classList.add('note-header-progress-bar')
 			const fill = createDiv()
 			fill.classList.add('note-header-progress-fill')
-			fill.setCssStyles({ width: String(progressPercent) + '%' })
+			fill.setCssProps({ '--library-progress': String(progressPercent) + '%' })
 			bar.appendChild(fill)
 			progRow.appendChild(bar)
 			infoSide.appendChild(progRow)
@@ -6389,7 +6164,7 @@ export default class LibraryPlugin extends Plugin {
 				renderHeaderMedia(coverSrc(this.app, resolvedMedia) || resolvedMedia, 0)
 			}
 		})
-		this.buildNftHistoryBlock(wrap, fm, file)
+		this.buildNftHistoryBlock(wrap, fm)
 		this.buildSeasonsBlock(wrap, fm, file)
 		this.buildTrophiesBlock(wrap, fm, file)
 		this.buildRecommendations(wrap, fm)
@@ -6569,7 +6344,7 @@ export default class LibraryPlugin extends Plugin {
 
 		const container = createDiv({ cls: 'note-header-nft-tokens' })
 		const titleRow = container.createDiv({ cls: 'note-header-nft-tokens-title' })
-		titleRow.createSpan({ text: tr('header.tokens') || 'Tokens' })
+		titleRow.createSpan({ text: tr('header.tokens') })
 		titleRow.createSpan({ cls: 'note-header-nft-tokens-count', text: ` (${String(tokenIds.length)})` })
 
 		let sortDescending = true
@@ -6605,7 +6380,7 @@ export default class LibraryPlugin extends Plugin {
 				const renderMedia = (wrap: HTMLElement, rawMedia: string): void => {
 					wrap.empty()
 					if (isSpamToken) {
-						wrap.createDiv({ cls: 'nft-token-spam-badge', text: tr('nft.spamBadge') || 'SPAM' })
+						wrap.createDiv({ cls: 'nft-token-spam-badge', text: tr('nft.spamBadge') })
 					}
 					if (isInvalidNftMedia(rawMedia)) {
 						const ph = wrap.createDiv({ cls: 'nft-token-placeholder' })
@@ -6703,12 +6478,12 @@ export default class LibraryPlugin extends Plugin {
 		if (tokenIds.length > 1) {
 			const sortBtn = titleRow.createEl('button', {
 				cls: 'note-header-nft-tokens-sort-btn',
-				text: (sortDescending ? '↓ ' : '↑ ') + (tr('header.minted') || 'Minted')
+				text: (sortDescending ? '↓ ' : '↑ ') + tr('header.minted')
 			})
 			sortBtn.addEventListener('click', (e) => {
 				e.preventDefault()
 				sortDescending = !sortDescending
-				sortBtn.setText((sortDescending ? '↓ ' : '↑ ') + (tr('header.minted') || 'Minted'))
+				sortBtn.setText((sortDescending ? '↓ ' : '↑ ') + tr('header.minted'))
 				renderGrid()
 			})
 		}
@@ -6717,7 +6492,7 @@ export default class LibraryPlugin extends Plugin {
 		wrap.appendChild(container)
 	}
 
-	private buildNftHistoryBlock(wrap: HTMLElement, fm: Record<string, unknown>, file?: TFile): void {
+	private buildNftHistoryBlock(wrap: HTMLElement, fm: Record<string, unknown>): void {
 		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) return
 		const rawHistory = Array.isArray(fm.History) ? (fm.History as Array<Record<string, unknown>>) : []
 
@@ -7388,7 +7163,6 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.soonAt !== 'number') this.settings.soonAt = 0
 		if (typeof this.settings.upNextAt !== 'number') this.settings.upNextAt = 999
 		if (typeof this.settings.localCovers !== 'boolean') this.settings.localCovers = false
-		if (typeof this.settings.enableItunesAudiobooks !== 'boolean') this.settings.enableItunesAudiobooks = true
 		if (typeof this.settings.enableLibrivox !== 'boolean') this.settings.enableLibrivox = true
 		if (typeof this.settings.enableOpenLibrary !== 'boolean') this.settings.enableOpenLibrary = true
 		if (!['english', 'romaji', 'native'].includes(this.settings.titleLanguage)) this.settings.titleLanguage = 'english'

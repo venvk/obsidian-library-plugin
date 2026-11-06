@@ -391,6 +391,7 @@
 }
 
 .library-card .card-poster-progress-fill {
+	width: var(--library-progress);
 	height: 100%;
 	background: var(--interactive-accent);
 	transition: width 0.3s ease;
@@ -761,6 +762,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .note-header-wrap .note-header-progress-fill {
+	width: var(--library-progress);
 	height: 100%;
 	background: var(--interactive-accent);
 	border-radius: 3px;
@@ -1222,6 +1224,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-time-chart {
+	background: var(--library-time-chart);
 	position: relative;
 	width: 100%;
 	max-width: 190px;
@@ -1278,6 +1281,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-time-dot {
+	background-color: var(--library-time-dot);
 	flex-shrink: 0;
 	width: 10px;
 	height: 10px;
@@ -2410,6 +2414,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-taste-fill {
+	height: var(--library-taste);
 	width: 100%;
 	border-radius: 4px;
 	background: color-mix(in srgb, var(--interactive-accent) 38%, transparent);
@@ -2942,4 +2947,17 @@ sort trigger, the chosen one in the accent colour. */
 	font-family: var(--font-monospace);
 	font-size: 11px;
 	color: var(--text-muted);
+}
+
+.canvas-node.library-measure {
+	position: absolute;
+	left: -100000px;
+	top: 0;
+	width: var(--library-measure-width);
+	visibility: hidden;
+}
+
+.canvas-node.library-measure .library-measure-grow {
+	height: auto;
+	contain: none;
 }

@@ -1,4 +1,5 @@
 import { App } from 'obsidian'
+import { tr } from '../i18n'
 import { coverSrc } from '../util'
 
 export class Lightbox {
@@ -42,7 +43,7 @@ export class Lightbox {
 		const closeBtn = createDiv({ cls: 'library-lightbox-close' })
 		closeBtn.setAttribute('role', 'button')
 		closeBtn.setAttribute('tabindex', '0')
-		closeBtn.setAttribute('aria-label', 'Close')
+		closeBtn.setAttribute('aria-label', tr('lightbox.close'))
 		closeBtn.setText('✕')
 		closeBtn.addEventListener('click', (e) => {
 			e.stopPropagation()
@@ -54,7 +55,7 @@ export class Lightbox {
 			const prevBtn = createDiv({ cls: 'library-lightbox-nav library-lightbox-prev' })
 			prevBtn.setAttribute('role', 'button')
 			prevBtn.setAttribute('tabindex', '0')
-			prevBtn.setAttribute('aria-label', 'Previous')
+			prevBtn.setAttribute('aria-label', tr('lightbox.previous'))
 			prevBtn.setText('‹')
 			prevBtn.addEventListener('click', (e) => {
 				e.stopPropagation()
@@ -65,7 +66,7 @@ export class Lightbox {
 			const nextBtn = createDiv({ cls: 'library-lightbox-nav library-lightbox-next' })
 			nextBtn.setAttribute('role', 'button')
 			nextBtn.setAttribute('tabindex', '0')
-			nextBtn.setAttribute('aria-label', 'Next')
+			nextBtn.setAttribute('aria-label', tr('lightbox.next'))
 			nextBtn.setText('›')
 			nextBtn.addEventListener('click', (e) => {
 				e.stopPropagation()

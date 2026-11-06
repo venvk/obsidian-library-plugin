@@ -1,5 +1,5 @@
 import { App, FuzzyMatch, FuzzySuggestModal, TFile } from 'obsidian'
-import { tr } from '../i18n'
+import { formatNumber, tr } from '../i18n'
 import { toStr, toStrArray } from '../util'
 
 export class LibrarySearchModal extends FuzzySuggestModal<TFile> {
@@ -43,7 +43,7 @@ export class LibrarySearchModal extends FuzzySuggestModal<TFile> {
 		if (fm?.Contract) subParts.push(String(fm.Contract))
 		else if (fm?.['Source ID']) subParts.push(String(fm['Source ID']))
 		const tokenLen = toStrArray(fm?.Tokens).length
-		if (tokenLen > 0) subParts.push(`${tokenLen} tokens`)
+		if (tokenLen > 0) subParts.push(`${formatNumber(tokenLen)} ${tr('header.tokens')}`)
 
 		if (subParts.length > 0) {
 			const note = row.createDiv({ cls: 'suggestion-note' })
