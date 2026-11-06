@@ -135,7 +135,6 @@ export function isInvalidNftMedia(url: string): boolean {
 	if (lower.indexOf('nft-placeholder') >= 0) return true
 	if (lower.indexOf('1a09c26b1c30427b26944c47fc7bb9') >= 0) return true
 	if (lower.indexOf('d81a09c26b1c30427b26944c47fc7bb9') >= 0) return true
-	if (lower.indexOf('nft-ccce32a1baf127c5') >= 0) return true
 	return false
 }
 
