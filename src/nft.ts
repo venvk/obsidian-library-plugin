@@ -48,6 +48,8 @@ export interface HeldNft {
 	minted?: string
 	acquired?: string
 	tx?: NftTx
+	// in one of OpenSea's shared contracts: the collection is the creator's, not the contract's
+	storefront?: boolean
 }
 
 export interface NftTx {
@@ -203,18 +205,18 @@ export function nftKey(chain: string, contract: string, id = ''): string {
 }
 
 // OpenSea's shared storefronts hold the tokens of every creator in one contract; a token's id starts
-// with its creator's address, so one contract is many collections.
-const SHARED_STOREFRONTS = ['0x2953399124f0cbb46d2cbacd8a89cf0599974963', '0x495f947276749ce646f68ac8c248420045cb7b5e']
-
-export function storefrontCreator(contract: string, id: string): string {
-	if (SHARED_STOREFRONTS.indexOf(contract.toLowerCase()) < 0) return ''
+// with its creator's address, so one contract is many collections. The contract says its own name.
+export function storefrontCreator(id: string): string {
 	return `0x${idHex(id).padStart(64, '0').slice(0, 40)}`
 }
 
-// Listed on OpenSea by its creator and never sold: the token has a balance but no transaction yet.
-export function lazyMinted(contract: string, id: string, wallets: string[]): boolean {
-	const creator = storefrontCreator(contract, id)
-	return !!creator && wallets.some(wallet => wallet.toLowerCase() === creator)
+export function isStorefrontName(name: string): boolean {
+	return /^opensea (?:collections|shared storefront)\b/i.test(name.trim())
+}
+
+// Listed on OpenSea by its creator and never sold: a balance but no transaction yet. Only a storefront's ids start with an address.
+export function lazyMinted(id: string, wallets: string[]): boolean {
+	return id.length > 60 && wallets.some(wallet => wallet.toLowerCase() === storefrontCreator(id))
 }
 
 // A deleted note's keys. A contract counts as hidden by its own key or address, or when every token
@@ -1174,7 +1176,7 @@ export function projectLinks(collection: OpenSeaCollection, account: OpenSeaAcco
 }
 
 // A collection's site and socials from OpenSea, keyless; with a key the creator's own profile adds to them.
-export async function openseaLinks(chain: string, contract: string, apiKey = '', tokenId = ''): Promise<string[]> {
+export async function openseaLinks(chain: string, contract: string, apiKey = '', storefrontToken = ''): Promise<string[]> {
 	const osChain = OPENSEA_CHAINS[chain]
 	if (!osChain) return []
 	const headers: Record<string, string> = { accept: 'application/json', ...(apiKey ? { 'x-api-key': apiKey } : {}) }
@@ -1184,9 +1186,8 @@ export async function openseaLinks(chain: string, contract: string, apiKey = '',
 	}
 	try {
 		// a shared storefront's contract answers with OpenSea's own collection: the token knows its real one, with a key
-		const shared = !!storefrontCreator(contract, tokenId)
-		if (shared && !apiKey) return []
-		const slug = shared ? (await read<{ nft?: { collection?: unknown } }>(`chain/${osChain}/contract/${contract.toLowerCase()}/nfts/${tokenId}`))?.nft?.collection
+		if (storefrontToken && !apiKey) return []
+		const slug = storefrontToken ? (await read<{ nft?: { collection?: unknown } }>(`chain/${osChain}/contract/${contract.toLowerCase()}/nfts/${storefrontToken}`))?.nft?.collection
 			: (await read<{ collection?: unknown }>(`chain/${osChain}/contract/${contract.toLowerCase()}`))?.collection
 		if (typeof slug !== 'string' || !slug) return []
 		const collection = await read<OpenSeaCollection>(`collections/${encodeURIComponent(slug)}`)
@@ -1556,7 +1557,7 @@ export function groupHeldByContract(tokens: HeldNft[]): HeldContract[] {
 	for (const token of tokens) {
 		const contractAddr = (token.contract || '').trim().toLowerCase()
 		const tokenId = token.tokenId?.trim()
-		const storefront = contractAddr && tokenId ? storefrontCreator(contractAddr, tokenId) : ''
+		const storefront = token.storefront && tokenId ? storefrontCreator(tokenId) : ''
 		const key = contractAddr ? `${token.chain}:${contractAddr}${storefront ? `:${storefront}` : ''}` : `${token.chain}:${token.collection.toLowerCase()}`
 		const existing = map.get(key)
 		const rawImage = token.image?.trim()
@@ -1685,6 +1686,30 @@ async function tezosHeld(address: string): Promise<NftRead> {
 	return { held, chains: ['Tezos'] }
 }
 
+// Asked once per contract, and only of ids long enough to carry an address. A contract a note already
+// knows as a storefront is not asked: an RPC that fails must not fold its collections back together.
+async function markStorefronts(held: HeldNft[], known: Set<string>): Promise<void> {
+	const answers = new Map<string, boolean>()
+	for (const token of held) {
+		if (!token.contract || (token.tokenId ?? '').length <= 60) continue
+		const key = `${token.chain}:${token.contract}`.toLowerCase()
+		let shared = answers.get(key)
+		if (shared === undefined) {
+			shared = known.has(key)
+			const rpc = PUBLIC_RPC[token.chain] || ETHERSCAN_CHAINS[token.chain]?.rpc || ROUTESCAN_CHAINS[token.chain]?.rpc
+			if (!shared && rpc) {
+				try {
+					shared = isStorefrontName(abiString(String(await rpcCall(rpc, 'eth_call', [{ to: token.contract, data: '0x06fdde03' }, 'latest']))))
+				} catch {
+					shared = false
+				}
+			}
+			answers.set(key, shared)
+		}
+		if (shared) token.storefront = true
+	}
+}
+
 interface TonTx {
 	hash?: unknown
 	utime?: unknown
@@ -1764,7 +1789,8 @@ export async function nftHoldings(
 	hasCover: (key: string) => boolean = () => false,
 	known: (key: string) => KnownToken | undefined = () => undefined,
 	openseaKey = '',
-	dated: Set<string> = new Set()
+	dated: Set<string> = new Set(),
+	storefronts: Set<string> = new Set()
 ): Promise<NftRead> {
 	const done = new Map<string, number>()
 	const wanted = new Map<string, number>()
@@ -1828,9 +1854,10 @@ export async function nftHoldings(
 		}
 	}))
 	const held = results.reduce((all, part) => all.concat(part), [] as HeldNft[])
+	await markStorefronts(held, storefronts)
 	// the explorer calls every shared-storefront token "OpenSea Collections": the token's own metadata has its name
 	for (const token of held) {
-		if (!token.contract || !token.tokenId || !storefrontCreator(token.contract, token.tokenId)) continue
+		if (!token.contract || !token.tokenId || !token.storefront) continue
 		const osChain = OPENSEA_CHAINS[token.chain]
 		const meta = osChain ? await tokenMetadata(`https://api.opensea.io/api/v2/metadata/${osChain}/${token.contract}/0x${idHex(token.tokenId)}`).catch(() => null) : null
 		if (typeof meta?.name === 'string' && meta.name) {
