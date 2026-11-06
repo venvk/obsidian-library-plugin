@@ -127,6 +127,7 @@ import {
 	plainCopy,
 	BOOK_FORMATS,
 	isAudiobook,
+	listeningEstimate,
 	COMIC_FORMATS
 } from './util'
 
@@ -1402,6 +1403,8 @@ export default class LibraryPlugin extends Plugin {
 			await this.syncTracking(file, fm)
 			await this.syncLinkFields(file, fm)
 			this.queueCover(file)
+			// however the note became an audiobook, by the button or by hand in its properties
+			if (this.kindOf(fm) === 'book' && isAudiobook(fm) && runtimeMinutes(fm.Runtime) === null) void this.fillAudiobookTimes()
 		} catch (e) {
 			console.error('Library: note sync error', file.path, e)
 		}
@@ -2685,10 +2688,13 @@ export default class LibraryPlugin extends Plugin {
 			if (!fm || isTemplateFile(file.path) || this.kindOf(fm) !== 'book' || !isAudiobook(fm) || runtimeMinutes(fm.Runtime) !== null || this.audiobookAsked.has(file.path)) continue
 			this.audiobookAsked.add(file.path)
 			const found = await this.audiobooks.lookUp(toStr(fm.Name) || file.basename, linkLabel(toStrArray(fm.Creator)[0] ?? ''))
-			if (found) {
+			// no catalogue has this edition: the pages give an estimate, and the note says it is one
+			const estimate = found ? 0 : listeningEstimate(hasChapters(fm) ? 0 : Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1]))
+			if (found || estimate > 0) {
 				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
-					cur.Runtime = found.minutes
-					if (isEmptyValue(cur.Narrator) && found.narrators.length > 0) cur.Narrator = this.toLinks(found.narrators)
+					cur.Runtime = found ? found.minutes : estimate
+					if (!found) cur['Runtime Estimated'] = estimate
+					if (found && isEmptyValue(cur.Narrator) && found.narrators.length > 0) cur.Narrator = this.toLinks(found.narrators)
 				})
 			}
 			await this.pause(500)
@@ -6283,7 +6289,9 @@ export default class LibraryPlugin extends Plugin {
 		if (kind === 'book' || kind === 'comic') this.addFormats(infoSide, file, fm, kind)
 
 		const runtime = runtimeMinutes(fm.Runtime)
-		if (runtime !== null) addRow(tr('header.runtime'), formatRuntime(totalRuntimeMinutes(fm, runtime, kind)))
+		// a length typed over the estimate is no estimate
+		const estimated = runtime !== null && Number(fm['Runtime Estimated']) === runtime
+		if (runtime !== null) addRow(tr('header.runtime'), `${estimated ? '≈ ' : ''}${formatRuntime(totalRuntimeMinutes(fm, runtime, kind))}`, ': ', estimated ? tr('header.runtimeEstimated') : '')
 		const playtimeNum = Number(fm.Playtime)
 		if (!isNaN(playtimeNum) && playtimeNum > 0) {
 			const perPlat = Object.keys(fm)
@@ -6389,8 +6397,6 @@ export default class LibraryPlugin extends Plugin {
 						if (next.length === 0) delete front.Format
 						else front.Format = next.length === 1 ? next[0] : next
 					}).then(() => {
-						// marked as an audiobook: its length is looked up at once
-						window.setTimeout(() => void this.fillAudiobookTimes(), 1000)
 						const idx = current.indexOf(value.toLowerCase())
 						if (on && idx >= 0) current.splice(idx, 1)
 						else if (!on && idx < 0) current.push(value.toLowerCase())

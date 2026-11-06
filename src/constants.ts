@@ -104,6 +104,7 @@ export type SupportedLocale =
 
 export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	en: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Book',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -660,6 +661,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	ru: {
+		'header.runtimeEstimated': 'Оценка по числу страниц. Впишите своё значение в Runtime, чтобы заменить её.',
 		'format.book': 'Книга',
 		'header.contractCreator': 'Создатель контракта',
 		'header.notOnChain': 'Ещё не в блокчейне',
@@ -1217,6 +1219,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Создать категорию «Аудиокниги»',
 	},
 	de: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Buch',
 		'header.contractCreator': 'Vertragsersteller',
 		'header.notOnChain': 'Not on chain yet',
@@ -1774,6 +1777,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Hörbücher-Kategorie erstellen',
 	},
 	es: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Libro',
 		'header.contractCreator': 'Creador del contrato',
 		'header.notOnChain': 'Not on chain yet',
@@ -2331,6 +2335,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crear categoría Audiolibros',
 	},
 	fr: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Livre',
 		'header.contractCreator': 'Créateur du contrat',
 		'header.notOnChain': 'Not on chain yet',
@@ -2888,6 +2893,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Créer la catégorie Livres audio',
 	},
 	zh: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': '图书',
 		'header.contractCreator': '合约创建者',
 		'header.notOnChain': 'Not on chain yet',
@@ -3445,6 +3451,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': '创建有声书分类',
 	},
 	ar: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'كتاب',
 		'header.contractCreator': 'منشئ العقد',
 		'header.notOnChain': 'Not on chain yet',
@@ -4002,6 +4009,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'أنشئ فئة الكتب الصوتية',
 	},
 	he: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'ספר',
 		'header.contractCreator': 'יוצר החוזה',
 		'header.notOnChain': 'Not on chain yet',
@@ -4560,6 +4568,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	uk: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Книга',
 		'header.contractCreator': 'Творець контракту',
 		'header.notOnChain': 'Not on chain yet',
@@ -5115,6 +5124,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ja: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': '書籍',
 		'header.contractCreator': 'コントラクト作成者',
 		'header.notOnChain': 'Not on chain yet',
@@ -5670,6 +5680,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	tl: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Aklat',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -6225,6 +6236,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ko: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': '도서',
 		'header.contractCreator': '컨트랙트 생성자',
 		'header.notOnChain': 'Not on chain yet',
@@ -6780,6 +6792,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	nl: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Boek',
 		'header.contractCreator': 'Contractmaker',
 		'header.notOnChain': 'Not on chain yet',
@@ -7335,6 +7348,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	cs: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kniha',
 		'header.contractCreator': 'Tvůrce kontraktu',
 		'header.notOnChain': 'Not on chain yet',
@@ -7890,6 +7904,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	hr: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Knjiga',
 		'header.contractCreator': 'Autor ugovora',
 		'header.notOnChain': 'Not on chain yet',
@@ -8445,6 +8460,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	hi: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'पुस्तक',
 		'header.contractCreator': 'कॉन्ट्रैक्ट निर्माता',
 		'header.notOnChain': 'Not on chain yet',
@@ -9000,6 +9016,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	bn: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'বই',
 		'header.contractCreator': 'কন্ট্রাক্ট নির্মাতা',
 		'header.notOnChain': 'Not on chain yet',
@@ -9555,6 +9572,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	vi: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Sách',
 		'header.contractCreator': 'Người tạo hợp đồng',
 		'header.notOnChain': 'Not on chain yet',
@@ -10110,6 +10128,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	tr: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kitap',
 		'header.contractCreator': 'Sözleşme oluşturucu',
 		'header.notOnChain': 'Not on chain yet',
@@ -10665,6 +10684,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	it: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Libro',
 		'header.contractCreator': 'Creatore del contratto',
 		'header.notOnChain': 'Not on chain yet',
@@ -11220,6 +11240,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	jv: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Buku',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -11775,6 +11796,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ur: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'کتاب',
 		'header.contractCreator': 'کنٹریکٹ بنانے والا',
 		'header.notOnChain': 'Not on chain yet',
@@ -12330,6 +12352,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	pl: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Książka',
 		'header.contractCreator': 'Twórca kontraktu',
 		'header.notOnChain': 'Not on chain yet',
@@ -12885,6 +12908,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	th: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'หนังสือ',
 		'header.contractCreator': 'ผู้สร้างสัญญา',
 		'header.notOnChain': 'Not on chain yet',
@@ -13440,6 +13464,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	az: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kitab',
 		'header.contractCreator': 'Kontraktın yaradıcısı',
 		'header.notOnChain': 'Not on chain yet',
@@ -13995,6 +14020,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	fa: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'کتاب',
 		'header.contractCreator': 'سازنده قرارداد',
 		'header.notOnChain': 'Not on chain yet',
@@ -14550,6 +14576,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ro: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Carte',
 		'header.contractCreator': 'Creatorul contractului',
 		'header.notOnChain': 'Not on chain yet',
@@ -15105,6 +15132,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	si: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'පොත',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -15660,6 +15688,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	be: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Кніга',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -16215,6 +16244,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	kk: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Кітап',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -16770,6 +16800,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	uz: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kitob',
 		'header.contractCreator': 'Kontrakt yaratuvchisi',
 		'header.notOnChain': 'Not on chain yet',
@@ -17324,6 +17355,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Esma kitoblar kategoriyasini yarating',
 	},
 	af: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Boek',
 		'header.contractCreator': 'Kontrakskepper',
 		'header.notOnChain': 'Not on chain yet',
@@ -17877,6 +17909,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Skep Hoorboek-kategorie',
 	},
 	am: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'መጽሐፍ',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -18430,6 +18463,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	bg: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Книга',
 		'header.contractCreator': 'Създател на договора',
 		'header.notOnChain': 'Not on chain yet',
@@ -18983,6 +19017,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Създайте категория аудиокниги',
 	},
 	ca: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Llibre',
 		'header.contractCreator': 'Creador del contracte',
 		'header.notOnChain': 'Not on chain yet',
@@ -19536,6 +19571,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crea categoria Llibres de so',
 	},
 	da: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Bog',
 		'header.contractCreator': 'Kontraktopretter',
 		'header.notOnChain': 'Not on chain yet',
@@ -20089,6 +20125,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Opret lydbogskategori',
 	},
 	dv: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'ފޮތް',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -20642,6 +20679,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	el: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Βιβλίο',
 		'header.contractCreator': 'Δημιουργός συμβολαίου',
 		'header.notOnChain': 'Not on chain yet',
@@ -21195,6 +21233,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Δημιουργήστε κατηγορία ηχοβιβλίων',
 	},
 	eo: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Libro',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -21748,6 +21787,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Kreŭ kategoriojn de aŭdbukoj',
 	},
 	eu: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Liburua',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -22301,6 +22341,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Audiolibroen kategoria sortzea',
 	},
 	fi: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kirja',
 		'header.contractCreator': 'Sopimuksen luoja',
 		'header.notOnChain': 'Not on chain yet',
@@ -22854,6 +22895,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Luo Äänikirja-luokka',
 	},
 	ga: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Leabhar',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -23407,6 +23449,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Cruthaigh catagóir leabhar chloisteála',
 	},
 	gl: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Libro',
 		'header.contractCreator': 'Creador do contrato',
 		'header.notOnChain': 'Not on chain yet',
@@ -23960,6 +24003,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crear categoría Audiolibros',
 	},
 	hu: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Könyv',
 		'header.contractCreator': 'Szerződés létrehozója',
 		'header.notOnChain': 'Not on chain yet',
@@ -24513,6 +24557,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Hangkönyv kategória létrehozása',
 	},
 	id: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Buku',
 		'header.contractCreator': 'Pembuat kontrak',
 		'header.notOnChain': 'Not on chain yet',
@@ -25066,6 +25111,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Buat kategori audiobook',
 	},
 	ka: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'წიგნი',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -25619,6 +25665,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	kh: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'សៀវភៅ',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -26172,6 +26219,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	kn: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'ಪುಸ್ತಕ',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -26725,6 +26773,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'ಆಡಿಯೋ ಪುಸ್ತಕ ವರ್ಗ ರಚಿಸಿ',
 	},
 	ky: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Китеп',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -27278,6 +27327,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	la: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Liber',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -27831,6 +27881,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create categoriam librorum sonorum',
 	},
 	lt: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Knyga',
 		'header.contractCreator': 'Sutarties kūrėjas',
 		'header.notOnChain': 'Not on chain yet',
@@ -28384,6 +28435,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Sukurti audioknygų kategoriją',
 	},
 	lv: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Grāmata',
 		'header.contractCreator': 'Līguma izveidotājs',
 		'header.notOnChain': 'Not on chain yet',
@@ -28937,6 +28989,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Izveidot Audiogramatu kategoriju',
 	},
 	kab: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Adlis',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -29490,6 +29543,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	ml: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'പുസ്തകം',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -30043,6 +30097,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'ഓഡിയോബുക്ക് വിഭാഗം നിർമ്മിക്കുക',
 	},
 	ms: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Buku',
 		'header.contractCreator': 'Pencipta kontrak',
 		'header.notOnChain': 'Not on chain yet',
@@ -30596,6 +30651,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Cipta kategori audiobuku',
 	},
 	ne: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'पुस्तक',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -31149,6 +31205,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'श्रव्यपुस्तक श्रेणी सिर्जना गर्नुहोस्.',
 	},
 	nn: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktoppretter',
 		'header.notOnChain': 'Not on chain yet',
@@ -31702,6 +31759,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Opprett lydbøkerkategori',
 	},
 	no: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktoppretter',
 		'header.notOnChain': 'Not on chain yet',
@@ -32255,6 +32313,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Opprett lydbokkategori',
 	},
 	or: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'ବହି',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -32808,6 +32867,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	oc: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Libre',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -33361,6 +33421,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crear la categoria dels audiolibres',
 	},
 	pt: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Livro',
 		'header.contractCreator': 'Criador do contrato',
 		'header.notOnChain': 'Not on chain yet',
@@ -33914,6 +33975,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Criar categoria de áudiolivros',
 	},
 	sa: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'पुस्तकम्',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -34467,6 +34529,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	sk: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kniha',
 		'header.contractCreator': 'Tvorca kontraktu',
 		'header.notOnChain': 'Not on chain yet',
@@ -35020,6 +35083,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Vytvorte kategoriu audiokníh',
 	},
 	sl: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Knjiga',
 		'header.contractCreator': 'Ustvarjalec pogodbe',
 		'header.notOnChain': 'Not on chain yet',
@@ -35573,6 +35637,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Ustvarite kategorijo zvočnih knjig',
 	},
 	sq: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Libër',
 		'header.contractCreator': 'Krijuesi i kontratës',
 		'header.notOnChain': 'Not on chain yet',
@@ -36126,6 +36191,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Krijoni Kategorinë e Audio-librave',
 	},
 	sr: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Knjiga',
 		'header.contractCreator': 'Tvorac ugovora',
 		'header.notOnChain': 'Not on chain yet',
@@ -36679,6 +36745,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Napravi kategoriju audio-knjiga',
 	},
 	sv: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktskapare',
 		'header.notOnChain': 'Not on chain yet',
@@ -37232,6 +37299,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Skapa kategori ljudböcker',
 	},
 	sw: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Kitabu',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -37785,6 +37853,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	ta: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'புத்தகம்',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -38338,6 +38407,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	te: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'పుస్తకం',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -38891,6 +38961,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	tt: {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Китап',
 		'header.contractCreator': 'Contract creator',
 		'header.notOnChain': 'Not on chain yet',
@@ -39444,6 +39515,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	'zh-TW': {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': '圖書',
 		'header.contractCreator': '合約建立者',
 		'header.notOnChain': 'Not on chain yet',
@@ -39997,6 +40069,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': '建立有聲書分類',
 	},
 	'pt-BR': {
+		'header.runtimeEstimated': 'Estimated from the page count. Type your own value in Runtime to replace it.',
 		'format.book': 'Livro',
 		'header.contractCreator': 'Criador do contrato',
 		'header.notOnChain': 'Not on chain yet',

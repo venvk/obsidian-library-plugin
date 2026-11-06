@@ -380,6 +380,11 @@ function isVideo(fm: Record<string, unknown>): boolean {
 	return fm.Source === 'youtube'
 }
 
+// A page read aloud takes about 1.8 minutes (some 275 words at 9,000 an hour). Too few pages say nothing.
+export function listeningEstimate(pages: number): number {
+	return pages >= 20 ? Math.round(pages * 1.8) : 0
+}
+
 // Runtime is the whole book, as for an album; the share read counts.
 export function isAudiobook(fm: Record<string, unknown>): boolean {
 	return toStrArray(fm.Format).some(value => /audio/i.test(value))
