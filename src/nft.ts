@@ -1308,8 +1308,8 @@ export async function openseaAccountHeld(chain: string, address: string, apiKey:
 				image: img,
 				url: typeof nft.opensea_url === 'string' ? nft.opensea_url : `https://opensea.io/assets/${osChain}/${contract}/${id}`,
 				count: 1,
-				// OpenSea flags quest and attendance tokens it does not know; they are not phishing
-				spam: nft.is_suspicious === true && !isOat(name, col),
+				// OpenSea's own flag also falls on real quest and attendance tokens: the name decides, as everywhere
+				spam: looksLikeSpam(name, col),
 				oat: isOat(name, col),
 				standard,
 				minted,
@@ -1817,7 +1817,9 @@ export async function nftHoldings(
 		for (const token of found) token.wallets = [address]
 		if (openseaKey && OPENSEA_CHAINS[chain]) {
 			try {
-				const osNfts = await openseaAccountHeld(chain, address, openseaKey)
+				const rpc = PUBLIC_RPC[chain] || ETHERSCAN_CHAINS[chain]?.rpc || ROUTESCAN_CHAINS[chain]?.rpc
+				const listed = await openseaAccountHeld(chain, address, openseaKey)
+				const osNfts = rpc ? await stillHeld(rpc, address, listed) : listed
 				for (const osToken of osNfts) {
 					osToken.wallets = [address]
 					const match = found.find(t => t.contract?.toLowerCase() === osToken.contract?.toLowerCase() && t.tokenId === osToken.tokenId)
