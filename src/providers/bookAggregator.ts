@@ -1,6 +1,7 @@
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 import { AudiobookProvider, isAudiobookId } from './audiobooks'
 import { findChapters } from './openlibrary'
+import { tr } from '../i18n'
 import { SEARCH_BUDGET_MS, within } from '../util'
 
 interface WrappedRaw {
@@ -30,7 +31,7 @@ export class BookAggregatorProvider implements ContentProvider {
 			within(this.audio.search(query, 'book'), SEARCH_BUDGET_MS * 2, [] as SearchResult[])
 		])
 		const wrap = (results: SearchResult[], pid: string): SearchResult[] =>
-			results.map((r) => ({ ...r, raw: { __pid: pid, __raw: r.raw } }))
+			results.map((r) => ({ ...r, badge: tr('format.book'), raw: { __pid: pid, __raw: r.raw } }))
 		return [...wrap(fromGoogle, 'googlebooks'), ...wrap(fromOpenlib, 'openlibrary'), ...fromAudio]
 	}
 

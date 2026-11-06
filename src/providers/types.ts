@@ -15,6 +15,8 @@ export interface SearchResult {
 	raw: unknown
 	// what the source says the title is beyond its medium, when it says it
 	kind?: TitleKind
+	// a ready label beside the title: a book or an audiobook and how long it runs
+	badge?: string
 }
 
 // A film or series' own kind, from Wikidata classes.

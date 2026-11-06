@@ -63,7 +63,9 @@ export class AddContentModal extends SuggestModal<SearchResult> {
 			img.src = cover
 		}
 		const info = el.createDiv({ cls: 'library-suggest-info' })
-		info.createDiv({ cls: 'library-suggest-title', text: result.title })
+		const title = info.createDiv({ cls: 'library-suggest-title has-kind' })
+		title.createSpan({ cls: 'library-suggest-name', text: result.title })
+		if (result.badge) title.createSpan({ cls: 'library-suggest-kind', text: result.badge })
 		const meta = [result.year ? String(result.year) : '', result.subtitle ?? '']
 			.filter(Boolean)
 			.join(' · ')
@@ -244,6 +246,7 @@ export class SearchEverythingModal extends SuggestModal<Found> {
 		const title = info.createDiv({ cls: 'library-suggest-title has-kind' })
 		title.createSpan({ cls: 'library-suggest-name', text: result.title })
 		if (result.kind) title.createSpan({ cls: 'library-suggest-kind', text: tr(`kind.${result.kind}`) })
+		if (result.badge) title.createSpan({ cls: 'library-suggest-kind', text: result.badge })
 		const meta = [result.year ? String(result.year) : '', result.subtitle ?? '']
 			.filter(Boolean)
 			.join(' · ')

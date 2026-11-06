@@ -31,6 +31,7 @@ import {
 	spentTime,
 	spentParts,
 	spentMinutes,
+	isAudiobook,
 	exactHours,
 	runtimeParts,
 	propertyValues,
@@ -74,6 +75,9 @@ const TIME_COLORS: Record<string, string> = {
 	game: 'color-mix(in srgb, var(--interactive-accent) 80%, var(--text-normal))',
 	video: 'color-mix(in srgb, #ff0000 70%, var(--background-primary))'
 }
+
+const AUDIOBOOK_POOL = '\u0000audiobooks'
+const AUDIOBOOK_COLOR = 'color-mix(in srgb, #f59e0b 80%, var(--background-primary))'
 
 // the video category is a manual one, counted by its minutes watched
 function timeColor(cat: ICategory): string | undefined {
@@ -296,10 +300,13 @@ export class LibraryRenderer {
 			})
 			rated.set(cat, list)
 
-			if (timeColor(cat)) {
+			// books have no time of their own, the audiobooks among them do
+			const audiobook = cat.contentType === 'book' && isAudiobook(fm)
+			if (timeColor(cat) || audiobook) {
 				const minutes = spentMinutes(fm, cat.contentType)
 				if (minutes > 0) {
-					timeMinutes.set(cat.name, (timeMinutes.get(cat.name) || 0) + minutes)
+					const pool = audiobook ? AUDIOBOOK_POOL : cat.name
+					timeMinutes.set(pool, (timeMinutes.get(pool) || 0) + minutes)
 				} else if (cat.contentType !== 'game' && runtimeMinutes(fm.Runtime) === null) {
 					// Counted out loud: silently dropping unknown lengths would understate the library.
 					undated++
@@ -341,6 +348,8 @@ export class LibraryRenderer {
 			const minutes = timeMinutes.get(cat.name) || 0
 			if (minutes > 0) time.push({ name: categoryLabel(cat), minutes, color })
 		}
+		const listened = timeMinutes.get(AUDIOBOOK_POOL) || 0
+		if (listened > 0) time.push({ name: tr('settings.default.audiobook'), minutes: listened, color: AUDIOBOOK_COLOR })
 
 		return { columns, time, undated }
 	}
@@ -416,7 +425,7 @@ export class LibraryRenderer {
 		const stats = this.collectStats()
 		const columns = stats.columns.filter(column => column.items.length > 0)
 		const showTime = this.plugin.settings.stats.watchTime
-			&& this.plugin.settings.categories.some(c => timeColor(c) !== undefined)
+			&& this.plugin.settings.categories.some(c => timeColor(c) !== undefined || c.contentType === 'book')
 		const psn = this.plugin.settings.psnStats
 		const mal = this.plugin.settings.malStats
 		const nintendo = this.plugin.settings.nintendoStats

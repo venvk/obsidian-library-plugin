@@ -104,6 +104,7 @@ export type SupportedLocale =
 
 export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	en: {
+		'format.book': 'Book',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -660,6 +661,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	ru: {
+		'format.book': 'Книга',
 		'header.contractCreator': 'Создатель контракта',
 		'header.links': 'Ссылки',
 		'header.notOnChain': 'Ещё не в блокчейне',
@@ -1217,6 +1219,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Создать категорию «Аудиокниги»',
 	},
 	de: {
+		'format.book': 'Buch',
 		'header.contractCreator': 'Vertragsersteller',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -1774,6 +1777,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Hörbücher-Kategorie erstellen',
 	},
 	es: {
+		'format.book': 'Libro',
 		'header.contractCreator': 'Creador del contrato',
 		'header.links': 'Enlaces',
 		'header.notOnChain': 'Not on chain yet',
@@ -2331,6 +2335,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crear categoría Audiolibros',
 	},
 	fr: {
+		'format.book': 'Livre',
 		'header.contractCreator': 'Créateur du contrat',
 		'header.links': 'Liens',
 		'header.notOnChain': 'Not on chain yet',
@@ -2888,6 +2893,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Créer la catégorie Livres audio',
 	},
 	zh: {
+		'format.book': '图书',
 		'header.contractCreator': '合约创建者',
 		'header.links': '链接',
 		'header.notOnChain': 'Not on chain yet',
@@ -3445,6 +3451,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': '创建有声书分类',
 	},
 	ar: {
+		'format.book': 'كتاب',
 		'header.contractCreator': 'منشئ العقد',
 		'header.links': 'روابط',
 		'header.notOnChain': 'Not on chain yet',
@@ -4002,6 +4009,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'أنشئ فئة الكتب الصوتية',
 	},
 	he: {
+		'format.book': 'ספר',
 		'header.contractCreator': 'יוצר החוזה',
 		'header.links': 'קישורים',
 		'header.notOnChain': 'Not on chain yet',
@@ -4560,6 +4568,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	uk: {
+		'format.book': 'Книга',
 		'header.contractCreator': 'Творець контракту',
 		'header.links': 'Посилання',
 		'header.notOnChain': 'Not on chain yet',
@@ -5115,6 +5124,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ja: {
+		'format.book': '書籍',
 		'header.contractCreator': 'コントラクト作成者',
 		'header.links': 'リンク',
 		'header.notOnChain': 'Not on chain yet',
@@ -5670,6 +5680,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	tl: {
+		'format.book': 'Aklat',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -6225,6 +6236,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ko: {
+		'format.book': '도서',
 		'header.contractCreator': '컨트랙트 생성자',
 		'header.links': '링크',
 		'header.notOnChain': 'Not on chain yet',
@@ -6780,6 +6792,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	nl: {
+		'format.book': 'Boek',
 		'header.contractCreator': 'Contractmaker',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -7335,6 +7348,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	cs: {
+		'format.book': 'Kniha',
 		'header.contractCreator': 'Tvůrce kontraktu',
 		'header.links': 'Odkazy',
 		'header.notOnChain': 'Not on chain yet',
@@ -7890,6 +7904,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	hr: {
+		'format.book': 'Knjiga',
 		'header.contractCreator': 'Autor ugovora',
 		'header.links': 'Poveznice',
 		'header.notOnChain': 'Not on chain yet',
@@ -8445,6 +8460,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	hi: {
+		'format.book': 'पुस्तक',
 		'header.contractCreator': 'कॉन्ट्रैक्ट निर्माता',
 		'header.links': 'लिंक',
 		'header.notOnChain': 'Not on chain yet',
@@ -9000,6 +9016,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	bn: {
+		'format.book': 'বই',
 		'header.contractCreator': 'কন্ট্রাক্ট নির্মাতা',
 		'header.links': 'লিঙ্ক',
 		'header.notOnChain': 'Not on chain yet',
@@ -9555,6 +9572,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	vi: {
+		'format.book': 'Sách',
 		'header.contractCreator': 'Người tạo hợp đồng',
 		'header.links': 'Liên kết',
 		'header.notOnChain': 'Not on chain yet',
@@ -10110,6 +10128,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	tr: {
+		'format.book': 'Kitap',
 		'header.contractCreator': 'Sözleşme oluşturucu',
 		'header.links': 'Bağlantılar',
 		'header.notOnChain': 'Not on chain yet',
@@ -10665,6 +10684,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	it: {
+		'format.book': 'Libro',
 		'header.contractCreator': 'Creatore del contratto',
 		'header.links': 'Link',
 		'header.notOnChain': 'Not on chain yet',
@@ -11220,6 +11240,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	jv: {
+		'format.book': 'Buku',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -11775,6 +11796,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ur: {
+		'format.book': 'کتاب',
 		'header.contractCreator': 'کنٹریکٹ بنانے والا',
 		'header.links': 'روابط',
 		'header.notOnChain': 'Not on chain yet',
@@ -12330,6 +12352,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	pl: {
+		'format.book': 'Książka',
 		'header.contractCreator': 'Twórca kontraktu',
 		'header.links': 'Linki',
 		'header.notOnChain': 'Not on chain yet',
@@ -12885,6 +12908,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	th: {
+		'format.book': 'หนังสือ',
 		'header.contractCreator': 'ผู้สร้างสัญญา',
 		'header.links': 'ลิงก์',
 		'header.notOnChain': 'Not on chain yet',
@@ -13440,6 +13464,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	az: {
+		'format.book': 'Kitab',
 		'header.contractCreator': 'Kontraktın yaradıcısı',
 		'header.links': 'Keçidlər',
 		'header.notOnChain': 'Not on chain yet',
@@ -13995,6 +14020,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	fa: {
+		'format.book': 'کتاب',
 		'header.contractCreator': 'سازنده قرارداد',
 		'header.links': 'پیوندها',
 		'header.notOnChain': 'Not on chain yet',
@@ -14550,6 +14576,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	ro: {
+		'format.book': 'Carte',
 		'header.contractCreator': 'Creatorul contractului',
 		'header.links': 'Linkuri',
 		'header.notOnChain': 'Not on chain yet',
@@ -15105,6 +15132,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	si: {
+		'format.book': 'පොත',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -15660,6 +15688,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	be: {
+		'format.book': 'Кніга',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -16215,6 +16244,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	kk: {
+		'format.book': 'Кітап',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -16770,6 +16800,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	},
 
 	uz: {
+		'format.book': 'Kitob',
 		'header.contractCreator': 'Kontrakt yaratuvchisi',
 		'header.links': 'Havolalar',
 		'header.notOnChain': 'Not on chain yet',
@@ -17324,6 +17355,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Esma kitoblar kategoriyasini yarating',
 	},
 	af: {
+		'format.book': 'Boek',
 		'header.contractCreator': 'Kontrakskepper',
 		'header.links': 'Skakels',
 		'header.notOnChain': 'Not on chain yet',
@@ -17877,6 +17909,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Skep Hoorboek-kategorie',
 	},
 	am: {
+		'format.book': 'መጽሐፍ',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -18430,6 +18463,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	bg: {
+		'format.book': 'Книга',
 		'header.contractCreator': 'Създател на договора',
 		'header.links': 'Връзки',
 		'header.notOnChain': 'Not on chain yet',
@@ -18983,6 +19017,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Създайте категория аудиокниги',
 	},
 	ca: {
+		'format.book': 'Llibre',
 		'header.contractCreator': 'Creador del contracte',
 		'header.links': 'Enllaços',
 		'header.notOnChain': 'Not on chain yet',
@@ -19536,6 +19571,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crea categoria Llibres de so',
 	},
 	da: {
+		'format.book': 'Bog',
 		'header.contractCreator': 'Kontraktopretter',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -20089,6 +20125,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Opret lydbogskategori',
 	},
 	dv: {
+		'format.book': 'ފޮތް',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -20642,6 +20679,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	el: {
+		'format.book': 'Βιβλίο',
 		'header.contractCreator': 'Δημιουργός συμβολαίου',
 		'header.links': 'Σύνδεσμοι',
 		'header.notOnChain': 'Not on chain yet',
@@ -21195,6 +21233,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Δημιουργήστε κατηγορία ηχοβιβλίων',
 	},
 	eo: {
+		'format.book': 'Libro',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -21748,6 +21787,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Kreŭ kategoriojn de aŭdbukoj',
 	},
 	eu: {
+		'format.book': 'Liburua',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -22301,6 +22341,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Audiolibroen kategoria sortzea',
 	},
 	fi: {
+		'format.book': 'Kirja',
 		'header.contractCreator': 'Sopimuksen luoja',
 		'header.links': 'Linkit',
 		'header.notOnChain': 'Not on chain yet',
@@ -22854,6 +22895,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Luo Äänikirja-luokka',
 	},
 	ga: {
+		'format.book': 'Leabhar',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -23407,6 +23449,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Cruthaigh catagóir leabhar chloisteála',
 	},
 	gl: {
+		'format.book': 'Libro',
 		'header.contractCreator': 'Creador do contrato',
 		'header.links': 'Ligazóns',
 		'header.notOnChain': 'Not on chain yet',
@@ -23960,6 +24003,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crear categoría Audiolibros',
 	},
 	hu: {
+		'format.book': 'Könyv',
 		'header.contractCreator': 'Szerződés létrehozója',
 		'header.links': 'Hivatkozások',
 		'header.notOnChain': 'Not on chain yet',
@@ -24513,6 +24557,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Hangkönyv kategória létrehozása',
 	},
 	id: {
+		'format.book': 'Buku',
 		'header.contractCreator': 'Pembuat kontrak',
 		'header.links': 'Tautan',
 		'header.notOnChain': 'Not on chain yet',
@@ -25066,6 +25111,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Buat kategori audiobook',
 	},
 	ka: {
+		'format.book': 'წიგნი',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -25619,6 +25665,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	kh: {
+		'format.book': 'សៀវភៅ',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -26172,6 +26219,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	kn: {
+		'format.book': 'ಪುಸ್ತಕ',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -26725,6 +26773,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'ಆಡಿಯೋ ಪುಸ್ತಕ ವರ್ಗ ರಚಿಸಿ',
 	},
 	ky: {
+		'format.book': 'Китеп',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -27278,6 +27327,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	la: {
+		'format.book': 'Liber',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -27831,6 +27881,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create categoriam librorum sonorum',
 	},
 	lt: {
+		'format.book': 'Knyga',
 		'header.contractCreator': 'Sutarties kūrėjas',
 		'header.links': 'Nuorodos',
 		'header.notOnChain': 'Not on chain yet',
@@ -28384,6 +28435,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Sukurti audioknygų kategoriją',
 	},
 	lv: {
+		'format.book': 'Grāmata',
 		'header.contractCreator': 'Līguma izveidotājs',
 		'header.links': 'Saites',
 		'header.notOnChain': 'Not on chain yet',
@@ -28937,6 +28989,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Izveidot Audiogramatu kategoriju',
 	},
 	kab: {
+		'format.book': 'Adlis',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -29490,6 +29543,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	ml: {
+		'format.book': 'പുസ്തകം',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -30043,6 +30097,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'ഓഡിയോബുക്ക് വിഭാഗം നിർമ്മിക്കുക',
 	},
 	ms: {
+		'format.book': 'Buku',
 		'header.contractCreator': 'Pencipta kontrak',
 		'header.links': 'Pautan',
 		'header.notOnChain': 'Not on chain yet',
@@ -30596,6 +30651,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Cipta kategori audiobuku',
 	},
 	ne: {
+		'format.book': 'पुस्तक',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -31149,6 +31205,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'श्रव्यपुस्तक श्रेणी सिर्जना गर्नुहोस्.',
 	},
 	nn: {
+		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktoppretter',
 		'header.links': 'Lenkjer',
 		'header.notOnChain': 'Not on chain yet',
@@ -31702,6 +31759,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Opprett lydbøkerkategori',
 	},
 	no: {
+		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktoppretter',
 		'header.links': 'Lenker',
 		'header.notOnChain': 'Not on chain yet',
@@ -32255,6 +32313,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Opprett lydbokkategori',
 	},
 	or: {
+		'format.book': 'ବହି',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -32808,6 +32867,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	oc: {
+		'format.book': 'Libre',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -33361,6 +33421,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Crear la categoria dels audiolibres',
 	},
 	pt: {
+		'format.book': 'Livro',
 		'header.contractCreator': 'Criador do contrato',
 		'header.links': 'Ligações',
 		'header.notOnChain': 'Not on chain yet',
@@ -33914,6 +33975,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Criar categoria de áudiolivros',
 	},
 	sa: {
+		'format.book': 'पुस्तकम्',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -34467,6 +34529,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	sk: {
+		'format.book': 'Kniha',
 		'header.contractCreator': 'Tvorca kontraktu',
 		'header.links': 'Odkazy',
 		'header.notOnChain': 'Not on chain yet',
@@ -35020,6 +35083,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Vytvorte kategoriu audiokníh',
 	},
 	sl: {
+		'format.book': 'Knjiga',
 		'header.contractCreator': 'Ustvarjalec pogodbe',
 		'header.links': 'Povezave',
 		'header.notOnChain': 'Not on chain yet',
@@ -35573,6 +35637,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Ustvarite kategorijo zvočnih knjig',
 	},
 	sq: {
+		'format.book': 'Libër',
 		'header.contractCreator': 'Krijuesi i kontratës',
 		'header.links': 'Lidhje',
 		'header.notOnChain': 'Not on chain yet',
@@ -36126,6 +36191,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Krijoni Kategorinë e Audio-librave',
 	},
 	sr: {
+		'format.book': 'Knjiga',
 		'header.contractCreator': 'Tvorac ugovora',
 		'header.links': 'Veze',
 		'header.notOnChain': 'Not on chain yet',
@@ -36679,6 +36745,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Napravi kategoriju audio-knjiga',
 	},
 	sv: {
+		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktskapare',
 		'header.links': 'Länkar',
 		'header.notOnChain': 'Not on chain yet',
@@ -37232,6 +37299,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Skapa kategori ljudböcker',
 	},
 	sw: {
+		'format.book': 'Kitabu',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -37785,6 +37853,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	ta: {
+		'format.book': 'புத்தகம்',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -38338,6 +38407,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	te: {
+		'format.book': 'పుస్తకం',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -38891,6 +38961,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	tt: {
+		'format.book': 'Китап',
 		'header.contractCreator': 'Contract creator',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
@@ -39444,6 +39515,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': 'Create Audiobooks category',
 	},
 	'zh-TW': {
+		'format.book': '圖書',
 		'header.contractCreator': '合約建立者',
 		'header.links': '連結',
 		'header.notOnChain': 'Not on chain yet',
@@ -39997,6 +40069,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.audiobookCategory.button': '建立有聲書分類',
 	},
 	'pt-BR': {
+		'format.book': 'Livro',
 		'header.contractCreator': 'Criador do contrato',
 		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',

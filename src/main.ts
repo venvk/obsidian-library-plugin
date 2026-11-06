@@ -78,6 +78,7 @@ import { renderTrophies, TROPHY_GRADES, trophyIcon } from './ui/trophyIcons'
 import { renderPlatformLabels } from './ui/platformIcons'
 import { createEmbedPlayer, toEmbed } from './trailer'
 import { applyEpisodeChange, areSeasonsChanged, chapterNotes, editChapters, setChapterNotes, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, recompute, writeBack, type EpisodeChange, type TrackKind } from './episodes'
+import { AudiobookProvider } from './providers/audiobooks'
 import { ChaptersModal } from './ui/chaptersModal'
 import { ChapterNotesModal } from './ui/chapterNotesModal'
 import { TrailerModal } from './ui/trailerModal'
@@ -125,6 +126,7 @@ import {
 	publicHttpsUrl,
 	plainCopy,
 	BOOK_FORMATS,
+	isAudiobook,
 	COMIC_FORMATS
 } from './util'
 
@@ -312,6 +314,9 @@ export default class LibraryPlugin extends Plugin {
 	private nftTokenQueueWorking = false
 	private nftPendingSaves = new Map<string, { file: TFile; images: string[]; timer: number; onTokenImageResolved?: (url: string) => void }>()
 	private nftBackfilling = false
+	private audiobooks = new AudiobookProvider()
+	// asked once a session: a book no catalogue has would be asked for ever
+	private audiobookAsked = new Set<string>()
 	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
@@ -409,6 +414,7 @@ export default class LibraryPlugin extends Plugin {
 			if (this.unloaded) return
 			for (const file of this.app.vault.getMarkdownFiles()) this.trackNft(file)
 			this.registerInterval(window.setTimeout(() => void this.consolidateNftNotes(false), 45000))
+			this.registerInterval(window.setTimeout(() => void this.fillAudiobookTimes(), 20000))
 			// a token note you delete marks its token as spam for later imports; the import's own trashing does not count
 			this.registerEvent(this.app.vault.on('delete', (file) => {
 				const info = this.nftPaths.get(file.path)
@@ -2660,6 +2666,25 @@ export default class LibraryPlugin extends Plugin {
 	private async nftSyncIfDue(): Promise<void> {
 		if (!Platform.isDesktopApp || walletPairs(this.settings.nftWallets).length === 0 || Date.now() - this.settings.nftLastImport < 24 * 3600000) return
 		await this.nftImport(false)
+	}
+
+	// Audiobook notes with no length: found by title and author, so their time counts. Nothing to set up, a note marked
+	// by hand or made before this existed is the same to it.
+	private async fillAudiobookTimes(): Promise<void> {
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (this.unloaded) return
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (!fm || isTemplateFile(file.path) || this.kindOf(fm) !== 'book' || !isAudiobook(fm) || runtimeMinutes(fm.Runtime) !== null || this.audiobookAsked.has(file.path)) continue
+			this.audiobookAsked.add(file.path)
+			const found = await this.audiobooks.lookUp(toStr(fm.Name) || file.basename, linkLabel(toStrArray(fm.Creator)[0] ?? ''))
+			if (found) {
+				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+					cur.Runtime = found.minutes
+					if (isEmptyValue(cur.Narrator) && found.narrators.length > 0) cur.Narrator = this.toLinks(found.narrators)
+				})
+			}
+			await this.pause(500)
+		}
 	}
 
 	// Everything an import leaves for later, to the last note. What a closed Obsidian cuts short goes on after the next import.
@@ -6353,6 +6378,8 @@ export default class LibraryPlugin extends Plugin {
 						if (next.length === 0) delete front.Format
 						else front.Format = next.length === 1 ? next[0] : next
 					}).then(() => {
+						// marked as an audiobook: its length is looked up at once
+						window.setTimeout(() => void this.fillAudiobookTimes(), 1000)
 						const idx = current.indexOf(value.toLowerCase())
 						if (on && idx >= 0) current.splice(idx, 1)
 						else if (!on && idx < 0) current.push(value.toLowerCase())

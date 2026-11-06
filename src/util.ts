@@ -372,7 +372,7 @@ export function notStarted(fm: Record<string, unknown>, kind?: ContentType): boo
 export function totalRuntimeMinutes(fm: Record<string, unknown>, perEpisode: number, kind?: ContentType): number {
 	if (perEpisode <= 0) return 0
 	const { total } = progressEpisodes(fm)
-	return total > 1 && kind !== 'music' && !isVideo(fm) ? perEpisode * total : perEpisode
+	return total > 1 && kind !== 'music' && !isVideo(fm) && !isAudiobook(fm) ? perEpisode * total : perEpisode
 }
 
 // A YouTube note: Runtime is the whole video and Progress the watched share, as for an album.
@@ -380,12 +380,17 @@ function isVideo(fm: Record<string, unknown>): boolean {
 	return fm.Source === 'youtube'
 }
 
+// Runtime is the whole book, as for an album; the share read counts.
+export function isAudiobook(fm: Record<string, unknown>): boolean {
+	return toStrArray(fm.Format).some(value => /audio/i.test(value))
+}
+
 export function watchedRuntimeMinutes(fm: Record<string, unknown>, kind?: ContentType): number {
 	const perEpisode = runtimeMinutes(fm.Runtime)
 	if (perEpisode === null) return 0
 	const { watched, total } = progressEpisodes(fm)
 	// Album Runtime is the whole album: the played track share counts.
-	if (kind === 'music' || isVideo(fm)) {
+	if (kind === 'music' || isVideo(fm) || isAudiobook(fm)) {
 		// a rewatched video counts once more for each rewatch
 		const times = isVideo(fm) ? 1 + Math.max(0, Number(fm.Rewatched) || 0) : 1
 		if (isFinished(fm, kind)) return perEpisode * times

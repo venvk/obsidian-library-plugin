@@ -1,13 +1,24 @@
 import { requestUrl } from 'obsidian'
 import { tr } from '../i18n'
-import { publicHttpsUrl } from '../util'
+import { formatRuntime, publicHttpsUrl, sameTitle, SEARCH_BUDGET_MS, within } from '../util'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 
-// Audiobooks from three open catalogues, none needs a key: Apple Books through the iTunes search,
-// LibriVox and the Internet Archive. A note's Source ID says which one: itunes:, librivox:, archive:.
+// Audiobooks from four open catalogues, none needs a key: Audible, Apple Books through the iTunes
+// search, LibriVox and the Internet Archive. A note's Source ID says which one by its prefix.
+// An audiobook's Runtime is the whole book, as an album's is.
 
 export function isAudiobookId(sourceId: string): boolean {
-	return /^(itunes|librivox|archive):/.test(sourceId)
+	return /^(audible|itunes|librivox|archive):/.test(sourceId)
+}
+
+export interface AudibleBook {
+	asin?: string
+	title?: string
+	authors?: { name?: string }[]
+	narrators?: { name?: string }[]
+	runtime_length_min?: number
+	release_date?: string
+	product_images?: Record<string, string>
 }
 
 export interface ItunesBook {
@@ -42,11 +53,14 @@ interface ArchiveDoc {
 	runtime?: string
 }
 
+const toText = (value: unknown): string => typeof value === 'string' ? value : ''
+const toNames = (value: unknown): string[] => Array.isArray(value) ? value.map(toText).filter(Boolean) : []
 const list = (value: string | string[] | undefined): string[] => Array.isArray(value) ? value : value ? [value] : []
 const yearOf = (value: string | undefined): number | null => {
 	const year = Number(/\d{4}/.exec(value ?? '')?.[0])
 	return year > 0 ? year : null
 }
+const names = (people: { name?: string }[] | undefined): string[] => (people ?? []).map(person => person.name ?? '').filter(Boolean)
 const audiobook = (fields: Record<string, unknown>, chapters = 0): NormalizedMetadata => ({
 	fields: { ...fields, Format: 'Audiobook' },
 	progressTotal: chapters > 0 ? chapters : null,
@@ -59,7 +73,26 @@ const authorsOf = (book: LibrivoxBook): string[] =>
 const archiveCover = (identifier: string): string | null => identifier ? `https://archive.org/services/img/${identifier}` : null
 const librivoxCover = (book: LibrivoxBook): string | null => archiveCover(/\/details\/([^/?#]+)/.exec(book.url_iarchive ?? '')?.[1] ?? '')
 
-export function itunesMeta(book: ItunesBook): NormalizedMetadata {
+export function audibleMeta(book: AudibleBook): NormalizedMetadata {
+	const cover = book.product_images ? Object.keys(book.product_images).map(size => book.product_images?.[size] ?? '').pop() ?? '' : ''
+	return audiobook({
+		Name: book.title,
+		Creator: names(book.authors),
+		Year: yearOf(book.release_date),
+		Cover: publicHttpsUrl(cover),
+		URL: book.asin ? `https://www.audible.com/pd/${book.asin}` : null,
+		Narrator: names(book.narrators),
+		...(book.runtime_length_min ? { Runtime: book.runtime_length_min } : {}),
+	})
+}
+
+// "PT21H2M4S" in the page's schema.org data: the iTunes API does not say how long a book is.
+export function isoMinutes(value: string): number {
+	const parts = /^PT(?:(\d+)H)?(?:(\d+)M)?/.exec(value)
+	return parts ? Number(parts[1] ?? 0) * 60 + Number(parts[2] ?? 0) : 0
+}
+
+export function itunesMeta(book: ItunesBook, minutes = 0): NormalizedMetadata {
 	const narrator = /narrated by ([^<.;,]+)/i.exec(book.description ?? '')?.[1]?.trim()
 	return audiobook({
 		Name: book.collectionName,
@@ -69,6 +102,7 @@ export function itunesMeta(book: ItunesBook): NormalizedMetadata {
 		Cover: itunesCover(book),
 		URL: publicHttpsUrl(book.collectionViewUrl ?? ''),
 		...(narrator ? { Narrator: [narrator] } : {}),
+		...(minutes > 0 ? { Runtime: minutes } : {}),
 	})
 }
 
@@ -86,14 +120,13 @@ export function librivoxMeta(book: LibrivoxBook): NormalizedMetadata {
 		URL: publicHttpsUrl(book.url_librivox ?? ''),
 		// a crowd reads the long ones: the first few are enough
 		Narrator: [...readers].slice(0, 5),
-		// Runtime of a book with chapters is per chapter, as of a series per episode
-		...(minutes > 0 ? { Runtime: Math.max(1, Math.round(minutes / Math.max(1, sections.length))) } : {}),
+		...(minutes > 0 ? { Runtime: minutes } : {}),
 		...(sections.length >= 2 ? { Chapters: sections.map((section, i) => ({ title: section.title || `${String(i + 1)}` })) } : {}),
 	}, sections.length)
 }
 
 export function archiveMeta(doc: ArchiveDoc): NormalizedMetadata {
-	const hours = /^(\d+):(\d{2})(?::\d{2})?$/.exec(doc.runtime ?? '')
+	const minutes = hoursOf(doc.runtime)
 	const skip = /^(audio ?book|librivox|podcast)s?$/i
 	return audiobook({
 		Name: doc.title,
@@ -102,27 +135,56 @@ export function archiveMeta(doc: ArchiveDoc): NormalizedMetadata {
 		Genre: list(doc.subject).reduce((all, value) => all.concat(value.split(/;\s*/)), [] as string[]).filter(value => value && !skip.test(value)).slice(0, 5),
 		Cover: archiveCover(doc.identifier ?? ''),
 		URL: doc.identifier ? `https://archive.org/details/${doc.identifier}` : null,
-		...(hours ? { Runtime: Number(hours[1]) * 60 + Number(hours[2]) } : {}),
+		...(minutes > 0 ? { Runtime: minutes } : {}),
 	})
 }
 
-const subtitle = (creator: string | undefined): string => [tr('format.audiobook'), creator].filter(Boolean).join(' · ')
+const badge = (minutes: number): string => [tr('format.audiobook'), minutes > 0 ? formatRuntime(minutes) : ''].filter(Boolean).join(' · ')
+const hoursOf = (runtime: string | undefined): number => {
+	const hours = /^(\d+):(\d{2})(?::\d{2})?$/.exec(runtime ?? '')
+	return hours ? Number(hours[1]) * 60 + Number(hours[2]) : 0
+}
+const AUDIBLE = 'https://api.audible.com/1.0/catalog/products'
+const AUDIBLE_GROUPS = 'response_groups=contributors,product_attrs,media'
 
 export class AudiobookProvider implements ContentProvider {
 	readonly id = 'audiobooks'
 	readonly contentTypes: ContentType[] = ['book']
 
 	async search(query: string): Promise<SearchResult[]> {
-		const found = await Promise.all([this.searchItunes(query), this.searchLibrivox(query), this.searchArchive(query)])
-		return found.reduce((all, part) => all.concat(part), [] as SearchResult[])
+		const [audible, apple, librivox, archive] = await Promise.all([this.searchAudible(query), this.searchItunes(query), this.searchLibrivox(query), this.searchArchive(query)])
+		// the same book on Audible and Apple Books once: Audible says how long it is without another request
+		const unique = apple.filter(book => !audible.some(known => sameTitle(known.title, book.title)))
+		return [...audible, ...await this.withItunesTime(unique), ...librivox, ...archive]
+	}
+
+	// How long a book in the library runs and who reads it, found by its title and author.
+	async lookUp(title: string, author: string): Promise<{ minutes: number; narrators: string[] } | null> {
+		const plain = (value: string): string => value.replace(/\s*[[(].*$/, '')
+		try {
+			const data = await this.json<{ products?: AudibleBook[] }>(`${AUDIBLE}?keywords=${encodeURIComponent(`${title} ${author}`.trim())}&num_results=25&${AUDIBLE_GROUPS}`)
+			const family = author.trim().split(/\s+/).pop()?.toLowerCase() ?? ''
+			const book = (data?.products ?? []).find(item => sameTitle(plain(item.title ?? ''), title) && item.runtime_length_min && (!family || names(item.authors).some(name => name.toLowerCase().includes(family))))
+			if (book) return { minutes: book.runtime_length_min ?? 0, narrators: names(book.narrators) }
+			const free = await this.json<{ books?: LibrivoxBook[] }>(`https://librivox.org/api/feed/audiobooks?title=${encodeURIComponent(title)}&format=json&extended=1&limit=5`)
+			const open = (free?.books ?? []).find(item => sameTitle(item.title ?? '', title) && item.totaltimesecs)
+			if (!open) return null
+			return { minutes: Math.round((open.totaltimesecs ?? 0) / 60), narrators: toNames(librivoxMeta(open).fields.Narrator) }
+		} catch {
+			return null
+		}
 	}
 
 	async fetch(sourceId: string): Promise<NormalizedMetadata | null> {
 		const [source = '', id = ''] = sourceId.split(/:(.*)/)
 		try {
+			if (source === 'audible') {
+				const book = (await this.json<{ product?: AudibleBook }>(`${AUDIBLE}/${encodeURIComponent(id)}?${AUDIBLE_GROUPS}`))?.product
+				return book ? audibleMeta(book) : null
+			}
 			if (source === 'itunes') {
 				const book = (await this.json<{ results?: ItunesBook[] }>(`https://itunes.apple.com/lookup?id=${encodeURIComponent(id)}&entity=audiobook`))?.results?.[0]
-				return book ? itunesMeta(book) : null
+				return book ? itunesMeta(book, await this.itunesMinutes(book)) : null
 			}
 			if (source === 'librivox') {
 				const book = (await this.json<{ books?: LibrivoxBook[] }>(`https://librivox.org/api/feed/audiobooks?id=${encodeURIComponent(id)}&format=json&extended=1`))?.books?.[0]
@@ -143,6 +205,42 @@ export class AudiobookProvider implements ContentProvider {
 		return resp.status === 200 ? resp.json as T : null
 	}
 
+	private async itunesMinutes(book: ItunesBook): Promise<number> {
+		const url = publicHttpsUrl(book.collectionViewUrl ?? '')
+		if (!url) return 0
+		try {
+			const page = await requestUrl({ url, throw: false })
+			return page.status === 200 ? isoMinutes(/"duration":"(PT[^"]+)"/.exec(page.text)?.[1] ?? '') : 0
+		} catch {
+			return 0
+		}
+	}
+
+	// the first few only: each one costs a page, and a slow page must not hold the search back
+	private async withItunesTime(results: SearchResult[]): Promise<SearchResult[]> {
+		const shown = results.slice(0, 4)
+		const minutes = await Promise.all(shown.map(result => within(this.itunesMinutes(result.raw as ItunesBook), SEARCH_BUDGET_MS, 0)))
+		return results.map((result, i) => ({ ...result, badge: badge(minutes[i] ?? 0) }))
+	}
+
+	private async searchAudible(query: string): Promise<SearchResult[]> {
+		try {
+			const data = await this.json<{ products?: AudibleBook[] }>(`${AUDIBLE}?keywords=${encodeURIComponent(query)}&num_results=8&${AUDIBLE_GROUPS}`)
+			return (data?.products ?? []).filter(book => book.asin && book.title).map(book => ({
+				provider: this.id,
+				sourceId: `audible:${book.asin ?? ''}`,
+				title: book.title ?? '',
+				year: yearOf(book.release_date),
+				cover: toText(audibleMeta(book).fields.Cover) || null,
+				subtitle: names(book.authors)[0] ?? null,
+				badge: badge(book.runtime_length_min ?? 0),
+				raw: book,
+			}))
+		} catch {
+			return []
+		}
+	}
+
 	private async searchItunes(query: string): Promise<SearchResult[]> {
 		try {
 			const data = await this.json<{ results?: ItunesBook[] }>(`https://itunes.apple.com/search?term=${encodeURIComponent(query)}&media=audiobook&entity=audiobook&limit=8`)
@@ -152,7 +250,7 @@ export class AudiobookProvider implements ContentProvider {
 				title: book.collectionName ?? '',
 				year: yearOf(book.releaseDate),
 				cover: itunesCover(book),
-				subtitle: subtitle(book.artistName),
+				subtitle: book.artistName ?? null,
 				raw: book,
 			}))
 		} catch {
@@ -169,7 +267,8 @@ export class AudiobookProvider implements ContentProvider {
 				title: book.title ?? '',
 				year: yearOf(book.copyright_year),
 				cover: librivoxCover(book),
-				subtitle: subtitle(authorsOf(book)[0]),
+				subtitle: authorsOf(book)[0] ?? null,
+				badge: badge(Math.round((book.totaltimesecs ?? 0) / 60)),
 				raw: book,
 			}))
 		} catch {
@@ -182,7 +281,7 @@ export class AudiobookProvider implements ContentProvider {
 		try {
 			const words = query.replace(/["()\\:]/g, ' ').trim()
 			const q = `title:(${words}) AND mediatype:audio AND subject:audiobook AND NOT collection:librivoxaudio`
-			const fields = ['identifier', 'title', 'creator', 'date'].map(field => `fl[]=${field}`).join('&')
+			const fields = ['identifier', 'title', 'creator', 'date', 'runtime'].map(field => `fl[]=${field}`).join('&')
 			const data = await this.json<{ response?: { docs?: ArchiveDoc[] } }>(`https://archive.org/advancedsearch.php?q=${encodeURIComponent(q)}&${fields}&rows=6&output=json`)
 			return (data?.response?.docs ?? []).filter(doc => doc.identifier && doc.title).map(doc => ({
 				provider: this.id,
@@ -190,7 +289,8 @@ export class AudiobookProvider implements ContentProvider {
 				title: doc.title ?? '',
 				year: yearOf(doc.date),
 				cover: archiveCover(doc.identifier ?? ''),
-				subtitle: subtitle(list(doc.creator)[0]),
+				subtitle: list(doc.creator)[0] ?? null,
+				badge: badge(hoursOf(doc.runtime)),
 				raw: doc,
 			}))
 		} catch {
