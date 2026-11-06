@@ -105,15 +105,40 @@
 	width: 28px;
 	height: 28px;
 	border-radius: var(--radius-s);
-	color: var(--text-muted);
-	background: var(--background-modifier-hover);
+	color: #ffffff;
 	text-decoration: none;
 }
 
 .note-header-link:hover,
 .note-header-link:focus-visible {
-	color: var(--text-normal);
-	background: var(--background-modifier-active-hover);
+	color: #ffffff;
+	filter: brightness(1.15);
+}
+
+.note-header-link.is-site {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.note-header-link.is-x {
+	background: #000000;
+	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+.note-header-link.is-discord {
+	background: #5865f2;
+}
+
+.note-header-link.is-opensea {
+	background: #2081e2;
+}
+
+.note-header-link.is-telegram {
+	background: #26a5e4;
+}
+
+.note-header-link.is-instagram {
+	background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
 }
 
 .note-header-link svg {

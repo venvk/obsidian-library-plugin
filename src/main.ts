@@ -6136,7 +6136,7 @@ export default class LibraryPlugin extends Plugin {
 			const links = infoSide.createDiv({ cls: 'note-header-links' })
 			for (const url of projectLinks) {
 				const service = linkService(url)
-				const link = links.createEl('a', { cls: 'note-header-link', href: url, attr: { target: '_blank', rel: 'noopener noreferrer', 'aria-label': service.name } })
+				const link = links.createEl('a', { cls: `note-header-link is-${service.mark ?? 'site'}`, href: url, attr: { target: '_blank', rel: 'noopener noreferrer', 'aria-label': service.name } })
 				setTooltip(link, service.name, { placement: 'top' })
 				if (service.mark) link.appendChild(platformMark(service.mark))
 				else setIcon(link, 'globe')
