@@ -43,7 +43,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, storefrontCreator, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
+import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -2058,10 +2058,13 @@ export default class LibraryPlugin extends Plugin {
 			const covered = new Set<string>()
 			const known = new Map<string, KnownToken>()
 			const dated = new Set<string>()
+			const storefronts = new Set<string>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 				if (!fm || toStr(fm.Source) !== NFT_SOURCE) continue
 				for (const row of toArrayOf(fm.History)) dated.add(toStr(row.tokenId))
+				const sourceParts = toStr(fm['Source ID']).toLowerCase().split(':')
+				if (sourceParts.length > 2) storefronts.add(sourceParts.slice(0, 2).join(':'))
 				if (toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
 				known.set(toStr(fm['Source ID']), { uri: toStr(fm['Token URI']) || undefined, minted: toStr(fm.Minted) || undefined })
 			}
@@ -2071,7 +2074,8 @@ export default class LibraryPlugin extends Plugin {
 				key => covered.has(key),
 				key => known.get(key),
 				this.apiKey('openseaApiKey'),
-				dated
+				dated,
+				storefronts
 			)
 			if (read.chains.length === 0 && read.held.length === 0) {
 				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
@@ -2697,7 +2701,7 @@ export default class LibraryPlugin extends Plugin {
 			const chain = toStrArray(fm?.Platforms)[0] ?? ''
 			const wallets = toStrArray(fm?.Wallet).map(linkLabel)
 			const known = new Set(toArrayOf(fm?.History).map(row => toStr(row.tokenId)))
-			const missing = toStrArray(fm?.Tokens).filter(id => !known.has(id) && !lazyMinted(contract, id, wallets) && !this.nftNoTransfers.has(`${contract}:${id}`))
+			const missing = toStrArray(fm?.Tokens).filter(id => !known.has(id) && !lazyMinted(id, wallets) && !this.nftNoTransfers.has(`${contract}:${id}`))
 			const rows: Record<string, unknown>[] = []
 			for (const id of missing) {
 				if (this.unloaded) return
@@ -2725,10 +2729,11 @@ export default class LibraryPlugin extends Plugin {
 			if (!/^0x[0-9a-fA-F]{40}$/.test(contract) || EVM_NETWORKS.indexOf(chain) < 0) continue
 			// in a shared storefront the creator is the token's, the contract is OpenSea's own
 			const token = toStrArray(fm?.Tokens)[0] ?? ''
-			const creator = storefrontCreator(contract, token) || await contractCreator(chain, contract, this.apiKey('etherscanApiKey'))
+			const owner = toStr(fm?.['Source ID']).split(':')[2] ?? ''
+			const creator = owner || await contractCreator(chain, contract, this.apiKey('etherscanApiKey'))
 			// an explorer that did not answer is asked again after the next import
 			if (creator === null) continue
-			const links = await openseaLinks(chain, contract, this.apiKey('openseaApiKey'), token)
+			const links = await openseaLinks(chain, contract, this.apiKey('openseaApiKey'), owner ? token : '')
 			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
 				// asked once: an empty value says so
 				cur['Contract Creator'] = creator
@@ -6674,7 +6679,7 @@ export default class LibraryPlugin extends Plugin {
 					})
 				} else {
 					// a token OpenSea holds for its creator was never written to the chain
-					txTd.setText(lazyMinted(toStr(fm.Contract), tokenId, wallets) ? tr('header.notOnChain') : '-')
+					txTd.setText(lazyMinted(tokenId, wallets) ? tr('header.notOnChain') : '-')
 				}
 
 				const blockTd = trEl.createEl('td')
