@@ -91,6 +91,36 @@
 	height: 18px;
 }
 
+.note-header-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.note-header-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--radius-s);
+	color: var(--text-muted);
+	background: var(--background-modifier-hover);
+	text-decoration: none;
+}
+
+.note-header-link:hover,
+.note-header-link:focus-visible {
+	color: var(--text-normal);
+	background: var(--background-modifier-active-hover);
+}
+
+.note-header-link svg {
+	width: 16px;
+	height: 16px;
+}
+
 .note-header-pill {
 	display: inline-flex;
 	align-items: center;

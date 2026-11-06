@@ -75,7 +75,7 @@ import { SIGNER_PROJECT, codeFromRedirect as nintendoCode, exchangeNintendoCode,
 import { codeFromEpicRedirect, EPIC_AUTH_PROBE, epicAuthUrl, epicExpired, exchangeEpicCode, fetchEpicLibrary, refreshEpicTokens } from './epic'
 import { eaAuthUrl, EA_AUTH_PROBE, eaExpired, eaSilentToken, exchangeEaToken, fetchEaLibrary, tokenFromEaRedirect } from './ea'
 import { renderTrophies, TROPHY_GRADES, trophyIcon } from './ui/trophyIcons'
-import { renderPlatformLabels } from './ui/platformIcons'
+import { platformMark, renderPlatformLabels } from './ui/platformIcons'
 import { createEmbedPlayer, toEmbed } from './trailer'
 import { applyEpisodeChange, areSeasonsChanged, chapterNotes, editChapters, setChapterNotes, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, recompute, writeBack, type EpisodeChange, type TrackKind } from './episodes'
 import { AudiobookProvider } from './providers/audiobooks'
@@ -175,11 +175,19 @@ function sortHistory(rows: Record<string, unknown>[]): Record<string, unknown>[]
 	return [...rows].sort((a, b) => time(b) - time(a) || block(b) - block(a))
 }
 
-// A link's name: the service for a social page, the host for a site.
-function linkName(url: string): string {
+// A link's service and its mark; a site is named by its host.
+function linkService(url: string): { name: string; mark?: string } {
 	const host = new URL(url).hostname.replace(/^www\./, '')
-	const known: Record<string, string> = { 'x.com': 'X', 'twitter.com': 'X', 'discord.gg': 'Discord', 'discord.com': 'Discord', 't.me': 'Telegram', 'instagram.com': 'Instagram', 'opensea.io': 'OpenSea' }
-	return known[host] ?? host
+	const known: Record<string, { name: string; mark: string }> = {
+		'x.com': { name: 'X', mark: 'x' },
+		'twitter.com': { name: 'X', mark: 'x' },
+		'discord.gg': { name: 'Discord', mark: 'discord' },
+		'discord.com': { name: 'Discord', mark: 'discord' },
+		't.me': { name: 'Telegram', mark: 'telegram' },
+		'instagram.com': { name: 'Instagram', mark: 'instagram' },
+		'opensea.io': { name: 'OpenSea', mark: 'opensea' },
+	}
+	return known[host] ?? { name: host }
 }
 
 // A mint date only moves earlier and an acquired date only later: a read that missed a token must not undo them.
@@ -6122,6 +6130,18 @@ export default class LibraryPlugin extends Plugin {
 				})
 			}
 		}
+		// the project's own pages, right under its name: a mark each, the site as a globe
+		const projectLinks = toStrArray(fm['Project Links']).map(value => safeUrl(value)).filter((value): value is string => value !== null)
+		if (projectLinks.length > 0) {
+			const links = infoSide.createDiv({ cls: 'note-header-links' })
+			for (const url of projectLinks) {
+				const service = linkService(url)
+				const link = links.createEl('a', { cls: 'note-header-link', href: url, attr: { target: '_blank', rel: 'noopener noreferrer', 'aria-label': service.name } })
+				setTooltip(link, service.name, { placement: 'top' })
+				if (service.mark) link.appendChild(platformMark(service.mark))
+				else setIcon(link, 'globe')
+			}
+		}
 		if (badges.childElementCount > 0) infoSide.appendChild(badges)
 
 		const addRow = (label: string, value: string, separator = ': ', title = ''): void => {
@@ -6175,15 +6195,6 @@ export default class LibraryPlugin extends Plugin {
 				const row = infoSide.createDiv({ cls: 'note-header-row' })
 				row.createEl('b', { text: tr('header.contractCreator') + ': ' })
 				row.createEl('a', { cls: 'external-link', href: explorerAddressUrl(site, creatorAddress), text: short(creatorAddress), attr: { target: '_blank', rel: 'noopener noreferrer', title: creatorAddress } })
-			}
-			const projectLinks = toStrArray(fm['Project Links']).map(value => safeUrl(value)).filter((value): value is string => value !== null)
-			if (projectLinks.length > 0) {
-				const row = infoSide.createDiv({ cls: 'note-header-row' })
-				row.createEl('b', { text: tr('header.links') + ': ' })
-				projectLinks.forEach((url, i) => {
-					if (i > 0) row.appendText(' · ')
-					row.createEl('a', { cls: 'external-link', href: url, text: linkName(url), attr: { target: '_blank', rel: 'noopener noreferrer' } })
-				})
 			}
 			// a wallet is a link like a person: its canvas holds its tokens, and the graph joins them
 			const wallets = toStrArray(fm.Wallet)

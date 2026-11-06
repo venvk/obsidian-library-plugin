@@ -106,7 +106,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	en: {
 		'format.book': 'Book',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -663,7 +662,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ru: {
 		'format.book': 'Книга',
 		'header.contractCreator': 'Создатель контракта',
-		'header.links': 'Ссылки',
 		'header.notOnChain': 'Ещё не в блокчейне',
 		'settings.wallets.name': 'Кошельки',
 		'header.txHistory': 'История транзакций',
@@ -1221,7 +1219,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	de: {
 		'format.book': 'Buch',
 		'header.contractCreator': 'Vertragsersteller',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaktionsverlauf',
@@ -1779,7 +1776,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	es: {
 		'format.book': 'Libro',
 		'header.contractCreator': 'Creador del contrato',
-		'header.links': 'Enlaces',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Billeteras',
 		'header.txHistory': 'Historial de transacciones',
@@ -2337,7 +2333,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	fr: {
 		'format.book': 'Livre',
 		'header.contractCreator': 'Créateur du contrat',
-		'header.links': 'Liens',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portefeuilles',
 		'header.txHistory': 'Historique des transactions',
@@ -2895,7 +2890,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	zh: {
 		'format.book': '图书',
 		'header.contractCreator': '合约创建者',
-		'header.links': '链接',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': '钱包',
 		'header.txHistory': '交易记录',
@@ -3453,7 +3447,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ar: {
 		'format.book': 'كتاب',
 		'header.contractCreator': 'منشئ العقد',
-		'header.links': 'روابط',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'المحافظ',
 		'header.txHistory': 'سجل المعاملات',
@@ -4011,7 +4004,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	he: {
 		'format.book': 'ספר',
 		'header.contractCreator': 'יוצר החוזה',
-		'header.links': 'קישורים',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ארנקים',
 		'header.txHistory': 'היסטוריית עסקאות',
@@ -4570,7 +4562,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	uk: {
 		'format.book': 'Книга',
 		'header.contractCreator': 'Творець контракту',
-		'header.links': 'Посилання',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Гаманці',
 		'header.txHistory': 'Історія транзакцій',
@@ -5126,7 +5117,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ja: {
 		'format.book': '書籍',
 		'header.contractCreator': 'コントラクト作成者',
-		'header.links': 'リンク',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ウォレット',
 		'header.txHistory': '取引履歴',
@@ -5682,7 +5672,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	tl: {
 		'format.book': 'Aklat',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Mga wallet',
 		'header.txHistory': 'Istoriko ng transaksyon',
@@ -6238,7 +6227,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ko: {
 		'format.book': '도서',
 		'header.contractCreator': '컨트랙트 생성자',
-		'header.links': '링크',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': '지갑',
 		'header.txHistory': '거래 내역',
@@ -6794,7 +6782,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	nl: {
 		'format.book': 'Boek',
 		'header.contractCreator': 'Contractmaker',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transactiegeschiedenis',
@@ -7350,7 +7337,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	cs: {
 		'format.book': 'Kniha',
 		'header.contractCreator': 'Tvůrce kontraktu',
-		'header.links': 'Odkazy',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Peněženky',
 		'header.txHistory': 'Historie transakcí',
@@ -7906,7 +7892,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	hr: {
 		'format.book': 'Knjiga',
 		'header.contractCreator': 'Autor ugovora',
-		'header.links': 'Poveznice',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Novčići',
 		'header.txHistory': 'Povijest transakcija',
@@ -8462,7 +8447,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	hi: {
 		'format.book': 'पुस्तक',
 		'header.contractCreator': 'कॉन्ट्रैक्ट निर्माता',
-		'header.links': 'लिंक',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'वॉलेट',
 		'header.txHistory': 'लेन-देन का इतिहास',
@@ -9018,7 +9002,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	bn: {
 		'format.book': 'বই',
 		'header.contractCreator': 'কন্ট্রাক্ট নির্মাতা',
-		'header.links': 'লিঙ্ক',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ওয়ালেট',
 		'header.txHistory': 'লেনদেনের ইতিহাস',
@@ -9574,7 +9557,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	vi: {
 		'format.book': 'Sách',
 		'header.contractCreator': 'Người tạo hợp đồng',
-		'header.links': 'Liên kết',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Ví',
 		'header.txHistory': 'Lịch sử giao dịch',
@@ -10130,7 +10112,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	tr: {
 		'format.book': 'Kitap',
 		'header.contractCreator': 'Sözleşme oluşturucu',
-		'header.links': 'Bağlantılar',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Cüzdanlar',
 		'header.txHistory': 'İşlem geçmişi',
@@ -10686,7 +10667,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	it: {
 		'format.book': 'Libro',
 		'header.contractCreator': 'Creatore del contratto',
-		'header.links': 'Link',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portafogli',
 		'header.txHistory': 'Cronologia transazioni',
@@ -11242,7 +11222,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	jv: {
 		'format.book': 'Buku',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Dompet',
 		'header.txHistory': 'Riwayat transaksi',
@@ -11798,7 +11777,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ur: {
 		'format.book': 'کتاب',
 		'header.contractCreator': 'کنٹریکٹ بنانے والا',
-		'header.links': 'روابط',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'والٹ',
 		'header.txHistory': 'لین دین کی تاریخ',
@@ -12354,7 +12332,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	pl: {
 		'format.book': 'Książka',
 		'header.contractCreator': 'Twórca kontraktu',
-		'header.links': 'Linki',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portfele',
 		'header.txHistory': 'Historia transakcji',
@@ -12910,7 +12887,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	th: {
 		'format.book': 'หนังสือ',
 		'header.contractCreator': 'ผู้สร้างสัญญา',
-		'header.links': 'ลิงก์',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'วอลเล็ต',
 		'header.txHistory': 'ประวัติธุรกรรม',
@@ -13466,7 +13442,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	az: {
 		'format.book': 'Kitab',
 		'header.contractCreator': 'Kontraktın yaradıcısı',
-		'header.links': 'Keçidlər',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Cüzdanlar',
 		'header.txHistory': 'Tranzaksiya tarixi',
@@ -14022,7 +13997,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	fa: {
 		'format.book': 'کتاب',
 		'header.contractCreator': 'سازنده قرارداد',
-		'header.links': 'پیوندها',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'کیف پول‌ها',
 		'header.txHistory': 'تاریخچه تراکنش‌ها',
@@ -14578,7 +14552,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ro: {
 		'format.book': 'Carte',
 		'header.contractCreator': 'Creatorul contractului',
-		'header.links': 'Linkuri',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portofele',
 		'header.txHistory': 'Istoricul tranzacțiilor',
@@ -15134,7 +15107,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	si: {
 		'format.book': 'පොත',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -15690,7 +15662,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	be: {
 		'format.book': 'Кніга',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -16246,7 +16217,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kk: {
 		'format.book': 'Кітап',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -16802,7 +16772,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	uz: {
 		'format.book': 'Kitob',
 		'header.contractCreator': 'Kontrakt yaratuvchisi',
-		'header.links': 'Havolalar',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Hamyonlar',
 		'header.txHistory': 'Tranzaksiya tarixi',
@@ -17357,7 +17326,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	af: {
 		'format.book': 'Boek',
 		'header.contractCreator': 'Kontrakskepper',
-		'header.links': 'Skakels',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallede',
 		'header.txHistory': 'Transaksiegeskiedenis',
@@ -17911,7 +17879,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	am: {
 		'format.book': 'መጽሐፍ',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -18465,7 +18432,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	bg: {
 		'format.book': 'Книга',
 		'header.contractCreator': 'Създател на договора',
-		'header.links': 'Връзки',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Портьонели',
 		'header.txHistory': 'История на транзакциите',
@@ -19019,7 +18985,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ca: {
 		'format.book': 'Llibre',
 		'header.contractCreator': 'Creador del contracte',
-		'header.links': 'Enllaços',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteres',
 		'header.txHistory': 'Historial de transaccions',
@@ -19573,7 +19538,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	da: {
 		'format.book': 'Bog',
 		'header.contractCreator': 'Kontraktopretter',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Tegnebøger',
 		'header.txHistory': 'Transaktionshistorik',
@@ -20127,7 +20091,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	dv: {
 		'format.book': 'ފޮތް',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -20681,7 +20644,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	el: {
 		'format.book': 'Βιβλίο',
 		'header.contractCreator': 'Δημιουργός συμβολαίου',
-		'header.links': 'Σύνδεσμοι',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Πορτοφόλια',
 		'header.txHistory': 'Ιστορικό συναλλαγών',
@@ -21235,7 +21197,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	eo: {
 		'format.book': 'Libro',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Monedoj',
 		'header.txHistory': 'Historio de transakcioj',
@@ -21789,7 +21750,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	eu: {
 		'format.book': 'Liburua',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Zaintzak',
 		'header.txHistory': 'Transakzioen historia',
@@ -22343,7 +22303,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	fi: {
 		'format.book': 'Kirja',
 		'header.contractCreator': 'Sopimuksen luoja',
-		'header.links': 'Linkit',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Lompakot',
 		'header.txHistory': 'Tapahtumahistoria',
@@ -22897,7 +22856,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ga: {
 		'format.book': 'Leabhar',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Mallanna',
 		'header.txHistory': 'Stair imeachtaí',
@@ -23451,7 +23409,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	gl: {
 		'format.book': 'Libro',
 		'header.contractCreator': 'Creador do contrato',
-		'header.links': 'Ligazóns',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteiras',
 		'header.txHistory': 'Historial de transaccións',
@@ -24005,7 +23962,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	hu: {
 		'format.book': 'Könyv',
 		'header.contractCreator': 'Szerződés létrehozója',
-		'header.links': 'Hivatkozások',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Pénztárcák',
 		'header.txHistory': 'Tranzakcióelőzmények',
@@ -24559,7 +24515,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	id: {
 		'format.book': 'Buku',
 		'header.contractCreator': 'Pembuat kontrak',
-		'header.links': 'Tautan',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Dompet',
 		'header.txHistory': 'Riwayat transaksi',
@@ -25113,7 +25068,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ka: {
 		'format.book': 'წიგნი',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -25667,7 +25621,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kh: {
 		'format.book': 'សៀវភៅ',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -26221,7 +26174,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kn: {
 		'format.book': 'ಪುಸ್ತಕ',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'ವಾಲೆಟ್‌ಗಳು',
 		'header.txHistory': 'ವಹಿವಾಟಿನ ಇತಿಹಾಸ',
@@ -26775,7 +26727,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ky: {
 		'format.book': 'Китеп',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -27329,7 +27280,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	la: {
 		'format.book': 'Liber',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Pelei',
 		'header.txHistory': 'Historia negotiationum',
@@ -27883,7 +27833,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	lt: {
 		'format.book': 'Knyga',
 		'header.contractCreator': 'Sutarties kūrėjas',
-		'header.links': 'Nuorodos',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Piniginės',
 		'header.txHistory': 'Operacijų istorija',
@@ -28437,7 +28386,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	lv: {
 		'format.book': 'Grāmata',
 		'header.contractCreator': 'Līguma izveidotājs',
-		'header.links': 'Saites',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transakciju vēsture',
@@ -28991,7 +28939,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	kab: {
 		'format.book': 'Adlis',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -29545,7 +29492,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ml: {
 		'format.book': 'പുസ്തകം',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'വാലറ്റ്',
 		'header.txHistory': 'വ്യവഹാര ചരിത്രം',
@@ -30099,7 +30045,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ms: {
 		'format.book': 'Buku',
 		'header.contractCreator': 'Pencipta kontrak',
-		'header.links': 'Pautan',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Dompet',
 		'header.txHistory': 'Sejarah transaksi',
@@ -30653,7 +30598,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ne: {
 		'format.book': 'पुस्तक',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'वालेटहरू',
 		'header.txHistory': 'लेनदेन इतिहास',
@@ -31207,7 +31151,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	nn: {
 		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktoppretter',
-		'header.links': 'Lenkjer',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Lommebøker',
 		'header.txHistory': 'Transaksjonarhistorikk',
@@ -31761,7 +31704,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	no: {
 		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktoppretter',
-		'header.links': 'Lenker',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Lommebøker',
 		'header.txHistory': 'Transaksjonshistorikk',
@@ -32315,7 +32257,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	or: {
 		'format.book': 'ବହି',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -32869,7 +32810,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	oc: {
 		'format.book': 'Libre',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Casses',
 		'header.txHistory': 'Istòria de las transaccions',
@@ -33423,7 +33363,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	pt: {
 		'format.book': 'Livro',
 		'header.contractCreator': 'Criador do contrato',
-		'header.links': 'Ligações',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteiras',
 		'header.txHistory': 'Histórico de transações',
@@ -33977,7 +33916,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sa: {
 		'format.book': 'पुस्तकम्',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -34531,7 +34469,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sk: {
 		'format.book': 'Kniha',
 		'header.contractCreator': 'Tvorca kontraktu',
-		'header.links': 'Odkazy',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Peňaženky',
 		'header.txHistory': 'Historia transakcií',
@@ -35085,7 +35022,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sl: {
 		'format.book': 'Knjiga',
 		'header.contractCreator': 'Ustvarjalec pogodbe',
-		'header.links': 'Povezave',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Denarnice',
 		'header.txHistory': 'Zgodovina transakcij',
@@ -35639,7 +35575,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sq: {
 		'format.book': 'Libër',
 		'header.contractCreator': 'Krijuesi i kontratës',
-		'header.links': 'Lidhje',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Portmonedat',
 		'header.txHistory': 'Historia e transaksioneve',
@@ -36193,7 +36128,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sr: {
 		'format.book': 'Knjiga',
 		'header.contractCreator': 'Tvorac ugovora',
-		'header.links': 'Veze',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Novčanici',
 		'header.txHistory': 'Istorija transakcija',
@@ -36747,7 +36681,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sv: {
 		'format.book': 'Bok',
 		'header.contractCreator': 'Kontraktskapare',
-		'header.links': 'Länkar',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Plånböcker',
 		'header.txHistory': 'Transaktionshistorik',
@@ -37301,7 +37234,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	sw: {
 		'format.book': 'Kitabu',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -37855,7 +37787,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	ta: {
 		'format.book': 'புத்தகம்',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -38409,7 +38340,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	te: {
 		'format.book': 'పుస్తకం',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -38963,7 +38893,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	tt: {
 		'format.book': 'Китап',
 		'header.contractCreator': 'Contract creator',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Wallets',
 		'header.txHistory': 'Transaction history',
@@ -39517,7 +39446,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	'zh-TW': {
 		'format.book': '圖書',
 		'header.contractCreator': '合約建立者',
-		'header.links': '連結',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': '錢包',
 		'header.txHistory': '交易記錄',
@@ -40071,7 +39999,6 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 	'pt-BR': {
 		'format.book': 'Livro',
 		'header.contractCreator': 'Criador do contrato',
-		'header.links': 'Links',
 		'header.notOnChain': 'Not on chain yet',
 		'settings.wallets.name': 'Carteiras',
 		'header.txHistory': 'Histórico de transações',
