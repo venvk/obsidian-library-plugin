@@ -1137,12 +1137,13 @@ export const OPENSEA_CHAINS: Record<string, string> = {
 const creatorOnPage = (html: string): string => /Contract Creator[\s\S]{0,800}?href=['"]\/address\/(0x[0-9a-fA-F]{40})/i.exec(html)?.[1] ?? ''
 
 // Who deployed a contract: the explorer's own answer.
-export async function contractCreator(chain: string, contract: string, etherscanKey = ''): Promise<string> {
+export async function contractCreator(chain: string, contract: string, etherscanKey = ''): Promise<string | null> {
 	const clean = (value: unknown): string => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value) ? value : ''
 	try {
 		const host = BLOCKSCOUT[chain]
 		if (host) {
-			return clean((await explorerJson(`https://${host}/api/v2/addresses/${contract}`) as { creator_address_hash?: unknown } | null)?.creator_address_hash)
+			const info = await explorerJson(`https://${host}/api/v2/addresses/${contract}`) as { creator_address_hash?: unknown } | null
+			return info ? clean(info.creator_address_hash) : null
 		}
 		const routescan = ROUTESCAN_CHAINS[chain]
 		const etherscan = ETHERSCAN_CHAINS[chain]
@@ -1159,7 +1160,7 @@ export async function contractCreator(chain: string, contract: string, etherscan
 		const rows = resp.status === 200 ? (resp.json as { result?: unknown }).result : null
 		return Array.isArray(rows) ? clean((rows[0] as { contractCreator?: unknown } | undefined)?.contractCreator) : ''
 	} catch {
-		return ''
+		return null
 	}
 }
 
@@ -1720,9 +1721,10 @@ async function tonTx(item: string, order: 'asc' | 'desc'): Promise<TonTx | null>
 }
 
 // A TON token is an account of its own: its first transaction is the mint, its last the latest transfer.
-// ponytail: the first 40 tokens per wallet, tonapi allows about a request a second without a key
-async function withTonHistory(read: NftRead): Promise<NftRead> {
-	for (const token of read.held.slice(0, 40)) {
+// A token with its history in a note is not asked again: tonapi allows about a request a second without a key.
+async function withTonHistory(read: NftRead, dated: Set<string>): Promise<NftRead> {
+	for (const token of read.held) {
+		if (dated.has(token.tokenId ?? '')) continue
 		const item = token.key.slice('TON:'.length)
 		try {
 			const first = await tonTx(item, 'asc')
@@ -1753,8 +1755,9 @@ interface NearTx {
 	block?: { block_height?: unknown } | null
 }
 
-async function withNearHistory(read: NftRead): Promise<NftRead> {
-	for (const token of read.held.slice(0, 40)) {
+async function withNearHistory(read: NftRead, dated: Set<string>): Promise<NftRead> {
+	for (const token of read.held) {
+		if (dated.has(token.tokenId ?? '')) continue
 		try {
 			const resp = await requestUrl({ url: `https://api.nearblocks.io/v1/nfts/${token.contract ?? ''}/tokens/${token.tokenId ?? ''}/txns?per_page=25`, headers: { accept: 'application/json' }, throw: false })
 			const txns = resp.status === 200 ? (resp.json as { txns?: NearTx[] }).txns ?? [] : []
@@ -1784,7 +1787,8 @@ export async function nftHoldings(
 	etherscanKey: string,
 	hasCover: (key: string) => boolean = () => false,
 	known: (key: string) => KnownToken | undefined = () => undefined,
-	openseaKey = ''
+	openseaKey = '',
+	dated: Set<string> = new Set()
 ): Promise<NftRead> {
 	const done = new Map<string, number>()
 	const wanted = new Map<string, number>()
@@ -1802,9 +1806,9 @@ export async function nftHoldings(
 		else if (routescan) read = active && !active.has(String(routescan.id)) ? { held: [], chains: [chain] } : await routescanHeld(chain, address)
 		else if (chain === 'Tezos') read = await tezosHeld(address)
 		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : await pageScanHeld(chain, address, hasCover)
-		else if (chain === 'TON') read = await withTonHistory(await tonAllHeld(address))
+		else if (chain === 'TON') read = await withTonHistory(await tonAllHeld(address), dated)
 		else if (chain === 'Solana') read = await solanaHeld(address)
-		else if (chain === 'NEAR') read = await withNearHistory(await nearHeld(address))
+		else if (chain === 'NEAR') read = await withNearHistory(await nearHeld(address), dated)
 		if (!read) return []
 		wanted.set(chain, (wanted.get(chain) ?? 0) + 1)
 		const found = [...read.held]

@@ -144,6 +144,9 @@ const CANVAS_ROLES = [
 	{ label: 'header.genre', fields: ['Genre'] },
 ]
 
+// Raised when an import brings something the existing NFT notes lack, so an update fills them by itself.
+const NFT_DATA_VERSION = 1
+
 const SOURCE_SCORES = ['Rating IMDB', 'Rating RT', 'Rating MC', 'Rating RAWG', 'Rating AniList', 'Rating MAL']
 
 // a category, or a medium whose category is created with its first note
@@ -308,7 +311,7 @@ export default class LibraryPlugin extends Plugin {
 	}> = []
 	private nftTokenQueueWorking = false
 	private nftPendingSaves = new Map<string, { file: TFile; images: string[]; timer: number; onTokenImageResolved?: (url: string) => void }>()
-	private lastNftEnrichTime = 0
+	private nftBackfilling = false
 	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
@@ -484,7 +487,8 @@ export default class LibraryPlugin extends Plugin {
 			this.registerInterval(window.setTimeout(() => void this.traktBackfill(), 90000))
 			this.registerInterval(window.setInterval(() => void this.airingIfDue(), 3600000))
 			this.registerInterval(window.setInterval(() => this.gameSyncTick(), 3600000))
-			if (walletPairs(this.settings.nftWallets).length > 0 && this.settings.nftLastImport === 0) {
+			// a first run, or a version that reads more than the notes hold: no waiting for the daily import
+			if (walletPairs(this.settings.nftWallets).length > 0 && (this.settings.nftLastImport === 0 || this.settings.nftDataVersion !== NFT_DATA_VERSION)) {
 				this.scheduleLazyNftImport(15000)
 			}
 		})
@@ -2016,7 +2020,8 @@ export default class LibraryPlugin extends Plugin {
 		this.nftImportTimer = window.setTimeout(() => {
 			this.nftImportTimer = null
 			if (!this.unloaded && Platform.isDesktopApp && walletPairs(this.settings.nftWallets).length > 0) {
-				void this.nftImport(false)
+				// the first read is announced: on a big wallet it takes a few minutes
+				void this.nftImport(this.settings.nftLastImport === 0)
 			}
 		}, delayMs)
 	}
@@ -2032,9 +2037,11 @@ export default class LibraryPlugin extends Plugin {
 			if (loud) new Notice(tr('notice.site.importing', { site: 'NFT' }))
 			const covered = new Set<string>()
 			const known = new Map<string, KnownToken>()
+			const dated = new Set<string>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 				if (!fm || toStr(fm.Source) !== NFT_SOURCE) continue
+				for (const row of toArrayOf(fm.History)) dated.add(toStr(row.tokenId))
 				if (toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
 				known.set(toStr(fm['Source ID']), { uri: toStr(fm['Token URI']) || undefined, minted: toStr(fm.Minted) || undefined })
 			}
@@ -2043,7 +2050,8 @@ export default class LibraryPlugin extends Plugin {
 				this.apiKey('etherscanApiKey'),
 				key => covered.has(key),
 				key => known.get(key),
-				this.apiKey('openseaApiKey')
+				this.apiKey('openseaApiKey'),
+				dated
 			)
 			if (read.chains.length === 0 && read.held.length === 0) {
 				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
@@ -2235,11 +2243,11 @@ export default class LibraryPlugin extends Plugin {
 				await this.app.fileManager.trashFile(file)
 				updated++
 			}
-			await this.fillNftTransfers()
-			await this.fillNftBlocks()
-			await this.fillNftProjects()
 			this.settings.nftLastImport = Date.now()
+			this.settings.nftDataVersion = NFT_DATA_VERSION
 			await this.saveSettings()
+			// the notes are there; their details fill in behind, nobody waits for them
+			void this.nftBackfill()
 			this.registerInterval(window.setTimeout(() => void this.consolidateNftNotes(false), 5000))
 			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'NFT', created, updated }))
 		} finally {
@@ -2654,11 +2662,26 @@ export default class LibraryPlugin extends Plugin {
 		await this.nftImport(false)
 	}
 
-	// Tokens the wallet's list gave no transfer for: their own page has it, a few dozen per import.
+	// Everything an import leaves for later, to the last note. What a closed Obsidian cuts short goes on after the next import.
+	private async nftBackfill(): Promise<void> {
+		if (this.nftBackfilling) return
+		this.nftBackfilling = true
+		try {
+			await this.fillNftTransfers()
+			await this.fillNftBlocks()
+			await this.fillNftProjects()
+			this.fillNftPictures()
+		} catch (e) {
+			console.error('Library: NFT details error', e)
+		} finally {
+			this.nftBackfilling = false
+		}
+	}
+
+	// Tokens the wallet's list gave no transfer for: their own page has it.
 	async fillNftTransfers(): Promise<void> {
-		let budget = 40
 		for (const file of this.app.vault.getMarkdownFiles()) {
-			if (this.unloaded || budget <= 0) return
+			if (this.unloaded) return
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			if (toStr(fm?.Source) !== NFT_SOURCE) continue
 			const contract = toStr(fm?.Contract)
@@ -2668,8 +2691,7 @@ export default class LibraryPlugin extends Plugin {
 			const missing = toStrArray(fm?.Tokens).filter(id => !known.has(id) && !lazyMinted(contract, id, wallets) && !this.nftNoTransfers.has(`${contract}:${id}`))
 			const rows: Record<string, unknown>[] = []
 			for (const id of missing) {
-				if (budget <= 0) break
-				budget--
+				if (this.unloaded) return
 				const found = await tokenTransfers(chain, contract, id)
 				if (found === null || found.length === 0) this.nftNoTransfers.add(`${contract}:${id}`)
 				rows.push(...(found ?? []) as unknown as Record<string, unknown>[])
@@ -2683,20 +2705,20 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	// Who deployed each contract, and the project's site and socials: once per note, a few dozen per import.
+	// Who deployed each contract, and the project's site and socials: once per note.
 	private async fillNftProjects(): Promise<void> {
-		let budget = 40
 		for (const file of this.app.vault.getMarkdownFiles()) {
-			if (this.unloaded || budget <= 0) return
+			if (this.unloaded) return
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			const contract = toStr(fm?.Contract)
 			const chain = toStrArray(fm?.Platforms)[0] ?? ''
 			if (toStr(fm?.Source) !== NFT_SOURCE || fm?.Spam === true || (fm?.['Project Links'] !== undefined && fm?.['Contract Creator'] !== undefined)) continue
 			if (!/^0x[0-9a-fA-F]{40}$/.test(contract) || EVM_NETWORKS.indexOf(chain) < 0) continue
-			budget--
 			// in a shared storefront the creator is the token's, the contract is OpenSea's own
 			const token = toStrArray(fm?.Tokens)[0] ?? ''
 			const creator = storefrontCreator(contract, token) || await contractCreator(chain, contract, this.apiKey('etherscanApiKey'))
+			// an explorer that did not answer is asked again after the next import
+			if (creator === null) continue
 			const links = await openseaLinks(chain, contract, this.apiKey('openseaApiKey'), token)
 			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
 				// asked once: an empty value says so
@@ -2707,12 +2729,11 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	// Transfers read without a block number get it from the chain, a few dozen per import.
+	// Transfers read without a block number get it from the chain.
 	async fillNftBlocks(): Promise<number> {
-		let budget = 60
 		let filled = 0
 		for (const file of this.app.vault.getMarkdownFiles()) {
-			if (this.unloaded || budget <= 0) break
+			if (this.unloaded) break
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			if (toStr(fm?.Source) !== NFT_SOURCE || !Array.isArray(fm?.History)) continue
 			const chain = toStrArray(fm?.Platforms)[0] ?? ''
@@ -2720,8 +2741,7 @@ export default class LibraryPlugin extends Plugin {
 			const found = new Map<string, string>()
 			for (const row of fm?.History as Record<string, unknown>[]) {
 				const hash = txHashOf(row.hash)
-				if (!hash || /^\d+$/.test(toStr(row.blockNumber)) || found.has(hash) || budget <= 0) continue
-				budget--
+				if (!hash || /^\d+$/.test(toStr(row.blockNumber)) || found.has(hash)) continue
 				const block = await txBlock(chain, hash)
 				if (block) found.set(hash, block)
 				await this.pause(100)
@@ -2848,51 +2868,19 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	private async lazyNftBackgroundEnrich(): Promise<void> {
-		if (this.unloaded || !Platform.isDesktopApp || this.nftTokenQueueWorking || this.nftImporting) return
-		const now = Date.now()
-		if (now - this.lastNftEnrichTime < 1800000) return
-		this.lastNftEnrichTime = now
-
-		const files = this.app.vault.getMarkdownFiles()
-		let enqueuedCount = 0
-		for (const file of files) {
-			if (this.unloaded || enqueuedCount >= 3) break
-			if (isTemplateFile(file.path)) continue
+	// A collection with no picture at all: its first token is looked up on every source there is.
+	private fillNftPictures(): void {
+		for (const file of this.app.vault.getMarkdownFiles()) {
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-			if (!fm || (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE)) continue
-			if (fm.Spam === true) continue
-
-			const tokenIds = toStrArray(fm.Tokens)
-			const single = toStr(fm['Token ID'])
-			if (single && tokenIds.indexOf(single) < 0) tokenIds.unshift(single)
-			if (tokenIds.length === 0) continue
-
-			const contract = toStr(fm.Contract)
-			const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
-			const gallery = toStrArray(fm.Gallery)
-			const cover = toStr(fm.Cover)
-
-			for (let i = 0; i < tokenIds.length; i++) {
-				const tid = tokenIds[i] ?? ''
-				if (!tid) continue
-				const key = `${chain}:${contract.toLowerCase()}:${tid}`
-				if (this.nftImageNegative.has(key) || this.nftImageCache.has(key)) continue
-				const gImg = gallery[i]
-				const hasMedia = (gImg && !isInvalidNftMedia(gImg)) || (tokenIds.length === 1 && cover && !isInvalidNftMedia(cover))
-				if (!hasMedia) {
-					this.enqueueNftToken({
-						key,
-						chain,
-						contract,
-						tokenId: tid,
-						file,
-						title: toStr(fm.Name) || file.basename
-					})
-					enqueuedCount++
-					if (enqueuedCount >= 3) break
-				}
-			}
+			if (toStr(fm?.Source) !== NFT_SOURCE || fm?.Spam === true || isTemplateFile(file.path)) continue
+			const cover = toStr(fm?.Cover)
+			if ((cover && !isInvalidNftMedia(cover)) || toStrArray(fm?.Gallery).some(image => !isInvalidNftMedia(image))) continue
+			const tokenId = toStrArray(fm?.Tokens)[0] ?? ''
+			const contract = toStr(fm?.Contract)
+			const chain = toStrArray(fm?.Platforms)[0] ?? ''
+			const key = `${chain}:${contract.toLowerCase()}:${tokenId}`
+			if (!tokenId || this.nftImageNegative.has(key) || this.nftImageCache.has(key)) continue
+			this.enqueueNftToken({ key, chain, contract, tokenId, file, title: toStr(fm?.Name) || file.basename })
 		}
 	}
 
@@ -3980,7 +3968,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).then(() => this.lazyNftBackgroundEnrich()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first — a third-party signing service carries the requests

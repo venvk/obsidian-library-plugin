@@ -40601,6 +40601,7 @@ export interface ILibrarySettings {
 	nftLastImport: number
 	// tokens whose note you deleted: an import brings them back as spam
 	nftHidden: string[]
+	nftDataVersion: number
 	showNftSpam: boolean
 	showNftOat: boolean
 	nftDisplayMode: 'collections' | 'all'
@@ -40713,6 +40714,7 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	openseaApiKey: '',
 	nftLastImport: 0,
 	nftHidden: [],
+	nftDataVersion: 0,
 	showNftSpam: false,
 	showNftOat: true,
 	nftDisplayMode: 'collections',
