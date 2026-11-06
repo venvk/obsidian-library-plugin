@@ -1,7 +1,11 @@
-import { spentTime, toStrArray } from '../util'
+import { spentTime, toStr, toStrArray } from '../util'
 
 // Brand marks from Simple Icons (CC0-1.0), 24×24, drawn in the current colour.
-const MARKS: Record<string, { label: string; path: string; viewBox?: string }> = {
+export const MARKS: Record<string, { label: string; path: string; viewBox?: string }> = {
+	near: {
+		label: 'NEAR',
+		path: 'M21.443 0c-.89 0-1.714.46-2.18 1.218l-5.017 7.448a.533.533 0 0 0 .792.7l4.938-4.282a.2.2 0 0 1 .334.151v13.41a.2.2 0 0 1-.354.128L5.03.905A2.555 2.555 0 0 0 3.078 0h-.521A2.557 2.557 0 0 0 0 2.557v18.886a2.557 2.557 0 0 0 4.736 1.338l5.017-7.448a.533.533 0 0 0-.792-.7l-4.938 4.283a.2.2 0 0 1-.333-.152V5.352a.2.2 0 0 1 .354-.128l14.924 17.87c.486.574 1.2.905 1.952.906h.521A2.558 2.558 0 0 0 24 21.445V2.557A2.558 2.558 0 0 0 21.443 0Z',
+	},
 	robinhood: {
 		label: 'Robinhood Chain',
 		path: 'M2.84 24h.53c.096 0 .192-.048.224-.128C7.591 13.696 11.94 8.656 14.67 5.638c.112-.128.064-.225-.096-.225h-4.88a.55.55 0 0 0-.45.225L5.746 9.972c-.514.642-.642 1.236-.642 2.086v4.43c-1.14 3.194-1.862 5.361-2.392 7.32-.032.125.016.192.129.192M20.447.646c-.754-.802-4.157-.834-5.73-.224a3 3 0 0 0-.786.465 41 41 0 0 0-3.323 3.178c-.112.113-.064.225.097.225h5.409c.497 0 .786.289.786.786v6.1c0 .16.128.208.225.064l3.258-4.254c.53-.69.69-.898.835-1.861.192-1.413.08-3.58-.77-4.479m-6.982 16.18 2.231-3.676a.7.7 0 0 0 .064-.29V6.73c0-.16-.112-.225-.224-.097-3.355 3.74-5.971 7.672-8.395 12.407-.06.12.016.225.16.177l5.009-1.54c.565-.174.882-.402 1.155-.852',
@@ -92,10 +96,22 @@ const MARKS: Record<string, { label: string; path: string; viewBox?: string }> =
 		label: 'EA App',
 		path: 'M16.635 6.162l-5.928 9.377H4.24l1.508-2.3h4.024l1.474-2.335H2.264L.79 13.239h2.156L0 17.84h12.072l4.563-7.259 1.652 2.66h-1.401l-1.473 2.299h4.347l1.473 2.3H24zm-11.461.107L3.7 8.604l9.52-.035 1.474-2.3z',
 	},
+	itunes: {
+		label: 'Apple Books / iTunes',
+		path: 'M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.38c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.63 1.35-.57.65-1.06 1.71-.93 2.73 1 .08 2.01-.48 2.63-1.23',
+	},
+	librivox: {
+		label: 'LibriVox',
+		path: 'M12 1a9 9 0 0 0-9 9v7c0 2.21 1.79 4 4 4h1a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2H5v-2a7 7 0 0 1 14 0v2h-3a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h1c2.21 0 4-1.79 4-4v-7a9 9 0 0 0-9-9z',
+	},
+	openlibrary: {
+		label: 'Open Library',
+		path: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+	},
 }
 
 // Networks without a mark in Simple Icons: their initial in the badge.
-const INITIALS: Record<string, { label: string; text: string }> = {
+export const INITIALS: Record<string, { label: string; text: string }> = {
 	arbitrum: { label: 'Arbitrum', text: 'A' },
 	gnosis: { label: 'Gnosis', text: 'G' },
 	celo: { label: 'Celo', text: 'C' },
@@ -107,6 +123,65 @@ const INITIALS: Record<string, { label: string; text: string }> = {
 	mode: { label: 'Mode', text: 'M' },
 	'arbitrum-nova': { label: 'Arbitrum Nova', text: 'N' },
 	shape: { label: 'Shape', text: 'S' },
+	mantle: { label: 'Mantle', text: 'M' },
+	avalanche: { label: 'Avalanche', text: 'A' },
+	blast: { label: 'Blast', text: 'B' },
+	boba: { label: 'Boba', text: 'B' },
+	hemi: { label: 'Hemi', text: 'H' },
+	chiliz: { label: 'Chiliz', text: 'C' },
+	lisk: { label: 'Lisk', text: 'L' },
+	'world-chain': { label: 'World Chain', text: 'W' },
+	metis: { label: 'Metis', text: 'M' },
+	rootstock: { label: 'Rootstock', text: 'R' },
+	apechain: { label: 'ApeChain', text: 'A' },
+	tezos: { label: 'Tezos', text: 'T' },
+}
+
+export const PLATFORM_COLORS: Record<string, { bg: string; text: string }> = {
+	ethereum: { bg: '#627eea', text: '#ffffff' },
+	optimism: { bg: '#ff0420', text: '#ffffff' },
+	base: { bg: '#0052ff', text: '#ffffff' },
+	arbitrum: { bg: '#28a0f0', text: '#ffffff' },
+	polygon: { bg: '#7b3fe4', text: '#ffffff' },
+	bnb: { bg: '#f0b90b', text: '#1e2026' },
+	taiko: { bg: '#e81899', text: '#ffffff' },
+	gnosis: { bg: '#04795b', text: '#ffffff' },
+	celo: { bg: '#fcff52', text: '#000000' },
+	zksync: { bg: '#1e69ff', text: '#ffffff' },
+	scroll: { bg: '#ffeeda', text: '#190f05' },
+	ink: { bg: '#7132f5', text: '#ffffff' },
+	soneium: { bg: '#000000', text: '#ffffff' },
+	unichain: { bg: '#f50db4', text: '#ffffff' },
+	mode: { bg: '#dffe00', text: '#000000' },
+	'arbitrum-nova': { bg: '#ef8220', text: '#ffffff' },
+	shape: { bg: '#000000', text: '#ffffff' },
+	ton: { bg: '#0098ea', text: '#ffffff' },
+	solana: { bg: '#9945ff', text: '#ffffff' },
+	robinhood: { bg: '#ccff00', text: '#000000' },
+	near: { bg: '#000000', text: '#ffffff' },
+	mantle: { bg: '#65b3ae', text: '#000000' },
+	avalanche: { bg: '#e84142', text: '#ffffff' },
+	blast: { bg: '#fcfc03', text: '#000000' },
+	boba: { bg: '#ccff00', text: '#000000' },
+	hemi: { bg: '#ff6c15', text: '#ffffff' },
+	chiliz: { bg: '#cd0124', text: '#ffffff' },
+	lisk: { bg: '#4070f4', text: '#ffffff' },
+	'world-chain': { bg: '#000000', text: '#ffffff' },
+	metis: { bg: '#00dacc', text: '#000000' },
+	rootstock: { bg: '#ff9100', text: '#000000' },
+	apechain: { bg: '#0054fa', text: '#ffffff' },
+	tezos: { bg: '#2c7df7', text: '#ffffff' },
+	playstation: { bg: '#0070d1', text: '#ffffff' },
+	steam: { bg: '#1b2838', text: '#ffffff' },
+	xbox: { bg: '#107c10', text: '#ffffff' },
+	nintendo: { bg: '#e60012', text: '#ffffff' },
+	youtube: { bg: '#ff0000', text: '#ffffff' },
+	netflix: { bg: '#000000', text: '#e50914' },
+	epic: { bg: '#2a2a2a', text: '#ffffff' },
+	ea: { bg: '#ff4747', text: '#ffffff' },
+	itunes: { bg: '#fa233b', text: '#ffffff' },
+	librivox: { bg: '#5b3e2b', text: '#ffffff' },
+	openlibrary: { bg: '#02598b', text: '#ffffff' },
 }
 
 export function platformMark(family: string): SVGSVGElement {
@@ -127,16 +202,17 @@ export function platformFamily(value: string): string | null {
 	if (v.includes('netflix')) return 'netflix'
 	if (v.includes('youtube')) return 'youtube'
 	// NFT networks; Arbitrum and Taiko have no mark and show their initial
-	if (v === 'ethereum') return 'ethereum'
-	if (v === 'optimism') return 'optimism'
-	if (v === 'base') return 'base'
-	if (v === 'arbitrum') return 'arbitrum'
-	if (v === 'polygon') return 'polygon'
-	if (v === 'ton') return 'ton'
-	if (v === 'solana') return 'solana'
-	if (v === 'bnb') return 'bnb'
-	if (v === 'taiko') return 'taiko'
-	if (v === 'robinhood') return 'robinhood'
+	if (v === 'ethereum' || v.includes('ethereum') || v === 'eth') return 'ethereum'
+	if (v === 'optimism' || v.includes('optimism')) return 'optimism'
+	if (v === 'base' || v.includes('base')) return 'base'
+	if (v === 'arbitrum' || v.includes('arbitrum')) return 'arbitrum'
+	if (v === 'polygon' || v.includes('polygon') || v.includes('matic')) return 'polygon'
+	if (v === 'ton' || v.includes('ton')) return 'ton'
+	if (v === 'solana' || v.includes('solana') || v === 'sol') return 'solana'
+	if (v === 'bnb' || v.includes('bnb') || v.includes('binance') || v.includes('bsc')) return 'bnb'
+	if (v === 'taiko' || v.includes('taiko')) return 'taiko'
+	if (v === 'robinhood' || v.includes('robinhood')) return 'robinhood'
+	if (v === 'near') return 'near'
 	if (INITIALS[v.replace(/\s+/g, '-')]) return v.replace(/\s+/g, '-')
 	return null
 }
@@ -161,14 +237,22 @@ export function renderPlatforms(parent: HTMLElement, fm: Record<string, unknown>
 
 export function renderPlatformLabels(parent: HTMLElement, fm: Record<string, unknown>): void {
 	// A bare "PlayStation" plate says no more than the mark already on the card.
-	const platforms = toStrArray(fm.Platforms)
+	let platforms = toStrArray(fm.Platforms)
 		.filter((value, i, all) => all.indexOf(value) === i && value.toLowerCase() !== 'playstation')
+	if (platforms.length === 0 && (toStr(fm.Source) === 'nft' || toStr(fm.Type) === 'NFT')) {
+		const fallback = toStr(fm['Source ID']).split(':')[0]
+		if (fallback) platforms = [fallback]
+	}
 	if (platforms.length === 0) return
 	const row = parent.createDiv({ cls: 'library-platform-labels' })
 	for (const platform of platforms) {
 		const family = platformFamily(platform) ?? 'other'
 		const badge = row.createSpan({ cls: `library-platform-label is-${family}` })
-		if (MARKS[family]) badge.appendChild(platformMark(family))
+		if (MARKS[family]) {
+			badge.appendChild(platformMark(family))
+		} else if (INITIALS[family]) {
+			badge.createSpan({ cls: 'library-platform-initial', text: INITIALS[family].text })
+		}
 		badge.createSpan({ text: platform })
 		const hours = fm[`Playtime ${platform}`] !== undefined ? Number(fm[`Playtime ${platform}`]) : null
 		if (hours !== null && !isNaN(hours) && hours > 0) {

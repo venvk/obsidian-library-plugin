@@ -17,6 +17,7 @@ export interface HistoryItem {
 	length: string
 	// the watched share of the video, 0 to 100; null when the page shows no bar
 	percent: number | null
+	isShort?: boolean
 }
 
 export interface HistorySection {
@@ -42,6 +43,7 @@ export interface WatchedVideo {
 	percent: number
 	// ISO date of the viewing day
 	day: string
+	isShort?: boolean
 }
 
 export interface VideoDetails {
@@ -140,7 +142,9 @@ export function pageVideos(page: HistoryPage, now = new Date(), days = HISTORY_D
 		for (const item of section.items) {
 			if (!VIDEO_ID.test(item.id) || !item.title || seen.has(item.id)) continue
 			seen.add(item.id)
-			videos.push({ id: item.id, title: item.title, channel: item.channel, channelUrl: channelUrl(item.channelPath), seconds: lengthSeconds(item.length), percent: Math.round(Math.min(100, Math.max(0, item.percent ?? 100))), day: lastDay })
+			const seconds = lengthSeconds(item.length)
+			const isShort = item.isShort === true || (seconds > 0 && seconds <= 60 && (/#shorts\b/i.test(item.title) || item.title.includes('#Shorts')))
+			videos.push({ id: item.id, title: item.title, channel: item.channel, channelUrl: channelUrl(item.channelPath), seconds, percent: Math.round(Math.min(100, Math.max(0, item.percent ?? 100))), day: lastDay, isShort })
 		}
 	}
 	return { videos, lastDay }
@@ -201,13 +205,22 @@ const HISTORY_CODE = `(async () => {${YOUTUBE_ASK}${HASH}
 					for (const badge of bottom.badges || []) length = badge.thumbnailBadgeViewModel?.text || length;
 				}
 				const channelPath = meta?.image?.decoratedAvatarViewModel?.rendererContext?.commandContext?.onTap?.innertubeCommand?.browseEndpoint?.canonicalBaseUrl || '';
-				items.push({ id: lockup.contentId || '', title: text(meta?.title), channel: text(meta?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts?.[0]?.text), channelPath, length, percent });
+				const isShort = !!(
+					lockup.rendererContext?.commandContext?.onTap?.innertubeCommand?.reelWatchEndpoint ||
+					meta?.title?.command?.reelWatchEndpoint ||
+					(lockup.contentId && lockup.contentImage?.thumbnailViewModel?.image?.sources?.[0]?.url?.includes('/shorts/'))
+				);
+				items.push({ id: lockup.contentId || '', title: text(meta?.title), channel: text(meta?.metadata?.contentMetadataViewModel?.metadataRows?.[0]?.metadataParts?.[0]?.text), channelPath, length, percent, isShort });
 			}
 			const video = item.videoRenderer;
 			if (video) {
 				const resume = (video.thumbnailOverlays || []).map(o => o.thumbnailOverlayResumePlaybackRenderer).find(Boolean);
 				const owner = video.ownerText || video.longBylineText;
-				items.push({ id: video.videoId || '', title: text(video.title), channel: text(owner), channelPath: owner?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '', length: text(video.lengthText), percent: typeof resume?.percentDurationWatched === 'number' ? resume.percentDurationWatched : null });
+				const isShort = !!(
+					video.navigationEndpoint?.reelWatchEndpoint ||
+					video.navigationEndpoint?.commandMetadata?.webCommandMetadata?.url?.startsWith('/shorts/')
+				);
+				items.push({ id: video.videoId || '', title: text(video.title), channel: text(owner), channelPath: owner?.runs?.[0]?.navigationEndpoint?.browseEndpoint?.canonicalBaseUrl || '', length: text(video.lengthText), percent: typeof resume?.percentDurationWatched === 'number' ? resume.percentDurationWatched : null, isShort });
 			}
 		}
 		sections.push({ title: text(list.header?.itemSectionHeaderRenderer?.title), items });

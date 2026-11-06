@@ -12,7 +12,7 @@ import {
 	type SettingDefinitionItem,
 } from "obsidian";
 import type LibraryPlugin from "./main";
-import { WALLET_FIELDS } from "./nft";
+import { WALLET_FIELD } from "./nft";
 import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constants";
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
@@ -42,7 +42,8 @@ type TextKey =
 	| "skipFields"
 	| "twitchClientId"
 	| "twitchClientSecret"
-	| "etherscanApiKey";
+	| "etherscanApiKey"
+	| "openseaApiKey";
 
 // One row; getSettingDefinitions() (1.13+) and display() render the same rows.
 interface Row {
@@ -137,7 +138,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 		if (page === "categories") return tr("settings.section.categories");
 		if (page === "keys") return tr("settings.section.keys");
 		if (page === "stats") return tr("stats.title");
-		if (page === "wallets") return tr("settings.page.wallets");
+		if (page === "wallets") return "NFT";
 		return tr(`settings.page.${page}`);
 	}
 
@@ -392,6 +393,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					this.keyRow("settings.twitchSecret", "twitchClientSecret", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.comicvine", "comicVineApiKey", tr("settings.comicvine.placeholder")),
 					this.keyRow("settings.etherscan", "etherscanApiKey", tr("settings.rawg.placeholder")),
+					this.keyRow("settings.opensea", "openseaApiKey", tr("settings.rawg.placeholder")),
 				],
 			},
 			{
@@ -408,18 +410,10 @@ export class LibrarySettingTab extends PluginSettingTab {
 				heading: "NFT",
 				rows: [
 					note(tr("settings.nft.desc")),
-					...WALLET_FIELDS.map((field): Row => ({
-						name: field,
-						desc: field === "EVM" ? tr("settings.wallets.evm.desc") : field === "TON" ? tr("settings.wallets.ton.desc") : tr("settings.nftWallets.desc"),
-						render: (row) => this.walletList(row, field),
-					})),
 					{
-						name: tr("settings.nftImport"),
-						render: (row) => {
-							row.addButton((button) =>
-								button.setButtonText(tr("settings.nftImport")).setCta().setDisabled(!Platform.isDesktopApp).onClick(() => void this.plugin.nftImport(true)),
-							);
-						},
+						name: tr("settings.wallets.name"),
+						desc: tr("settings.nftWallets.desc"),
+						render: (row) => this.walletList(row, WALLET_FIELD),
 					},
 					{
 						name: tr("settings.nftOat.name"),
@@ -449,8 +443,22 @@ export class LibrarySettingTab extends PluginSettingTab {
 			},
 			{
 				page: "connectors",
-				heading: "YouTube",
-				rows: [{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") }],
+				heading: tr("settings.default.video"),
+				rows: [
+					{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") },
+					{
+						name: tr("settings.youtubeShorts.name"),
+						desc: tr("settings.youtubeShorts.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(settings.youtubeIncludeShorts).onChange(async (value) => {
+									settings.youtubeIncludeShorts = value;
+									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+				],
 			},
 			{
 				page: "connectors",
@@ -552,9 +560,13 @@ export class LibrarySettingTab extends PluginSettingTab {
 		const list = row.controlEl.createDiv({ cls: "library-wallet-list" });
 		const save = async (): Promise<void> => {
 			const value = lines.map((line) => line.trim()).filter(Boolean).join("\n");
+			const prev = settings.nftWallets[field] ?? "";
 			if (value) settings.nftWallets[field] = value;
 			else delete settings.nftWallets[field];
 			await this.plugin.saveSettings();
+			if (value !== prev) {
+				this.plugin.scheduleLazyNftImport(2500);
+			}
 		};
 		const draw = (focus = false): void => {
 			list.empty();
@@ -867,6 +879,13 @@ export class LibrarySettingTab extends PluginSettingTab {
 		row.nameEl.prepend(icon);
 		const status = row.nameEl.createSpan({ cls: `library-platform-status${state.connected ? " is-connected" : ""}` });
 		status.setText(tr(state.connected ? "settings.connected" : "settings.notConnected"));
+		if (state.connected) {
+			row.addButton((button) => {
+				button.setIcon("refresh-cw");
+				button.setTooltip(tr("cmd.updateAll"));
+				button.onClick(() => void this.plugin.watchImport(site, true));
+			});
+		}
 		row.addButton((button) => {
 			button.setButtonText(tr(state.connected ? "settings.disconnect" : "settings.connect"));
 			if (!state.connected) button.setCta();

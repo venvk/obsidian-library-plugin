@@ -1,7 +1,7 @@
 import { App, normalizePath, TFile } from 'obsidian'
 import { progressPattern, dmyDatePattern, type ICategory, type IStatsTop, type TitleLanguage } from './constants'
 import { formatNumber, tr } from './i18n'
-import { categoryLabel, NFT_CATEGORY } from './categories'
+import { categoryLabel } from './categories'
 import { normalizeSeasons } from './trailer'
 import type { ContentType } from './providers/types'
 
@@ -36,22 +36,106 @@ export function editedSince(echo: { p: string; r: number } | undefined, progress
 
 export function parseDate(val: unknown): number {
 	if (!val) return 0
-	const raw = toStr(val)
+	if (typeof val === 'number') {
+		if (isNaN(val) || val <= 0) return 0
+		if (val >= 1800 && val <= 2100) return new Date(val, 0, 1).getTime()
+		return val > 1e11 ? (val > 1e14 ? Math.floor(val / 1000) : val) : val * 1000
+	}
+	const raw = toStr(val).trim()
+	if (!raw) return 0
+	if (/^\d{4}$/.test(raw)) {
+		const y = Number(raw)
+		if (y >= 1800 && y <= 2100) return new Date(y, 0, 1).getTime()
+	}
+	if (/^\d{9,16}$/.test(raw)) {
+		const num = Number(raw)
+		if (isNaN(num) || num <= 0) return 0
+		return num > 1e11 ? (num > 1e14 ? Math.floor(num / 1000) : num) : num * 1000
+	}
 	const dmyMatch = raw.match(dmyDatePattern)
 	if (dmyMatch) {
 		return new Date(Number(dmyMatch[3]), Number(dmyMatch[2]) - 1, Number(dmyMatch[1])).getTime()
 	}
-	const timestamp = new Date(raw).getTime()
+	let iso = raw.includes(' ') && !raw.includes('T') ? raw.replace(' ', 'T') : raw
+	iso = iso.replace(/T(\d):/, 'T0$1:').replace(/ (\d):/, ' 0$1:')
+	const timestamp = new Date(iso).getTime()
 	return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-// ISO to the note's dd.mm.yyyy, local time.
-export function dmyOf(iso: string): string {
-	const date = new Date(iso)
-	if (Number.isNaN(date.getTime())) return ''
-	const dd = ('0' + String(date.getDate())).slice(-2)
-	const mm = ('0' + String(date.getMonth() + 1)).slice(-2)
-	return `${dd}.${mm}.${String(date.getFullYear())}`
+// ISO or timestamp to the note's dd.mm.yyyy, local time.
+export function dmyOf(iso: unknown): string {
+	if (iso === null || iso === undefined || iso === '') return ''
+	let ms = 0
+	if (typeof iso === 'number') {
+		if (isNaN(iso) || iso <= 0) return ''
+		if (iso >= 1800 && iso <= 2100) return `01.01.${String(iso)}`
+		ms = iso > 1e11 ? (iso > 1e14 ? Math.floor(iso / 1000) : iso) : iso * 1000
+	} else {
+		const raw = toStr(iso).trim()
+		if (!raw) return ''
+		const dmyMatch = raw.match(dmyDatePattern)
+		if (dmyMatch) return raw
+		if (/^\d{4}$/.test(raw)) {
+			const y = Number(raw)
+			if (y >= 1800 && y <= 2100) return `01.01.${String(y)}`
+		}
+		if (/^\d{9,16}$/.test(raw)) {
+			const num = Number(raw)
+			if (isNaN(num) || num <= 0) return ''
+			ms = num > 1e11 ? (num > 1e14 ? Math.floor(num / 1000) : num) : num * 1000
+		} else {
+			let normalized = raw.includes(' ') && !raw.includes('T') ? raw.replace(' ', 'T') : raw
+			normalized = normalized.replace(/T(\d):/, 'T0$1:').replace(/ (\d):/, ' 0$1:')
+			const date = new Date(normalized)
+			if (Number.isNaN(date.getTime())) return ''
+			ms = date.getTime()
+		}
+	}
+	const d = new Date(ms)
+	if (isNaN(d.getTime())) return ''
+	const dd = ('0' + String(d.getDate())).slice(-2)
+	const mm = ('0' + String(d.getMonth() + 1)).slice(-2)
+	return `${dd}.${mm}.${String(d.getFullYear())}`
+}
+
+// Finds the oldest on-chain timestamp for an NFT note (from Minted, Acquired, History, TokenDates).
+// Returns timestamp in milliseconds, or 0 if missing.
+export function getNftMintTimestamp(fm: Record<string, unknown>): number {
+	if (fm.Minted) {
+		const t = parseDate(fm.Minted)
+		if (t > 0) return t
+	}
+	if (fm.Acquired) {
+		const t = parseDate(fm.Acquired)
+		if (t > 0) return t
+	}
+	const rawHistory = Array.isArray(fm.History) ? fm.History : []
+	let oldest = 0
+	for (const tx of rawHistory) {
+		if (tx && typeof tx === 'object') {
+			const item = tx as Record<string, unknown>
+			const tsVal = item.timeStamp || item.timestamp || item.date
+			if (tsVal && tsVal !== '-') {
+				const t = parseDate(tsVal)
+				if (t > 0 && (oldest === 0 || t < oldest)) oldest = t
+			}
+		}
+	}
+	if (oldest > 0) return oldest
+
+	if (typeof fm.TokenDates === 'object' && fm.TokenDates !== null) {
+		const td = fm.TokenDates as Record<string, unknown>
+		for (const k of Object.keys(td)) {
+			const t = parseDate(td[k])
+			if (t > 0 && (oldest === 0 || t < oldest)) oldest = t
+		}
+		if (oldest > 0) return oldest
+	}
+	if (fm.Date) {
+		const t = parseDate(fm.Date)
+		if (t > 0) return t
+	}
+	return 0
 }
 
 // '' when the source date has no day in it ("2020", "Q4 2020", "Coming soon").
@@ -131,12 +215,14 @@ const UNRANKED = new Set([
 	'name', 'url', 'cover', 'image', 'baner', 'gallery', 'trailer', 'seasons', 'source', 'source id',
 	'date', 'progress', 'related', 'type', 'isbn', 'aliases', 'cssclasses', 'runtime', 'season',
 	'end year', 'complete', 'my rating', 'rating', 'rating imdb', 'rating rt', 'rating rawg', 'rating mc',
-	'rating anilist'
+	'rating anilist', 'contract', 'token id', 'tokens', 'tokendates', 'wallet', 'spam', 'oat', 'count',
+	'favorite', 'standard', 'kind', 'acquired', 'minted'
 ])
 
 export function rankableProperties(frontmatters: Record<string, unknown>[], coverProperty: string): string[] {
 	const found = new Map<string, string>()
 	for (const fm of frontmatters) {
+		if (isCollectible(fm)) continue
 		for (const key of Object.keys(fm)) {
 			const lower = key.trim().toLowerCase()
 			if (!lower || UNRANKED.has(lower) || lower === coverProperty.trim().toLowerCase()) continue
@@ -175,7 +261,6 @@ export function topLabel(top: IStatsTop, categories: ICategory[]): string {
 	if (top.kind === 'property' && top.scope) {
 		const scope = categories.find(c => c.typeValue === top.scope)
 		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'game') return tr('stats.topDevelopers')
-		if (top.key.toLowerCase() === 'creator' && scope?.typeValue === NFT_CATEGORY) return tr('stats.topCollections')
 		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'manual') return tr('stats.topChannels')
 		return tr('stats.topNamed', { name: `${top.key} · ${scope ? categoryLabel(scope) : top.scope}` })
 	}
@@ -258,7 +343,21 @@ export function shownProgress(fm: Record<string, unknown>, kind?: ContentType): 
 // A rated title counts as seen, ticked or not.
 // A collectible (an NFT) is held, not watched or read: never started, never in progress.
 export function isCollectible(fm: Record<string, unknown>): boolean {
-	return fm.Source === 'nft'
+	return fm.Source === 'nft' || fm.Type === 'NFT' || fm.Contract !== undefined
+}
+
+// Detects raw public blockchain wallet addresses (EVM, Solana, TON, etc.)
+export function isWalletAddress(val: unknown): boolean {
+	if (typeof val !== 'string') return false
+	const s = val.trim()
+	if (!s) return false
+	// EVM address: 0x followed by 32+ hex characters (standard is 40)
+	if (/^0x[a-f0-9]{32,}$/i.test(s)) return true
+	// TON user-friendly (UQ/EQ/kQ...) or raw (0:hex...) address
+	if (/^(UQ|EQ|kQ)[a-zA-Z0-9_-]{40,}$/i.test(s) || /^0:[a-f0-9]{60,}$/i.test(s)) return true
+	// Solana base58 address: 32-44 characters, no spaces, no punctuation
+	if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(s) && !/\s/.test(s) && !s.includes('-') && !s.includes('.')) return true
+	return false
 }
 
 export function notStarted(fm: Record<string, unknown>, kind?: ContentType): boolean {
@@ -358,9 +457,10 @@ export function sameTitle(a: string, b: string): boolean {
 
 function titleKey(value: string): string {
 	let s = value
+		.normalize('NFC')
 		.toLowerCase()
 		.replace(/\([^)]*\)|\[[^\]]*\]/g, ' ')
-		.replace(/\s+(?:на|для|for|on)\s+(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, ' ')
+		.replace(/\s+(?:на\s+|для\s+|for\s+|on\s+)(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, ' ')
 		.replace(/\s*[-–—:]?\s*(?:cloud\s+version|pc\s+edition|ps[45]\s*&\s*ps[45])\b.*$/i, ' ')
 		.replace(/^(?:sid meier'?s|tom clancy'?s|ea sports)\s+/i, '')
 		.replace(/\s*[-–—:]?\s*(?:standard|digital deluxe|deluxe|enhanced|definitive|goty|game of the year|complete|director'?s cut|anniversary|special|collector'?s|gold|premium|ultimate|remastered|remaster|legendary|legacy|redux|обновленная версия|обновлённая версия|полное издание|золотое издание)\s*(?:edition|cut|bundle|version)?\s*$/i, ' ')
@@ -377,9 +477,10 @@ function titleKey(value: string): string {
 // Drops trademark marks and platform tags from note names.
 export function cleanGameTitle(title: string): string {
 	return title
+		.normalize('NFC')
 		.replace(/[™®©]/g, '')
-		.replace(/\s*\((?:PlayStation\s*\d?|PS[45](?:\s*[&/]\s*PS[45])?|Nintendo\s*Switch|Switch|PC|Xbox(?:\s*One|\s*Series\s*[xs]?)?)\)/i, '')
-		.replace(/\s+(?:на|для|for|on)\s+(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, '')
+		.replace(/\s*\((?:PlayStation\s*\d?|PS[45](?:\s*[&/]\s*PS[45])?|Nintendo\s*Switch|Switch|PC|Xbox(?:\s*One|\s*Series\s*[xs]?)?)\)/i, ' ')
+		.replace(/\s+(?:на\s+|для\s+|for\s+|on\s+)(?:nintendo\s+switch|switch|playstation(?:\s*\d)?|ps\d|pc|xbox(?:\s*one|\s*series\s*[xs]?)?)\b.*$/i, ' ')
 		.replace(/\s+/g, ' ')
 		.trim()
 }
@@ -408,8 +509,9 @@ export function findGameNote(
 	})
 }
 
-// a book's medium, stored in Format as these English words; any other value a user wrote shows as is
+// a book or comic medium, stored in Format as these English words; any other value a user wrote shows as is
 export const BOOK_FORMATS: [string, string][] = [['Paper', 'format.paper'], ['eBook', 'format.ebook'], ['Audiobook', 'format.audiobook']]
+export const COMIC_FORMATS: [string, string][] = [['Paper', 'format.paper'], ['eBook', 'format.ebook']]
 
 export function formatLabel(value: string): string {
 	const known = BOOK_FORMATS.find(([v]) => v.toLowerCase() === value.toLowerCase())
@@ -490,10 +592,14 @@ export function coverKey(fm: Record<string, unknown>, property = 'Cover'): strin
 	return null
 }
 
-// File extension for a downloaded image, from its content type; null when it is not one.
+// File extension for a downloaded media file, from its content type; null when it is not one.
 export function imageExtension(contentType: string): string | null {
 	const type = contentType.split(';')[0]?.trim().toLowerCase() ?? ''
-	const known: Record<string, string> = { 'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif' }
+	const known: Record<string, string> = {
+		'image/jpeg': 'jpg', 'image/jpg': 'jpg', 'image/png': 'png',
+		'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif',
+		'video/mp4': 'mp4', 'video/webm': 'webm', 'video/quicktime': 'mov'
+	}
 	return known[type] ?? null
 }
 
@@ -509,26 +615,33 @@ export function urlHash(url: string): string {
 	return a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0')
 }
 
-// Image servers that answer application/octet-stream: the first bytes tell the format.
+// Image and media servers that answer application/octet-stream: the first bytes tell the format.
 export function sniffImage(data: ArrayBuffer): string | null {
 	const b = new Uint8Array(data.slice(0, 12))
 	if (b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return 'png'
 	if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'jpg'
 	if (b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46) return 'gif'
 	if (b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'webp'
+	if (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70) return 'mp4'
+	if (b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3) return 'webm'
 	return null
 }
 
 export function coverSrc(app: App, raw: unknown): string | null {
 	const value = toStr(raw).trim()
 	if (!value) return null
-	if (/^https?:\/\//i.test(value)) return value
+	if (/^https?:\/\//i.test(value) || value.startsWith('data:image/')) return value
 	// Vault image: a path or the properties panel's "[[poster.jpg]]" / "![[...|300]]".
-	const link = value.match(/^!?\[\[([^\]|#]+)/)
-	const path = (link?.[1] ?? value).trim()
-	if (!path) return null
-	const file = app.vault.getFileByPath(normalizePath(path))
-		?? app.metadataCache.getFirstLinkpathDest(path, '')
+	const link = value.match(/^!?\[\[([^\]|]+)/)
+	const rawPath = (link?.[1] ?? value).trim()
+	if (!rawPath) return null
+	let file = app.vault.getFileByPath(normalizePath(rawPath))
+		?? app.metadataCache.getFirstLinkpathDest(rawPath, '')
+	if (!file && rawPath.indexOf('#') >= 0) {
+		const withoutHash = (rawPath.split('#')[0] ?? '').trim()
+		file = app.vault.getFileByPath(normalizePath(withoutHash))
+			?? app.metadataCache.getFirstLinkpathDest(withoutHash, '')
+	}
 	return file ? app.vault.getResourcePath(file) : null
 }
 
@@ -542,6 +655,12 @@ export function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise
 			(value) => { window.clearTimeout(timer); resolve(value) },
 			() => { window.clearTimeout(timer); resolve(fallback) }
 		)
+	})
+}
+
+export function sleep(ms: number): Promise<void> {
+	return new Promise((resolve) => {
+		window.setTimeout(resolve, ms)
 	})
 }
 
@@ -592,4 +711,53 @@ export function plainCopy<T>(value: T): T {
 	const out: Record<string, unknown> = {}
 	for (const key of Object.keys(value)) out[key] = plainCopy((value as Record<string, unknown>)[key])
 	return out as T
+}
+
+export function latestNftMintDate(fm: Record<string, unknown>, cardName = ''): string {
+	const match = cardName.match(/#([a-zA-Z0-9xX_-]+)$/)
+	const tokenDates = (typeof fm.TokenDates === 'object' && fm.TokenDates !== null) ? (fm.TokenDates as Record<string, string>) : null
+	if (match && tokenDates) {
+		const tid = match[1] ?? ''
+		if (tokenDates[tid]) {
+			const d = toStr(tokenDates[tid])
+			if (/^\d{2}\.\d{2}\.\d{4}$/.test(d)) return d
+			const dmy = dmyOf(d)
+			if (dmy) return dmy
+		}
+	}
+
+	let latestTime = 0
+	let latestStr = ''
+
+	const consider = (val: unknown) => {
+		const s = toStr(val).trim()
+		if (!s) return
+		let dmy = ''
+		let time = 0
+		if (/^\d{2}\.\d{2}\.\d{4}$/.test(s)) {
+			dmy = s
+			time = parseDate(s)
+		} else {
+			dmy = dmyOf(s)
+			time = dmy ? parseDate(dmy) : 0
+		}
+		if (time > latestTime) {
+			latestTime = time
+			latestStr = dmy
+		}
+	}
+
+	if (tokenDates) {
+		for (const k of Object.keys(tokenDates)) consider(tokenDates[k])
+	}
+	if (Array.isArray(fm.History)) {
+		for (let i = 0; i < fm.History.length; i++) {
+			const item = fm.History[i] as Record<string, unknown> | null
+			if (item) consider(item.date || item.timeStamp)
+		}
+	}
+	consider(fm.Minted)
+	consider(fm.Acquired)
+
+	return latestStr || toStr(fm.Minted) || toStr(fm.Acquired) || ''
 }

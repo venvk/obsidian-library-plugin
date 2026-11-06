@@ -32,7 +32,14 @@ const round1 = (value: number): number => Math.round(value * 10) / 10
 
 // Five rated titles before there is a taste to speak of; three before a genre or decade counts.
 export function tasteOf(cards: TasteCard[]): Taste | null {
-	const rated = cards.filter(card => card.rating >= 1 && card.rating <= 10)
+	const nonNft = cards.filter(card => {
+		const fm = card.fm
+		if (!fm) return true
+		if (toStr(fm.Source) === 'nft' || toStr(fm.Type) === 'NFT' || fm.Contract !== undefined || fm.Tokens !== undefined) return false
+		if (toStr(fm.Source) === 'youtube' || toStr(fm.Type) === 'Video') return false
+		return true
+	})
+	const rated = nonNft.filter(card => card.rating >= 1 && card.rating <= 10)
 	if (rated.length < 5) return null
 	const histogram = new Array<number>(10).fill(0)
 	let sum = 0
@@ -53,7 +60,7 @@ export function tasteOf(cards: TasteCard[]): Taste | null {
 			genres.set(genre, entry)
 		}
 	}
-	for (const card of cards) if (card.year > 1800) decades.set(Math.floor(card.year / 10) * 10, (decades.get(Math.floor(card.year / 10) * 10) ?? 0) + 1)
+	for (const card of rated) if (card.year > 1800) decades.set(Math.floor(card.year / 10) * 10, (decades.get(Math.floor(card.year / 10) * 10) ?? 0) + 1)
 	const topDecade = [...decades.entries()].filter(([, count]) => count >= 3).sort((a, b) => b[1] - a[1] || b[0] - a[0])[0]
 	return {
 		rated: rated.length,

@@ -1,7 +1,8 @@
 import { App, ItemView, WorkspaceLeaf, TFile, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
-import { categoryLabel, ownCreators, sectionOrder } from './categories'
+import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, isNftCategory } from './categories'
+import { cleanCollectionName, looksLikeSpam } from './nft'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
 import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
@@ -35,7 +36,9 @@ import {
 	propertyValues,
 	topLabel,
 	formatLabel,
-	BOOK_FORMATS
+	BOOK_FORMATS,
+	latestNftMintDate,
+	getNftMintTimestamp
 } from './util'
 
 export const LIBRARY_VIEW_TYPE = 'library-view'
@@ -48,6 +51,8 @@ export interface CardData {
 	year: number
 	rating: number
 	date: number
+	cover?: string
+	tokenCount?: number
 }
 
 type StatsColumn =
@@ -75,9 +80,9 @@ function timeColor(cat: ICategory): string | undefined {
 	return TIME_COLORS[cat.typeValue === YOUTUBE_TYPE ? 'video' : cat.contentType]
 }
 
-type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress' | 'chain' | 'favorite'
+type SortKey = 'name' | 'year' | 'rating' | 'date' | 'modified' | 'played' | 'unstarted' | 'progress' | 'chain' | 'favorite' | 'minted'
 
-const SORT_KEYS: SortKey[] = ['name', 'year', 'rating', 'date', 'modified', 'played', 'unstarted', 'progress', 'chain', 'favorite']
+const SORT_KEYS: SortKey[] = ['name', 'year', 'rating', 'date', 'modified', 'played', 'unstarted', 'progress', 'chain', 'favorite', 'minted']
 
 interface SortChoice {
 	key: SortKey
@@ -107,7 +112,7 @@ function facetValues(card: CardData, facet: Facet): string[] {
 		// a token is a collectible or an achievement (OAT)
 		case 'kind': return isCollectible(card.fm) ? [card.fm.OAT === true ? 'OAT' : 'NFT'] : []
 		case 'format': {
-			if (card.kind !== 'book') return []
+			if (card.kind !== 'book' && card.kind !== 'comic') return []
 			return toStrArray(card.fm.Format).map((val) => {
 				const match = BOOK_FORMATS.find(([v]) => v.toLowerCase() === val.toLowerCase())
 				return match ? match[0] : val
@@ -129,6 +134,7 @@ interface SectionSpec {
 	collapsed: boolean
 	setCollapsed(collapsed: boolean): void
 	kind?: ContentType
+	category?: ICategory
 	filters?: { all: CardData[], chosen: Record<string, string>, choose(facet: Facet, value: string): void }
 }
 
@@ -140,14 +146,22 @@ export class LibraryRenderer {
 	constructor(private app: App, private plugin: LibraryPlugin) {}
 
 	collectCards(category: ICategory): CardData[] {
-		const cards: CardData[] = []
+		let cards: CardData[] = []
+		const seenFiles = new Set<string>()
 		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (seenFiles.has(file.path)) continue
+			seenFiles.add(file.path)
 			if (isTemplateFile(file.path)) continue
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			if (!fm || fm.Type !== category.typeValue) continue
 			// spam NFTs stay hidden unless the setting shows them, OATs while it hides them
-			if (fm.Spam === true && fm.Source === 'nft' && !this.plugin.settings.showNftSpam) continue
-			if (fm.OAT === true && fm.Source === 'nft' && !this.plugin.settings.showNftOat) continue
+			const isNft = fm.Source === 'nft' || isNftCategory(category)
+			const isSpam = fm.Spam === true || (isNft && fm.Spam !== false && looksLikeSpam(toStr(fm.Name), toStr(fm.Contract)))
+			if (isSpam && isNft && !this.plugin.settings.showNftSpam) continue
+			if (fm.OAT === true && isNft && !this.plugin.settings.showNftOat) continue
+			if (!this.plugin.settings.youtubeIncludeShorts && toStr(fm.Source) === 'youtube') {
+				if (fm.Short === true || toStr(fm.URL).includes('/shorts/') || /#shorts\b/i.test(toStr(fm.Name))) continue
+			}
 			cards.push({
 				file,
 				fm,
@@ -155,14 +169,80 @@ export class LibraryRenderer {
 				name: toStr(fm.Name) || file.basename,
 				year: Number(fm.Year) || 0,
 				rating: Number(fm['My Rating'] ?? fm.Rating) || 0,
-				date: parseDate(fm.Date)
+				date: isNft ? getNftMintTimestamp(fm) : parseDate(fm.Date)
 			})
+		}
+		if (category.contentType === 'game') {
+			const seenGameKeys = new Set<string>()
+			const deduped: CardData[] = []
+			for (const card of cards) {
+				const sourceId = toStr(card.fm['Source ID'])
+				const nameKey = card.name.toLowerCase().trim()
+				const key = sourceId || nameKey
+				if (seenGameKeys.has(key)) continue
+				seenGameKeys.add(key)
+				deduped.push(card)
+			}
+			return deduped
+		}
+		if (!isNftCategory(category)) {
+			const seenKeys = new Set<string>()
+			const deduped: CardData[] = []
+			for (const card of cards) {
+				const sourceId = toStr(card.fm['Source ID'])
+				if (sourceId) {
+					if (seenKeys.has(sourceId)) continue
+					seenKeys.add(sourceId)
+				}
+				deduped.push(card)
+			}
+			cards = deduped
+		}
+		if (category.typeValue === NFT_CATEGORY || category.name === NFT_CATEGORY) {
+			if (this.plugin.settings.nftDisplayMode === 'all') {
+				const allCards: CardData[] = []
+				for (const card of cards) {
+					const tokenIds = toStrArray(card.fm.Tokens)
+					if (tokenIds.length > 0) {
+						const gallery = toStrArray(card.fm.Gallery)
+						const cover = toStr(card.fm.Cover)
+						for (let j = 0; j < tokenIds.length; j++) {
+							const tid = tokenIds[j]
+							allCards.push({
+								file: card.file,
+								fm: card.fm,
+								kind: card.kind,
+								name: `${card.name} #${tid}`,
+								year: card.year,
+								rating: card.rating,
+								date: card.date,
+								cover: gallery[j] || (tokenIds.length === 1 ? cover : '') || cover
+							})
+						}
+					} else {
+						allCards.push(card)
+					}
+				}
+				return allCards
+			}
+			const seenContracts = new Set<string>()
+			const deduped: CardData[] = []
+			for (const card of cards) {
+				const contract = toStr(card.fm.Contract).toLowerCase()
+				const chain = toStrArray(card.fm.Platforms)[0] || toStr(card.fm.Platforms) || toStr(card.fm['Source ID']).split(':')[0] || ''
+				const cleanName = cleanCollectionName(card.name, toStrArray(card.fm.Creator)[0] || '', toStr(card.fm['Token ID']))
+				const key = contract && contract !== '0' ? `${chain}:${contract}` : `${chain}:${cleanName.toLowerCase()}`
+				if (seenContracts.has(key)) continue
+				seenContracts.add(key)
+				deduped.push(card)
+			}
+			return deduped
 		}
 		return cards
 	}
 
 	collectStats(): { columns: StatsColumn[]; time: TimeSlice[]; undated: number } {
-		const tops = this.plugin.settings.stats.tops
+		const tops = this.plugin.settings.stats.tops.filter(top => top.scope !== NFT_CATEGORY && !this.plugin.settings.categories.some(c => c.typeValue === top.scope && isNftCategory(c)))
 		const properties = tops.filter(top => top.kind === 'property')
 		const counts = properties.map(() => new Map<string, { label: string; count: number }>())
 		const rated = new Map<ICategory, CardData[]>()
@@ -177,18 +257,30 @@ export class LibraryRenderer {
 			const cat = this.plugin.settings.categories.find(c => c.typeValue === fm.Type)
 			if (!cat) continue
 
+			const isNft = isCollectible(fm) || cat.typeValue === NFT_CATEGORY || toStr(fm.Source) === 'nft' || isNftCategory(cat)
+			if (isNft) continue
+
 			properties.forEach((top, i) => {
 				const tally = counts[i]
+				if (!tally) return
 				// a scoped top counts its category alone; the shared creator top leaves out games and videos
-				if (!tally || (top.scope ? cat.typeValue !== top.scope : top.key.toLowerCase() === 'creator' && ownCreators(cat))) return
+				if (top.scope) {
+					if (cat.typeValue !== top.scope) return
+				} else {
+					if (top.key.toLowerCase() === 'creator' && ownCreators(cat)) return
+				}
+
 				const seen = new Set<string>()
-				for (const value of propertyValues(fm, top.key)) {
-					const key = value.toLowerCase()
+				const vals = propertyValues(fm, top.key)
+
+				for (const value of vals) {
+					const clean = linkLabel(value).trim()
+					const key = clean.toLowerCase()
 					if (!key || seen.has(key)) continue
 					seen.add(key)
 					const entry = tally.get(key)
-					if (entry) entry.count++
-					else tally.set(key, { label: value, count: 1 })
+					if (entry) entry.count += 1
+					else tally.set(key, { label: clean, count: 1 })
 				}
 			})
 
@@ -328,7 +420,7 @@ export class LibraryRenderer {
 		const psn = this.plugin.settings.psnStats
 		const mal = this.plugin.settings.malStats
 		const nintendo = this.plugin.settings.nintendoStats
-		const taste = cards && this.plugin.settings.showProfile ? tasteOf(cards) : null
+		const taste = cards && this.plugin.settings.showProfile ? tasteOf(cards.filter(c => !isCollectible(c.fm) && c.fm.Type !== NFT_CATEGORY && toStr(c.fm.Source) !== 'nft' && c.fm.Type !== YOUTUBE_TYPE && toStr(c.fm.Source) !== 'youtube')) : null
 		const today = todayIso()
 		const diaryRows: Array<{ card: CardData; label: string; date: string }> = []
 		if (cards && this.plugin.settings.showDiary) {
@@ -616,19 +708,37 @@ export class LibraryRenderer {
 			}
 		})
 
-		const cover = coverValue(fm, this.plugin.settings.coverProperty)
+		const cover = card.cover || coverValue(fm, this.plugin.settings.coverProperty)
 		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
-		const cardCover = coverSrc(this.app, cover)
+		let cardCover = coverSrc(this.app, cover)
+		if (cardCover && isCollectible(fm) && cardCover.includes('ipfs.filebase.io/ipfs/')) {
+			cardCover = cardCover.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
+		}
 		// some NFT pictures are short videos
 		if (cardCover && /\.(mp4|webm|mov)(\?|$)/i.test(cardCover)) {
 			imgDiv.createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } })
 		} else if (cardCover) {
 			const img = imgDiv.createEl('img', { attr: { src: cardCover, alt: card.name, loading: 'lazy', decoding: 'async' } })
-			// a token's "image" can be a video at an address with no extension: tried as one when it won't load
+			// a token's "image" can be a video at an address with no extension or on an alternate IPFS gateway
 			img.addEventListener('error', () => {
 				if (!isCollectible(fm)) return
-				img.replaceWith(createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } }))
-			}, { once: true })
+				const curSrc = img.getAttribute('src') || ''
+				const ipfsMatch = /\/ipfs\/([^/?#]+(?:\/[^/?#]+)*)/i.exec(curSrc)
+				if (ipfsMatch) {
+					const ipfsPath = ipfsMatch[1]
+					const gateways = ['https://gateway.pinata.cloud/ipfs/', 'https://cloudflare-ipfs.com/ipfs/', 'https://ipfs.io/ipfs/', 'https://dweb.link/ipfs/']
+					const nextGw = gateways.find(gw => !curSrc.startsWith(gw))
+					if (nextGw) {
+						img.replaceWith(createEl('video', { attr: { src: `${nextGw}${ipfsPath}`, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } }))
+						return
+					}
+				}
+				let vidSrc = curSrc || cardCover
+				if (vidSrc.includes('ipfs.filebase.io/ipfs/')) {
+					vidSrc = vidSrc.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
+				}
+				img.replaceWith(createEl('video', { attr: { src: vidSrc, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } }))
+			}, { once: false })
 		} else {
 			const type = toStr(fm.Type).toLowerCase()
 			const emoji = type === 'anime' ? '🎌'
@@ -641,12 +751,66 @@ export class LibraryRenderer {
 			imgDiv.createSpan({ text: emoji })
 		}
 		renderPlatforms(imgDiv, fm, 'card-platforms')
+		if (card.kind === 'book' || card.kind === 'comic') {
+			const formats = toStrArray(fm.Format).map(f => f.toLowerCase().trim())
+			const hasAudio = formats.some(f => f === 'audiobook' || f === 'аудиокнига' || f === 'аудіокнига')
+			const hasEbook = formats.some(f => f === 'ebook' || f === 'e-book' || f === 'электронная' || f === 'електронна' || f === 'digital')
+			const hasPaper = formats.some(f => f === 'paper' || f === 'бумажная' || f === 'паперова' || f === 'print')
+			if (hasAudio || hasEbook || hasPaper) {
+				const badges = imgDiv.createDiv({ cls: 'card-format-badges' })
+				if (hasAudio) {
+					const b = badges.createSpan({
+						cls: 'card-format-badge is-audiobook',
+						attr: { 'role': 'img', 'aria-label': tr('format.audiobook'), 'title': tr('format.audiobook') }
+					})
+					setIcon(b, 'headphones')
+				}
+				if (hasEbook) {
+					const b = badges.createSpan({
+						cls: 'card-format-badge is-ebook',
+						attr: { 'role': 'img', 'aria-label': tr('format.ebook'), 'title': tr('format.ebook') }
+					})
+					setIcon(b, 'tablet')
+				}
+				if (hasPaper) {
+					const b = badges.createSpan({
+						cls: 'card-format-badge is-paper',
+						attr: { 'role': 'img', 'aria-label': tr('format.paper'), 'title': tr('format.paper') }
+					})
+					setIcon(b, 'book-open')
+				}
+			}
+		}
 		if (notStarted(fm, card.kind)) {
 			const badge = imgDiv.createSpan({
 				cls: 'card-unstarted',
 				attr: { 'role': 'img', 'aria-label': tr('card.notStarted') }
 			})
 			setIcon(badge, 'eye')
+		}
+		const nftTokensCount = toStrArray(fm.Tokens).length
+		const countNum = Math.max(Number(fm.Count) || 1, nftTokensCount)
+		const isNft = toStr(fm.Source) === 'nft' || toStr(fm.Type) === 'NFT'
+		const isSpam = fm.Spam === true || (isNft && fm.Spam !== false && looksLikeSpam(card.name, toStr(fm.Contract)))
+		if (isSpam) {
+			imgDiv.createDiv({ cls: 'card-badge-spam', text: tr('nft.spamBadge') || 'SPAM' })
+		}
+		if ((toStr(fm.Source) === 'nft' || isCollectible(fm)) && countNum > 1 && this.plugin.settings.nftDisplayMode !== 'all') {
+			imgDiv.createSpan({
+				cls: 'card-count-badge',
+				text: `×${String(countNum)}`,
+				attr: { title: `${String(countNum)} items`, 'aria-label': `${String(countNum)} items` }
+			})
+		}
+
+		const percent = shownProgress(fm, card.kind)
+		if (percent !== null && percent < 100) {
+			const posterProgress = imgDiv.createDiv({ cls: 'card-poster-progress' })
+			posterProgress.createDiv({ cls: 'card-poster-progress-fill' }).setCssStyles({ width: `${String(percent)}%` })
+			const label = `${String(percent)}%`
+			setTooltip(posterProgress, label, { placement: 'top' })
+			posterProgress.setAttribute('title', label)
+			posterProgress.setAttribute('aria-label', label)
 		}
 
 		const video = toStr(fm.Source) === 'youtube'
@@ -656,9 +820,16 @@ export class LibraryRenderer {
 
 		const author = toStrArray(fm.Author || fm.Creator || fm.Director || fm.Artist).map(linkLabel).join(', ')
 		if (author) info.createDiv({ cls: 'card-author', text: author })
-		// a video shows the day it came out
-		const year = video && toStr(fm.Published) ? toStr(fm.Published) : toStr(fm.Year)
-		if (year) info.createDiv({ cls: 'card-year', text: year })
+		// a video shows the day it came out; a collection the Minted of its note, a token its own
+		let dateLabel = ''
+		if (video && toStr(fm.Published)) {
+			dateLabel = toStr(fm.Published)
+		} else if (isNft) {
+			dateLabel = card.name.indexOf('#') < 0 ? toStr(fm.Minted) || latestNftMintDate(fm) : latestNftMintDate(fm, card.name)
+		} else if (toStr(fm.Year)) {
+			dateLabel = toStr(fm.Year)
+		}
+		if (dateLabel) info.createDiv({ cls: 'card-year', text: dateLabel })
 
 		// a video: likes, dislikes and views where a score would be; your own like or dislike filled
 		if (video) this.renderVotes(info, fm)
@@ -686,14 +857,6 @@ export class LibraryRenderer {
 		}
 
 		renderTrophies(info, fm, 'card-trophies')
-
-		const percent = shownProgress(fm, card.kind)
-		if (percent !== null && percent < 100) {
-			const pc = info.createDiv({ cls: 'card-progress' })
-			pc.createDiv({ cls: 'card-progress-label', text: String(percent) + '%' })
-			const bar = pc.createDiv({ cls: 'card-progress-bar' })
-			bar.createDiv({ cls: 'card-progress-fill' }).setCssStyles({ width: String(percent) + '%' })
-		}
 	}
 }
 
@@ -740,6 +903,10 @@ export class LibraryView extends ItemView {
 			this.contentEl.querySelectorAll('.library-sort-menu.open').forEach(m => m.removeClass('open'))
 		})
 		// in the tab's header, right to left: each new action goes in front
+		if (Object.keys(this.plugin.settings.nftWallets).length > 0) this.addAction('merge', tr('cmd.consolidateNft'), () => void this.plugin.consolidateNftNotes(true))
+		this.addAction('link', tr('cmd.rebuildLinks'), () => void this.plugin.rebuildGraphLinks())
+		this.addAction('files', tr('cmd.findDuplicates'), () => this.plugin.openDuplicates())
+		this.addAction('database', tr('cmd.refreshAll'), () => void this.plugin.refreshAll())
 		this.addAction('settings', tr('cmd.openSettings'), () => {
 			const setting = (this.app as unknown as { setting: { open(): void; openTabById(id: string): void } }).setting
 			setting.open()
@@ -816,6 +983,7 @@ export class LibraryView extends ItemView {
 				sortId: category.name,
 				defaultSort: { key: 'name', asc: true },
 				kind: category.contentType,
+				category,
 				collapsed: category.collapsed === true,
 				setCollapsed: (collapsed) => {
 					if (collapsed) category.collapsed = true
@@ -956,12 +1124,33 @@ export class LibraryView extends ItemView {
 		})
 	}
 
-	private sectionMeta(row: HTMLElement, cards: CardData[], kind?: ContentType): void {
-		const count = formatNumber(cards.length)
+	private sectionMeta(row: HTMLElement, cards: CardData[], kind?: ContentType, category?: ICategory): void {
+		let totalNftTokens = 0
+		if (category?.typeValue === NFT_CATEGORY || category?.name === NFT_CATEGORY) {
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				if (isTemplateFile(file.path)) continue
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (!fm || (fm.Type !== 'NFT' && toStr(fm.Source) !== 'nft')) continue
+				const tLen = toStrArray(fm.Tokens).length
+				totalNftTokens += Math.max(tLen, Number(fm.Count) || 1)
+			}
+		}
+
+		let countText = formatNumber(cards.length)
+		let titleAttr = `${countText} ${trCount('stats.works', cards.length)}`
+		if (totalNftTokens > 0) {
+			if (totalNftTokens !== cards.length) {
+				countText = `${formatNumber(cards.length)} (${formatNumber(totalNftTokens)})`
+			} else {
+				countText = formatNumber(totalNftTokens)
+			}
+			titleAttr = `${formatNumber(cards.length)} cards, ${formatNumber(totalNftTokens)} total NFTs`
+		}
+
 		row.createSpan({
 			cls: 'library-section-count',
-			text: count,
-			attr: { 'aria-label': `${count} ${trCount('stats.works', cards.length)}` }
+			text: countText,
+			attr: { 'aria-label': titleAttr, title: titleAttr }
 		})
 		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game' && kind !== 'manual') return
 		let minutes = 0
@@ -982,9 +1171,24 @@ export class LibraryView extends ItemView {
 			text: '▼',
 			attr: { 'aria-label': spec.title, 'aria-expanded': 'true' }
 		})
-		this.sectionMeta(toolbar, cards, spec.kind)
+		this.sectionMeta(toolbar, cards, spec.kind, spec.category)
 		if (spec.filters) this.sectionFilters(toolbar, spec.filters)
 		toolbar.createDiv({ cls: 'library-toolbar-spacer' })
+
+		if (spec.category) {
+			const mapBtn = toolbar.createEl('button', {
+				cls: 'library-category-map-btn',
+				attr: {
+					'aria-label': tr('cmd.categoryMap', { category: spec.title }),
+					'title': tr('cmd.categoryMap', { category: spec.title })
+				}
+			})
+			setIcon(mapBtn, 'network')
+			mapBtn.addEventListener('click', (e) => {
+				e.stopPropagation()
+				void this.plugin.buildCategoryMap(spec.category!)
+			})
+		}
 
 		const sortDropdown = toolbar.createDiv({ cls: 'library-sort-dropdown' })
 		const sortTrigger = sortDropdown.createEl('button', {
@@ -1004,7 +1208,7 @@ export class LibraryView extends ItemView {
 		const collectibles = cards.length > 0 && cards.every(card => isCollectible(card.fm))
 		const sortOptions: { label: string; key: SortKey }[] = collectibles ? [
 			{ label: tr('sort.name'), key: 'name' },
-			{ label: tr('sort.date'), key: 'date' },
+			{ label: tr('header.minted'), key: 'minted' },
 			{ label: tr('sort.modified'), key: 'modified' },
 			{ label: tr('header.favorite'), key: 'favorite' },
 		] : [
@@ -1021,6 +1225,8 @@ export class LibraryView extends ItemView {
 		]
 
 		const restored = this.readSort(spec.sortId, spec.defaultSort)
+		// Date and Minted are one date on a token: an older choice of Date reads as Minted
+		if (collectibles && restored.key === 'date') restored.key = 'minted'
 		const fallback = sortOptions.some(o => o.key === spec.defaultSort.key) ? spec.defaultSort : { key: 'date' as SortKey, asc: false }
 		const savedSort = sortOptions.some(o => o.key === restored.key) ? restored : fallback
 		let currentSort: SortKey = savedSort.key
@@ -1040,7 +1246,13 @@ export class LibraryView extends ItemView {
 					case 'name': cmp = a.name.localeCompare(b.name); break
 					case 'year': cmp = a.year - b.year || parseDate(a.fm.Released) - parseDate(b.fm.Released); break
 					case 'rating': cmp = a.rating - b.rating; break
-					case 'date': cmp = a.date - b.date; break
+					case 'date': {
+						if (!a.date && !b.date) return a.name.localeCompare(b.name)
+						if (!a.date) return 1
+						if (!b.date) return -1
+						cmp = a.date - b.date
+						break
+					}
 					case 'modified': cmp = a.file.stat.mtime - b.file.stat.mtime; break
 					case 'played': cmp = parseDate(a.fm['Last Played']) - parseDate(b.fm['Last Played']); break
 					case 'progress': cmp = progressOf(a) - progressOf(b) || a.name.localeCompare(b.name); break
@@ -1049,6 +1261,22 @@ export class LibraryView extends ItemView {
 						cmp = Number(a.fm.Favorite === true) - Number(b.fm.Favorite === true)
 						if (cmp === 0) return a.name.localeCompare(b.name)
 						break
+					case 'minted': {
+						const mintA = a.date || getNftMintTimestamp(a.fm)
+						const mintB = b.date || getNftMintTimestamp(b.fm)
+						if (!mintA && !mintB) {
+							return a.name.localeCompare(b.name)
+						} else if (!mintA) {
+							return 1
+						} else if (!mintB) {
+							return -1
+						} else {
+							cmp = mintA - mintB
+							if (cmp === 0) cmp = a.date - b.date
+							if (cmp === 0) cmp = a.name.localeCompare(b.name)
+						}
+						break
+					}
 					case 'unstarted':
 						cmp = Number(notStarted(b.fm, b.kind)) - Number(notStarted(a.fm, a.kind))
 						// Named order within each half, whichever way the halves go.

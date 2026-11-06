@@ -43,9 +43,9 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, nftHoldings, type KnownToken, parseWallets, walletPairs } from './nft'
+import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, type HeldContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
-import { MEDIA, TYPE_DEFAULTS, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
+import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
 import { PromptModal } from './ui/promptModal'
@@ -60,7 +60,7 @@ import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKit
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, tickLabel, todayIso } from './diary'
-import { libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type PersonCard } from './libraryMap'
+import { categoryCanvas, libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type MapTitle, type PersonCard } from './libraryMap'
 import { albumAwards, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
@@ -77,7 +77,7 @@ import { eaAuthUrl, EA_AUTH_PROBE, eaExpired, eaSilentToken, exchangeEaToken, fe
 import { renderTrophies, TROPHY_GRADES, trophyIcon } from './ui/trophyIcons'
 import { renderPlatformLabels } from './ui/platformIcons'
 import { createEmbedPlayer, toEmbed } from './trailer'
-import { applyEpisodeChange, chapterNotes, editChapters, setChapterNotes, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, type EpisodeChange, type TrackKind } from './episodes'
+import { applyEpisodeChange, areSeasonsChanged, chapterNotes, editChapters, setChapterNotes, followProgress, hasChapters, mergeSeasons, seasonsOf, setChapters, recompute, writeBack, type EpisodeChange, type TrackKind } from './episodes'
 import { ChaptersModal } from './ui/chaptersModal'
 import { ChapterNotesModal } from './ui/chapterNotesModal'
 import { TrailerModal } from './ui/trailerModal'
@@ -124,17 +124,25 @@ import {
 	urlHash,
 	publicHttpsUrl,
 	plainCopy,
-	BOOK_FORMATS
+	BOOK_FORMATS,
+	COMIC_FORMATS
 } from './util'
 
 // Genre, Creator and Cast hold [[links]] to a canvas of the titles that share
 // the name, or to a note of that name when there is one; the graph draws them.
-const LINK_FIELDS = ['Genre', 'Creator', 'Cast', 'Wallet']
+const LINK_FIELDS = ['Genre', 'Creator', 'Cast', 'Wallet', 'Narrator']
 
 // let the vault settle before the walk starts
 const ENRICH_START_DELAY = 10 * 1000
 // iPhone Safari UA: some sign-in pages only fit as a phone-width window.
 const PHONE_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1'
+
+// The sections of a name's canvas, in this order.
+const CANVAS_ROLES = [
+	{ label: 'header.creator', fields: ['Creator', 'Director', 'Author', 'Artist'] },
+	{ label: 'header.cast', fields: ['Cast'] },
+	{ label: 'header.genre', fields: ['Genre'] },
+]
 
 const SOURCE_SCORES = ['Rating IMDB', 'Rating RT', 'Rating MC', 'Rating RAWG', 'Rating AniList', 'Rating MAL']
 
@@ -142,6 +150,42 @@ const SOURCE_SCORES = ['Rating IMDB', 'Rating RT', 'Rating MC', 'Rating RAWG', '
 type Target = ICategory | ContentType
 
 // A library score as a Netflix thumb: 1 down, 2 up, 3 way up.
+// Newest first; a transfer read again keeps what was added to it, and older ones stay.
+function mergeHistory(fresh: unknown[], old: unknown): Record<string, unknown>[] {
+	const rows = new Map<string, Record<string, unknown>>()
+	const keyOf = (row: Record<string, unknown>): string => `${txHashOf(row.hash) || toStr(row.hash)}:${toStr(row.tokenId)}`
+	for (const row of (Array.isArray(old) ? old : []) as Record<string, unknown>[]) rows.set(keyOf(row), row)
+	for (const row of fresh as Record<string, unknown>[]) {
+		const known = rows.get(keyOf(row))
+		const merged: Record<string, unknown> = { ...known }
+		for (const key of Object.keys(row)) if (row[key] !== undefined && row[key] !== '') merged[key] = row[key]
+		rows.set(keyOf(row), merged)
+	}
+	return sortHistory([...rows.values()])
+}
+
+function sortHistory(rows: Record<string, unknown>[]): Record<string, unknown>[] {
+	const block = (row: Record<string, unknown>): number => Number(toStr(row.blockNumber || row.block).replace(/\D/g, '')) || 0
+	const time = (row: Record<string, unknown>): number => parseDate(row.timeStamp || row.date)
+	return [...rows].sort((a, b) => time(b) - time(a) || block(b) - block(a))
+}
+
+// A link's name: the service for a social page, the host for a site.
+function linkName(url: string): string {
+	const host = new URL(url).hostname.replace(/^www\./, '')
+	const known: Record<string, string> = { 'x.com': 'X', 'twitter.com': 'X', 'discord.gg': 'Discord', 'discord.com': 'Discord', 't.me': 'Telegram', 'instagram.com': 'Instagram', 'opensea.io': 'OpenSea' }
+	return known[host] ?? host
+}
+
+// A mint date only moves earlier and an acquired date only later: a read that missed a token must not undo them.
+function applyNftDates(cur: Record<string, unknown>, dates: { Minted?: string; Acquired?: string }): void {
+	const time = (value: unknown): number => parseDate(value)
+	if (dates.Minted && (!time(cur.Minted) || time(dates.Minted) < time(cur.Minted))) cur.Minted = dates.Minted
+	if (dates.Acquired && (!time(cur.Acquired) || time(dates.Acquired) > time(cur.Acquired))) cur.Acquired = dates.Acquired
+	const date = toStr(cur.Minted) || toStr(cur.Acquired)
+	if (date && date !== '-') cur.Date = date
+}
+
 function thumbRank(score: number): number {
 	return ({ THUMBS_DOWN: 1, THUMBS_UP: 2, THUMBS_WAY_UP: 3 } as const)[thumbOf(score)]
 }
@@ -189,6 +233,14 @@ interface ImportRow {
 	complete: boolean
 }
 
+interface NftTrackInfo {
+	sourceId: string
+	contract: string
+	chain: string
+	name: string
+	tokenIds: string[]
+}
+
 export default class LibraryPlugin extends Plugin {
 	settings!: ILibrarySettings
 	private registry = new ProviderRegistry()
@@ -211,6 +263,7 @@ export default class LibraryPlugin extends Plugin {
 	// YouTube's older months and missing counts, running apart from the imports
 	private youtubeBackfilling = false
 	private nftImporting = false
+	private nftImportTimer: number | null = null
 	// Notes an import just found or made, before the metadata cache knows the new ones
 	private watchNotes = new Map<string, TFile>()
 	// shows whose note got its Netflix ID in this import: their viewings tick, nothing to undo yet
@@ -231,8 +284,25 @@ export default class LibraryPlugin extends Plugin {
 	// an album's awards, looked up once a session
 	private albumAwards = new Map<string, Promise<Award[]>>()
 	// NFT notes by path, to know the token of a note once it is deleted; and the ones the import trashes itself
-	private nftPaths = new Map<string, string>()
+	private nftPaths = new Map<string, NftTrackInfo>()
 	private nftTrashing = new Set<string>()
+	private nftImageCache = new Map<string, string>()
+	private nftImageNegative = new Set<string>()
+	private nftTokenQueue: Array<{
+		key: string
+		chain: string
+		contract: string
+		tokenId: string
+		file: TFile
+		title: string
+		renderMedia?: (wrap: HTMLElement, media: string) => void
+		imgWrap?: HTMLElement | null
+		card?: HTMLElement | null
+		onTokenImageResolved?: (url: string) => void
+	}> = []
+	private nftTokenQueueWorking = false
+	private nftPendingSaves = new Map<string, { file: TFile; images: string[]; timer: number; onTokenImageResolved?: (url: string) => void }>()
+	private lastNftEnrichTime = 0
 	private people = new Map<string, Promise<Person | null>>()
 	// sleeps between import steps; unload wakes them so their finally blocks run
 	private pauses = new Map<number, () => void>()
@@ -279,9 +349,12 @@ export default class LibraryPlugin extends Plugin {
 		const tmdb = new TmdbEnricher(() => this.apiKey('tmdbApiKey'))
 		// Cinemeta is keyless; TMDB runs first and wins where both have data
 		this.registry.register(
-			new OmdbProvider(() => this.apiKey('omdbApiKey'), [tmdb, new CinemetaEnricher(), new RottenTomatoesEnricher()])
+			new OmdbProvider(() => this.apiKey('omdbApiKey'), [tmdb, new CinemetaEnricher(), new RottenTomatoesEnricher()], () => this.settings.watchSites.imdb.connected)
 		)
-		this.registry.register(new BookAggregatorProvider(googleBooks, openLibrary))
+		this.registry.register(new BookAggregatorProvider(
+			googleBooks,
+			openLibrary
+		))
 		const trailers = new GameTrailerFinder(() => ({ id: this.apiKey('twitchClientId'), secret: this.apiKey('twitchClientSecret') }))
 		this.registry.register(new GameAggregatorProvider(
 			new RawgProvider(() => this.apiKey('rawgApiKey'), trailers),
@@ -326,21 +399,35 @@ export default class LibraryPlugin extends Plugin {
 		this.app.workspace.onLayoutReady(() => {
 			if (this.unloaded) return
 			for (const file of this.app.vault.getMarkdownFiles()) this.trackNft(file)
+			this.registerInterval(window.setTimeout(() => void this.consolidateNftNotes(false), 45000))
 			// a token note you delete marks its token as spam for later imports; the import's own trashing does not count
 			this.registerEvent(this.app.vault.on('delete', (file) => {
-				const key = this.nftPaths.get(file.path)
+				const info = this.nftPaths.get(file.path)
 				this.nftPaths.delete(file.path)
-				if (!key || this.nftTrashing.delete(file.path)) return
-				if (this.settings.nftHidden.indexOf(key) < 0) {
-					this.settings.nftHidden.push(key)
-					void this.saveSettings()
+				if (!info || this.nftTrashing.delete(file.path)) return
+				const keysToAdd: string[] = []
+				if (info.sourceId) keysToAdd.push(info.sourceId)
+				if (info.contract) keysToAdd.push(info.contract)
+				if (info.chain && info.contract) keysToAdd.push(`${info.chain}:${info.contract}`)
+				for (const tid of info.tokenIds) {
+					if (info.contract) keysToAdd.push(`${info.contract}:${tid}`)
+					if (info.chain && info.contract) keysToAdd.push(`${info.chain}:${info.contract}:${tid}`)
 				}
+				let changed = false
+				for (const k of keysToAdd) {
+					const clean = k.trim()
+					if (clean && this.settings.nftHidden.indexOf(clean) < 0) {
+						this.settings.nftHidden.push(clean)
+						changed = true
+					}
+				}
+				if (changed) void this.saveSettings()
 			}))
 			this.registerEvent(this.app.vault.on('rename', (file, oldPath) => {
-				const key = this.nftPaths.get(oldPath)
-				if (!key) return
+				const info = this.nftPaths.get(oldPath)
+				if (!info) return
 				this.nftPaths.delete(oldPath)
-				this.nftPaths.set(file.path, key)
+				this.nftPaths.set(file.path, info)
 			}))
 			// registered on layout-ready: startup re-indexes every note changed while the app was closed
 			this.registerEvent(
@@ -388,6 +475,9 @@ export default class LibraryPlugin extends Plugin {
 			this.registerInterval(window.setTimeout(() => void this.traktBackfill(), 90000))
 			this.registerInterval(window.setInterval(() => void this.airingIfDue(), 3600000))
 			this.registerInterval(window.setInterval(() => this.gameSyncTick(), 3600000))
+			if (walletPairs(this.settings.nftWallets).length > 0 && this.settings.nftLastImport === 0) {
+				this.scheduleLazyNftImport(15000)
+			}
 		})
 		this.keySignatures = this.apiKeySignatures()
 
@@ -430,7 +520,7 @@ export default class LibraryPlugin extends Plugin {
 		this.addCommand({
 			id: 'refresh-all-metadata',
 			name: tr('cmd.refreshAll'),
-			callback: () => { void this.enrichPass(true) }
+			callback: () => { void this.refreshAll() }
 		})
 
 		this.addCommand({
@@ -482,6 +572,12 @@ export default class LibraryPlugin extends Plugin {
 			id: 'anilist-pull',
 			name: tr('cmd.anilistPull'),
 			callback: () => { void this.anilistPull() }
+		})
+
+		this.addCommand({
+			id: 'consolidate-nft-notes',
+			name: tr('cmd.consolidateNft'),
+			callback: () => { void this.consolidateNftNotes(true) }
 		})
 
 		this.addCommand({
@@ -576,10 +672,24 @@ export default class LibraryPlugin extends Plugin {
 			name: tr('cmd.eaImport'),
 			callback: () => { void this.eaImport(true) }
 		})
+		this.addCommand({
+			id: 'nft-import',
+			name: tr('settings.nftImport'),
+			callback: () => { void this.nftImport(true) }
+		})
+		this.addCommand({
+			id: 'update-all',
+			name: tr('cmd.updateAll'),
+			callback: () => { void this.updateAll() }
+		})
 	}
 
 	onunload(): void {
 		this.unloaded = true
+		if (this.nftImportTimer !== null) {
+			window.clearTimeout(this.nftImportTimer)
+			this.nftImportTimer = null
+		}
 		if (this.refreshTimer) window.clearTimeout(this.refreshTimer)
 		if (this.bannerTimer) window.clearTimeout(this.bannerTimer)
 		window.clearTimeout(this.removalTimer)
@@ -589,6 +699,11 @@ export default class LibraryPlugin extends Plugin {
 		for (const timer of this.kitsuPushTimers.values()) window.clearTimeout(timer)
 		for (const timer of this.traktPushTimers.values()) window.clearTimeout(timer)
 		this.traktPushTimers.clear()
+		for (const pending of this.nftPendingSaves.values()) {
+			if (pending.timer) window.clearTimeout(pending.timer)
+		}
+		this.nftPendingSaves.clear()
+		this.nftTokenQueue = []
 		this.refreshTimer = null
 		this.bannerTimer = null
 		this.linkTimers.clear()
@@ -661,7 +776,7 @@ export default class LibraryPlugin extends Plugin {
 		void workspace.revealLeaf(leaf)
 	}
 
-	private refreshViews(): void {
+	refreshViews(): void {
 		for (const leaf of this.app.workspace.getLeavesOfType(LIBRARY_VIEW_TYPE)) {
 			if (leaf.view instanceof LibraryView) leaf.view.render()
 		}
@@ -804,7 +919,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async newNote(category: ICategory, source: string, sourceId: string, title: string, meta: NormalizedMetadata, extra: Record<string, unknown> = {}): Promise<TFile> {
-		const path = await this.uniqueNotePath(title, category.folder)
+		const disambiguator = source === NFT_SOURCE ? (toStrArray(extra.Platforms)[0] || toStr(extra.Platforms) || undefined) : (toStr(meta.fields.Year) || undefined)
+		const path = await this.uniqueNotePath(title, category.folder, disambiguator)
 		const file = await this.app.vault.create(path, await this.templateText(category))
 		// series/anime/books track progress, movies a watched switch (Complete), others both
 		const tracking = trackingOf(category.contentType)
@@ -814,11 +930,12 @@ export default class LibraryPlugin extends Plugin {
 				...(tracking !== 'watched' ? { Progress: meta.progressTotal ? `0/${String(meta.progressTotal)}` : '' } : {}),
 				'My Rating': null,
 				...(tracking !== 'progress' ? { Complete: false } : {}),
-				Date: todayDmy(),
+				Date: (source === NFT_SOURCE && (extra.Date || extra.Minted || extra.Acquired)) ? (extra.Date || extra.Minted || extra.Acquired) : (source === NFT_SOURCE ? '-' : todayDmy()),
 				Source: source,
 				'Source ID': sourceId,
 			}, extra)
-			this.applyMetaFields(fm as Record<string, unknown>, meta)
+			const record = fm as Record<string, unknown>
+			this.applyMetaFields(record, meta)
 		})
 		return file
 	}
@@ -938,7 +1055,10 @@ export default class LibraryPlugin extends Plugin {
 			Array.isArray(current) && current.length === links.length && current.every((v, i) => String(v) === links[i])
 		const patch: Record<string, string[]> = {}
 		for (const key of LINK_FIELDS) {
-			const links = this.toLinks(fields[key])
+			const current = fields[key]
+			const arr = toStrArray(current)
+			if (arr.length > 0 && arr.every(s => /^\[\[[^\]]+\]\]$/.test(s))) continue
+			const links = this.toLinks(current)
 			if (links.length > 0 && !same(cache?.[key], links)) patch[key] = links
 		}
 		const dropRelated = cache?.Related !== undefined
@@ -1022,28 +1142,79 @@ export default class LibraryPlugin extends Plugin {
 		const sections = new Map<string, { path: string; name: string; cover: string }[]>()
 		// a person is named in Creator or Cast; their titles' IMDb ids find them on Wikidata
 		let person = false
+		let nftCard: PersonCard | undefined
 		const imdbIds: string[] = []
 		for (const note of this.app.vault.getMarkdownFiles()) {
 			if (isTemplateFile(note.path)) continue
 			const fm = this.app.metadataCache.getFileCache(note)?.frontmatter
 			const category = fm ? this.settings.categories.find(c => c.typeValue === toStr(fm.Type)) : undefined
 			if (!fm || !category) continue
-			const named = NAME_FIELDS.some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))
-			if (!named) continue
+			const isNftNote = toStr(fm.Source) === NFT_SOURCE || fm.Type === NFT_TYPE
+			const has = (key: string): boolean => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename)
+			const network = toStrArray(fm.Platforms)[0] ?? ''
+			const onNetwork = isNftNote && network === file.basename
+			if (!onNetwork && !NAME_FIELDS.some(has)) continue
 			if (['Creator', 'Cast'].some(key => toStrArray(fm[key]).some(value => linkTarget(value) === file.basename))) {
 				person = true
 				const id = toStr(fm['Source ID'])
 				if (/^tt\d+$/.test(id)) imdbIds.push(id)
 			}
-			const list = sections.get(category.name) ?? []
-			list.push(this.poster(note, fm))
-			sections.set(category.name, list)
+			// a wallet shows its networks, a network its collections, a collection its wallets; anyone else each role they hold
+			const shortName = (name: string): string => name.length > 18 ? `${name.slice(0, 8)}…${name.slice(-6)}` : name
+			const keys = !isNftNote ? CANVAS_ROLES.filter(role => role.fields.some(has)).map(role => `${tr(role.label)} · ${category.name}`)
+				: onNetwork ? [toStr(fm.Name) || note.basename]
+					: has('Wallet') ? [network || category.name]
+						: toStrArray(fm.Wallet).map(wallet => shortName(linkLabel(wallet)))
+			const entries: { path: string; name: string; cover: string }[] = []
+			const tokenIds = toStrArray(fm.Tokens)
+			if (isNftNote && tokenIds.length > 0) {
+				const gallery = toStrArray(fm.Gallery)
+				const coverRaw = toStr(fm.Cover)
+				for (let j = 0; j < tokenIds.length; j++) {
+					const tokenId = tokenIds[j]
+					// the gallery drops repeats, so it lines up with the tokens only at equal length; else the collection's cover
+					const tokenImg = (gallery.length === tokenIds.length ? gallery[j] : '') || coverRaw || gallery[0] || ''
+					const local = /^!?\[\[([^\]|#]+)/.exec(tokenImg)?.[1]
+					const web = safeUrl(tokenImg)
+					const cover = web ? `![](${web})` : local ? `![[${local}]]` : ''
+					entries.push({ path: note.path, name: `#${tokenId}`, cover })
+				}
+				if (!nftCard && has('Creator')) {
+					const contract = toStr(fm.Contract)
+					const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+					const standard = toStr(fm.Standard)
+					const count = Math.max(tokenIds.length, Number(fm.Count) || 1)
+					const wallets = toStrArray(fm.Wallet).map(linkLabel).join(', ')
+					const shortAddr = (addr: string): string => addr.length > 18 ? `${addr.slice(0, 8)}…${addr.slice(-6)}` : addr
+					const expUrl = contract ? explorerContractUrl(chain, contract) : ''
+					const contractMd = contract ? (expUrl ? `[${shortAddr(contract)}](${expUrl})` : shortAddr(contract)) : ''
+
+					let text = `# ${toStr(fm.Name) || file.basename}\n\n`
+					const meta: string[] = []
+					if (chain) meta.push(`**${tr('header.chain') || 'Chain'}:** ${chain}`)
+					if (standard) meta.push(`**${tr('header.standard') || 'Standard'}:** ${standard}`)
+					if (count > 0) meta.push(`**${tr('header.count') || 'Count'}:** ${count}`)
+					if (meta.length > 0) text += meta.join(' · ') + '\n\n'
+					if (contractMd) text += `**${tr('header.contract') || 'Contract'}:** ${contractMd}\n\n`
+					if (wallets) text += `**${tr('header.wallet') || 'Wallet'}:** ${wallets}\n\n`
+
+					const localCover = /^!?\[\[([^\]|#]+)/.exec(coverRaw)?.[1]
+					const webCover = safeUrl(coverRaw)
+					const photo = webCover || (localCover ? `[[${localCover}]]` : '')
+					nftCard = { text, photo, photoHeight: 200 }
+				}
+			} else entries.push(this.poster(note, fm))
+			for (const key of keys.length > 0 ? keys : [category.name]) sections.set(key, [...(sections.get(key) ?? []), ...entries])
 		}
 		if (sections.size === 0) return
-		const ordered = this.settings.categories
-			.filter(c => sections.has(c.name))
-			.map(c => ({ label: c.name, titles: (sections.get(c.name) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
-		let card: PersonCard | undefined
+		const roleRank = (label: string): number => {
+			const at = CANVAS_ROLES.findIndex(role => label.startsWith(`${tr(role.label)} · `))
+			return at < 0 ? CANVAS_ROLES.length : at
+		}
+		const ordered = [...sections.keys()]
+			.sort((a, b) => roleRank(a) - roleRank(b) || a.localeCompare(b))
+			.map(label => ({ label, titles: (sections.get(label) ?? []).sort((a, b) => a.name.localeCompare(b.name)) }))
+		let card: PersonCard | undefined = nftCard
 		if (person && imdbIds.length > 0) {
 			let pending = this.people.get(file.path)
 			if (!pending) {
@@ -1149,6 +1320,35 @@ export default class LibraryPlugin extends Plugin {
 		const existing = this.app.vault.getFileByPath(path)
 		const file = existing ? (await this.app.vault.modify(existing, text), existing) : await this.app.vault.create(path, text)
 		// a canvas already on screen keeps its old nodes, so close it and open the fresh one
+		for (const leaf of this.app.workspace.getLeavesOfType('canvas')) {
+			if (leaf.getViewState().state?.file === file.path) leaf.detach()
+		}
+		await this.app.workspace.getLeaf(true).openFile(file)
+	}
+
+	async buildCategoryMap(category: ICategory): Promise<void> {
+		if (this.canvasOff()) return
+		const titles: MapTitle[] = []
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (!fm || toStr(fm.Type) !== category.typeValue || isTemplateFile(file.path)) continue
+			const people = [...toStrArray(fm.Creator), ...toStrArray(fm.Cast), ...toStrArray(fm.Author), ...toStrArray(fm.Director), ...toStrArray(fm.Artist), ...toStrArray(fm.Narrator)].map(linkLabel).filter(Boolean)
+			titles.push({ ...this.poster(file, fm), people })
+		}
+		if (titles.length === 0) {
+			new Notice(tr('notice.map.empty'))
+			return
+		}
+		const canvas = categoryCanvas(category.name, titles, (path) => {
+			const f = this.app.vault.getFileByPath(path)
+			return f ? this.app.metadataCache.getFileCache(f)?.frontmatter : undefined
+		})
+		const folder = category.folder || this.settings.libraryFolder
+		if (folder) await this.ensureFolder(folder)
+		const path = `${folder ? `${folder}/` : ''}${category.name} map.canvas`
+		const text = JSON.stringify(canvas, null, '\t')
+		const existing = this.app.vault.getFileByPath(path)
+		const file = existing ? (await this.app.vault.modify(existing, text), existing) : await this.app.vault.create(path, text)
 		for (const leaf of this.app.workspace.getLeavesOfType('canvas')) {
 			if (leaf.getViewState().state?.file === file.path) leaf.detach()
 		}
@@ -1683,6 +1883,7 @@ export default class LibraryPlugin extends Plugin {
 		let category = this.settings.categories.find(c => c.typeValue === YOUTUBE_TYPE)
 		for (const video of videos) {
 			if (this.unloaded) break
+			if (!this.settings.youtubeIncludeShorts && video.isShort) continue
 			try {
 				// Runtime is the whole video, Progress the watched share in percent
 				const length = video.seconds > 0 ? Math.max(1, Math.round(video.seconds / 60)) : 0
@@ -1721,6 +1922,7 @@ export default class LibraryPlugin extends Plugin {
 					imdbId: null,
 				}
 				const extra: Record<string, unknown> = { Platforms: ['YouTube'], Progress: `${String(video.percent)}/100`, Complete: done, Date: dmyOf(`${video.day}T12:00:00`) }
+				if (video.isShort) extra.Short = true
 				const channel = found?.channelUrl || video.channelUrl
 				if (channel) extra['Channel URL'] = channel
 				if (found) this.youtubeDetails(extra, found)
@@ -1797,8 +1999,21 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	// NFTs of the wallets in the settings, a note per token group in the NFT category made on first use.
-	// A known note only follows the count; a token gone from a network read in full leaves for the trash.
+	scheduleLazyNftImport(delayMs = 2000): void {
+		if (this.nftImportTimer !== null) {
+			window.clearTimeout(this.nftImportTimer)
+			this.nftImportTimer = null
+		}
+		this.nftImportTimer = window.setTimeout(() => {
+			this.nftImportTimer = null
+			if (!this.unloaded && Platform.isDesktopApp && walletPairs(this.settings.nftWallets).length > 0) {
+				void this.nftImport(false)
+			}
+		}, delayMs)
+	}
+
+	// NFTs of the wallets in the settings, consolidated into one note per contract/collection.
+	// A known note follows count and token IDs; duplicate single-token notes are cleaned up.
 	async nftImport(loud: boolean): Promise<void> {
 		if (this.nftImporting || !Platform.isDesktopApp) return
 		const wallets = walletPairs(this.settings.nftWallets)
@@ -1812,16 +2027,20 @@ export default class LibraryPlugin extends Plugin {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 				if (!fm || toStr(fm.Source) !== NFT_SOURCE) continue
 				if (toStr(fm.Cover)) covered.add(toStr(fm['Source ID']))
-				// a note keeps its dates as dd.mm.yyyy; known only needs to say the mint date is there
 				known.set(toStr(fm['Source ID']), { uri: toStr(fm['Token URI']) || undefined, minted: toStr(fm.Minted) || undefined })
 			}
-			const read = await nftHoldings(wallets, this.apiKey('etherscanApiKey'), key => covered.has(key), key => known.get(key))
+			const read = await nftHoldings(
+				wallets,
+				this.apiKey('etherscanApiKey'),
+				key => covered.has(key),
+				key => known.get(key),
+				this.apiKey('openseaApiKey')
+			)
 			if (read.chains.length === 0 && read.held.length === 0) {
 				if (loud) new Notice(tr('notice.site.failed', { site: 'NFT' }))
 				return
 			}
 			const notes = new Map<string, TFile>()
-			// notes made before tokens were keyed by id are found by their link, which has the token id
 			const byUrl = new Map<string, TFile>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
@@ -1834,92 +2053,149 @@ export default class LibraryPlugin extends Plugin {
 			let created = 0
 			let updated = 0
 			const seen = new Set<string>()
-			// a token whose note you deleted comes back as spam, hidden while spam is
-			const deleted = new Set(this.settings.nftHidden)
-			for (const token of read.held) {
+			const deleted = new Set(this.settings.nftHidden.map(k => k.trim().toLowerCase()))
+
+			const contracts = groupHeldByContract(read.held)
+			for (const contract of contracts) {
 				if (this.unloaded) return
-				seen.add(token.key)
-				if (deleted.has(token.key)) {
-					token.spam = true
-					token.trusted = false
+				seen.add(contract.key)
+				const isDeleted = nftIsHidden(deleted, contract.key, contract.contract, contract.tokenIds)
+				if (isDeleted) {
+					contract.spam = true
 				}
-				const existing = notes.get(token.key) ?? byUrl.get(token.url.toLowerCase())
+
+				let existing = notes.get(contract.key) ?? byUrl.get(contract.url.toLowerCase())
+				if (!existing) {
+					for (const [k, f] of notes) {
+						if (k.startsWith(`${contract.key}:`)) {
+							existing = f
+							break
+						}
+					}
+				}
+				if (contract.spam && !this.settings.showNftSpam) {
+					if (existing) {
+						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+							current.Spam = true
+						})
+					}
+					continue
+				}
 				if (existing) kept.add(existing)
+
+				// Trash older duplicate notes that represented individual tokens for this contract
+				for (const [k, f] of notes) {
+					if (k.startsWith(`${contract.key}:`) && f !== existing && !kept.has(f)) {
+						this.nftTrashing.add(f.path)
+						await this.app.fileManager.trashFile(f)
+					}
+				}
+
 				try {
 					if (existing) {
-						const known = this.app.metadataCache.getFileCache(existing)?.frontmatter
-						const cover = toStr(known?.Cover)
-						// a picture that never loaded (none, or a remote one other than the explorer's) is replaced, and so
-						// is any picture when the token's own metadata was just read: the old one can predate a reveal
-						const picture = await this.nftPicture(token.image)
-						const recover = !!picture && cover !== picture && (!!token.fresh || !cover || /^https?:\/\//i.test(cover))
-						const rename = !!token.fresh && token.name !== toStr(known?.Name)
-						// spam rules grow: a note they newly catch is marked; one the wallet asked for is unmarked
-						const spam = token.spam && known?.Spam === undefined
-						const unspam = !!token.trusted && known?.Spam === true
-						const checkbox = known?.Favorite === undefined
-						const wallets = this.toLinks(token.wallets ?? [])
-						const kind = token.oat ? 'OAT' : 'NFT'
-						const dates = this.nftDates(token)
-						const facts = toStrArray(known?.Wallet).join() !== wallets.join() || toStr(known?.Contract) !== (token.contract ?? '') || (!!dates.Acquired && toStr(known?.Acquired) !== dates.Acquired) || (!!dates.Minted && !toStr(known?.Minted)) || toStr(known?.Standard) !== (token.standard ?? '') || toStr(known?.['Token ID']) !== (token.tokenId ?? '') || (!!token.tokenUri && toStr(known?.['Token URI']) !== token.tokenUri) || known?.Kind === undefined
-						const rekey = toStr(known?.['Source ID']) !== token.key
-						if (Number(known?.Count) === token.count && !recover && !rename && !spam && !unspam && !checkbox && !facts && !rekey) continue
+						const knownFm = this.app.metadataCache.getFileCache(existing)?.frontmatter
+						const cover = toStr(knownFm?.Cover)
+						const picture = await this.nftPicture(contract.image)
+						const recover = !!picture && cover !== picture && (!cover || isInvalidNftMedia(cover))
+						const rename = contract.name !== toStr(knownFm?.Name)
+						const spam = contract.spam && knownFm?.Spam === undefined
+						const unspam = !contract.spam && knownFm?.Spam === true
+						const checkbox = knownFm?.Favorite === undefined
+						const walletLinks = this.toLinks(contract.wallets ?? [])
+						const kind = contract.oat ? 'OAT' : 'NFT'
+						const dates = this.nftDates(contract)
+						const rekey = toStr(knownFm?.['Source ID']) !== contract.key
+
 						await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
-							current.Count = token.count
-							if (rekey) current['Source ID'] = token.key
+							current.Count = contract.count
+							if (rekey) current['Source ID'] = contract.key
 							if (recover) current.Cover = picture
-							if (rename) current.Name = token.name
+							if (rename) current.Name = contract.name
 							if (spam) current.Spam = true
 							if (unspam) delete current.Spam
-							if (wallets.length > 0) current.Wallet = wallets
-							if (token.contract) current.Contract = token.contract
-							if (dates.Acquired) current.Acquired = dates.Acquired
-							if (dates.Minted && !toStr(current.Minted)) current.Minted = dates.Minted
-							if (token.standard) current.Standard = token.standard
-							if (token.tokenId) current['Token ID'] = token.tokenId
-							if (token.tokenUri) current['Token URI'] = token.tokenUri
-							// set once like Spam and OAT, so a kind you change by hand stays
+							if (walletLinks.length > 0) current.Wallet = walletLinks
+							if (contract.contract) current.Contract = contract.contract
+							if (contract.tokenIds.length > 0) current.Tokens = contract.tokenIds
+							// pictures found later stay: taking them away only makes the next pass add them back
+							if (contract.gallery.length > 0) {
+								const pictures = toStrArray(current.Gallery)
+								for (const image of contract.gallery) if (pictures.indexOf(image) < 0) pictures.push(image)
+								current.Gallery = pictures
+							}
+							applyNftDates(current, dates)
+							if (contract.standard) current.Standard = contract.standard
+							if (contract.history && contract.history.length > 0) {
+								current.History = mergeHistory(contract.history, current.History)
+								const firstBlock = toStr(contract.history[0]?.blockNumber)
+								const blockUrl = firstBlock && /^\d+$/.test(firstBlock) ? explorerBlockUrl(contract.chain, firstBlock) : ''
+								if (blockUrl && !toStr(current.Block)) current.Block = blockUrl
+							}
 							if (current.Kind === undefined) current.Kind = kind
 							if (checkbox) {
 								if (isEmptyValue(current['My Rating'])) delete current['My Rating']
 								current.Favorite = false
 							}
 						})
+
 						if (recover) this.queueCover(existing)
 						updated++
 						continue
 					}
+
 					if (!category) category = await this.nftCategory()
 					const meta: NormalizedMetadata = {
-						fields: { Name: token.name, Creator: [token.collection], ...(token.image ? { Cover: await this.nftPicture(token.image) } : {}), URL: token.url },
+						fields: {
+							Name: contract.name,
+							Creator: [contract.collection],
+							...(contract.image ? { Cover: await this.nftPicture(contract.image) } : {}),
+							URL: contract.url
+						},
 						progressTotal: null,
 						imdbId: null,
 					}
-					// Spam and OAT are set once; you can change them, and the next import leaves them
+					const firstBlock = contract.history && contract.history.length > 0 ? toStr(contract.history[0]?.blockNumber) : ''
+					const blockUrl = firstBlock && /^\d+$/.test(firstBlock) ? explorerBlockUrl(contract.chain, firstBlock) : ''
 					const facts: Record<string, unknown> = {
-						Kind: token.oat ? 'OAT' : 'NFT',
-						...(token.wallets?.length ? { Wallet: this.toLinks(token.wallets) } : {}),
-						...(token.contract ? { Contract: token.contract } : {}),
-						...this.nftDates(token),
-						...(token.standard ? { Standard: token.standard } : {}),
-						...(token.tokenId ? { 'Token ID': token.tokenId } : {}),
-						...(token.tokenUri ? { 'Token URI': token.tokenUri } : {}),
+						Kind: contract.oat ? 'OAT' : 'NFT',
+						...(contract.wallets.length ? { Wallet: this.toLinks(contract.wallets) } : {}),
+						...(contract.contract ? { Contract: contract.contract } : {}),
+						...(contract.tokenIds.length ? { Tokens: contract.tokenIds } : {}),
+						...(contract.gallery.length ? { Gallery: contract.gallery } : {}),
+						...(contract.history && contract.history.length ? { History: contract.history } : {}),
+						...(blockUrl ? { Block: blockUrl } : {}),
+						...this.nftDates(contract),
+						...(contract.standard ? { Standard: contract.standard } : {}),
 					}
-					const file = await this.newNote(category, NFT_SOURCE, token.key, token.name, meta, { Platforms: [token.chain], Count: token.count, ...facts, ...(token.spam ? { Spam: true } : {}), ...(token.oat ? { OAT: true } : {}) })
-					// a collectible is held, not watched: no progress, no Complete
+					const file = await this.newNote(
+						category,
+						NFT_SOURCE,
+						contract.key,
+						contract.name,
+						meta,
+						{
+							Platforms: [contract.chain],
+							Count: contract.count,
+							...facts,
+							...(contract.spam ? { Spam: true } : {}),
+							...(contract.oat ? { OAT: true } : {})
+						}
+					)
 					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 						delete current.Progress
 						delete current.Complete
-						// a token is a favorite or not: a checkbox instead of a rating
 						delete current['My Rating']
 						current.Favorite = false
 					})
-					notes.set(token.key, file)
+
+					notes.set(contract.key, file)
 					created++
 				} catch (e) {
-					console.error('Library: NFT import error', token.key, e)
+					console.error('Library: NFT import error', contract.key, e)
 				}
+				await this.pause(80)
+				if (this.unloaded) return
 			}
+
 			// gone from a network read in full: to the trash, where it can be restored.
 			// A network that came back empty is more likely an explorer hiccup, and a favorite stays.
 			const live = new Set<string>()
@@ -1932,17 +2208,352 @@ export default class LibraryPlugin extends Plugin {
 				await this.app.fileManager.trashFile(file)
 				updated++
 			}
+			await this.fillNftBlocks()
+			await this.fillNftProjects()
 			this.settings.nftLastImport = Date.now()
 			await this.saveSettings()
+			this.registerInterval(window.setTimeout(() => void this.consolidateNftNotes(false), 5000))
 			if (loud || created > 0 || updated > 0) new Notice(tr('notice.site.imported', { site: 'NFT', created, updated }))
 		} finally {
 			this.nftImporting = false
 		}
 	}
 
+	async consolidateNftNotes(loud = false): Promise<{ consolidated: number; trashed: number }> {
+		let consolidated = 0
+		let trashed = 0
+		const files = this.app.vault.getMarkdownFiles()
+		const groups = new Map<string, {
+			chain: string
+			contract: string
+			cleanName: string
+			notes: Array<{ file: TFile; fm: Record<string, unknown> }>
+		}>()
+
+		let fileCount = 0
+		for (const file of files) {
+			if (this.unloaded) return { consolidated, trashed }
+			fileCount++
+			if (fileCount % 20 === 0) await this.pause(20)
+			if (isTemplateFile(file.path)) continue
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (!fm || (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE)) continue
+
+			const rawName = toStr(fm.Name) || file.basename
+			const contract = (toStr(fm.Contract) || '').toLowerCase()
+			const isRealOat = isOat(rawName, contract) && !/claim|airdrop|voucher|giveaway|\$|\d\s*(?:usdt|usdc|eth|steth|uni|ldo)/i.test(rawName)
+			const isSpam = !isRealOat && (fm.Spam === true || (fm.Spam !== false && looksLikeSpam(rawName, contract)))
+
+			if (isRealOat && fm.Spam === true) {
+				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+					delete cur.Spam
+					cur.OAT = true
+					cur.Kind = 'OAT'
+				})
+			} else if (isSpam) {
+				// only marked: the list hides it, and a wrong guess loses nothing
+				if (fm.Spam !== true) {
+					await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+						cur.Spam = true
+					})
+				}
+			}
+
+			// Clean invalid media (such as Bored Ape fallback images)
+			const gallery = toStrArray(fm.Gallery)
+			const cleanGallery = gallery.filter(g => g && !isInvalidNftMedia(g))
+			const curCover = toStr(fm.Cover)
+			const badCover = isInvalidNftMedia(curCover)
+			if (cleanGallery.length !== gallery.length || badCover) {
+				const replacementCover = badCover && cleanGallery[0] ? await this.nftPicture(cleanGallery[0]) : ''
+				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+					cur.Gallery = cleanGallery
+					if (badCover) {
+						cur.Cover = replacementCover
+					}
+				})
+			}
+
+			// Minted, Acquired and Date follow the transfers; rows an older version made up are dropped
+			if (Array.isArray(fm.History)) {
+				const rows = (fm.History as Array<Record<string, unknown>>).filter(row => txHashOf(row.hash) || !/^https?:/i.test(toStr(row.hash)))
+				const dates = this.nftDates({ history: rows })
+				const next: Record<string, unknown> = { Minted: fm.Minted, Acquired: fm.Acquired, Date: fm.Date }
+				applyNftDates(next, dates)
+				if (rows.length !== fm.History.length || next.Minted !== fm.Minted || next.Acquired !== fm.Acquired || next.Date !== fm.Date) {
+					await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+						cur.History = rows
+						applyNftDates(cur, dates)
+					})
+				}
+			}
+
+			if (Array.isArray(fm.History) && (fm.History as unknown[]).length > 1) {
+				const currentHist = fm.History as Array<Record<string, unknown>>
+				const sortedHist = sortHistory(currentHist)
+				const isAlreadySorted = currentHist.every((item, idx) => item === sortedHist[idx])
+				if (!isAlreadySorted) {
+					await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+						cur.History = sortedHist
+					})
+				}
+			}
+
+			const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+			const tokenId = toStr(fm['Token ID'])
+			const creator = toStrArray(fm.Creator)[0] || ''
+			const cleanName = cleanCollectionName(rawName, creator, tokenId)
+			const groupKey = (contract && contract !== '0') ? `${chain}:${contract}` : `${chain}:${cleanName.toLowerCase()}`
+
+			let g = groups.get(groupKey)
+			if (!g) {
+				g = { chain, contract, cleanName, notes: [] }
+				groups.set(groupKey, g)
+			}
+			g.notes.push({ file, fm })
+		}
+
+		const groupList = Array.from(groups.values()).sort((a, b) => b.notes.length - a.notes.length)
+		for (const g of groupList) {
+			if (this.unloaded) return { consolidated, trashed }
+			try {
+				if (g.notes.length <= 1) {
+					continue
+				}
+				await this.pause(40)
+
+				const tokensSet = new Set<string>()
+				const tokenImageMap = new Map<string, string>()
+				const tokenDateMap = new Map<string, string>()
+				const gallerySet = new Set<string>()
+				const walletsSet = new Set<string>()
+				let favorite = false
+				let allSpam = true
+				let anyOat = false
+				let bestCover = ''
+				let standard = ''
+				let earliestDate = ''
+				let latestMint = ''
+
+				for (const item of g.notes) {
+					const ifm = item.fm
+					if (ifm.Favorite === true) favorite = true
+					if (ifm.Spam !== true) allSpam = false
+					if (ifm.OAT === true || ifm.Kind === 'OAT') anyOat = true
+					if (!standard && ifm.Standard) standard = toStr(ifm.Standard)
+					const d = toStr(ifm.Minted) ||
+						toStr(ifm.Acquired) ||
+						toStr(ifm.Date)
+					if (d && (!earliestDate || parseDate(d) < parseDate(earliestDate))) earliestDate = d
+					const m = toStr(ifm.Minted) ||
+						toStr(ifm.Acquired)
+					if (m && (!latestMint || parseDate(m) > parseDate(latestMint))) latestMint = m
+
+					for (const w of toStrArray(ifm.Wallet)) walletsSet.add(w)
+					for (const img of toStrArray(ifm.Gallery)) gallerySet.add(img)
+
+					const cov = toStr(ifm.Cover)
+					if (cov) {
+						gallerySet.add(cov)
+						if (!bestCover) bestCover = cov
+						else if (cov.startsWith('[[') && !bestCover.startsWith('[[')) bestCover = cov
+					}
+
+					const tIds = toStrArray(ifm.Tokens)
+					const singleId = toStr(ifm['Token ID'])
+					if (singleId && tIds.indexOf(singleId) < 0) tIds.push(singleId)
+
+					const ifmTokenDates = (typeof ifm.TokenDates === 'object' && ifm.TokenDates !== null) ? (ifm.TokenDates as Record<string, string>) : {}
+					for (const tid of Object.keys(ifmTokenDates)) {
+						const td = ifmTokenDates[tid]
+						if (td && (!latestMint || parseDate(td) > parseDate(latestMint))) latestMint = td
+					}
+					for (const tid of tIds) {
+						tokensSet.add(tid)
+						if (cov && !tokenImageMap.has(tid)) tokenImageMap.set(tid, cov)
+						const specificDate = ifmTokenDates[tid] || m || d
+						if (specificDate && !tokenDateMap.has(tid)) tokenDateMap.set(tid, specificDate)
+					}
+				}
+
+				const historyMap = new Map<string, Record<string, unknown>>()
+				for (const item of g.notes) {
+					if (Array.isArray(item.fm.History)) {
+						for (const h of item.fm.History as Array<Record<string, unknown>>) {
+							const hKey = `${toStr(h.hash)}:${toStr(h.tokenId || h['Token ID'])}`
+							if (!historyMap.has(hKey)) historyMap.set(hKey, h)
+						}
+					}
+				}
+
+				const safeTitle = sanitizeFilename(g.cleanName).replace(/[\\/:*?"<>|]/g, '-').trim()
+				let canonical = g.notes.find(n => n.file.basename === g.cleanName || n.file.basename === safeTitle)?.file
+				if (!canonical) {
+					canonical = g.notes.find(n => !/\(\d+\)$/.test(n.file.basename) && toStr(n.fm.Cover))?.file || g.notes[0]?.file
+				}
+				if (!canonical) continue
+
+				const tokensArr = [...tokensSet].sort((a, b) => {
+					const numA = Number(a)
+					const numB = Number(b)
+					if (!isNaN(numA) && !isNaN(numB)) return numA - numB
+					return a.localeCompare(b)
+				})
+				const galleryArr = [...gallerySet]
+				const walletsArr = [...walletsSet]
+
+				await this.app.fileManager.processFrontMatter(canonical, (current: Record<string, unknown>) => {
+					current.Name = g.cleanName
+					current.Type = NFT_TYPE
+					current.Source = NFT_SOURCE
+					current['Source ID'] = g.contract ? `${g.chain}:${g.contract}` : `${g.chain}:${g.cleanName.toLowerCase()}`
+					current.Platforms = [g.chain]
+					current.Count = tokensArr.length || g.notes.length
+					if (tokensArr.length > 0) current.Tokens = tokensArr
+					if (g.contract) current.Contract = g.contract
+					if (bestCover) current.Cover = bestCover
+					if (galleryArr.length > 0) current.Gallery = galleryArr
+					if (walletsArr.length > 0) current.Wallet = walletsArr
+					if (standard) current.Standard = standard
+					if (earliestDate) current.Date = earliestDate
+					if (latestMint) current.Minted = latestMint
+					if (tokenDateMap.size > 0) {
+						const dateObj: Record<string, string> = {}
+						for (const [tid, dt] of tokenDateMap.entries()) dateObj[tid] = dt
+						current.TokenDates = dateObj
+					}
+					if (historyMap.size > 0) {
+						const sortedHistory = sortHistory([...historyMap.values()])
+						current.History = sortedHistory
+					}
+					current.Kind = anyOat ? 'OAT' : 'NFT'
+					if (anyOat) current.OAT = true
+					if (allSpam) current.Spam = true
+					else delete current.Spam
+					if (favorite) current.Favorite = true
+					delete current['Token ID']
+				})
+
+				const text = await this.app.vault.read(canonical)
+				const stripped = text.replace(/\n### Tokens[\s\S]*?(?=\n###|\n---|$)/, '').trim()
+				if (stripped !== text.trim()) {
+					await this.app.vault.modify(canonical, stripped)
+				}
+
+				let effectiveTitle = safeTitle
+				const directPath = `${canonical.parent?.path ?? ''}/${safeTitle}.md`
+				const existingDirect = this.app.vault.getAbstractFileByPath(directPath) as TFile | null
+				if (existingDirect && existingDirect !== canonical) {
+					const exFm = this.app.metadataCache.getFileCache(existingDirect)?.frontmatter
+					const exContract = toStr(exFm?.Contract).toLowerCase()
+					if (exContract && g.contract && exContract !== g.contract.toLowerCase()) {
+						effectiveTitle = `${safeTitle} (${g.chain})`
+					}
+				}
+				if (canonical.basename !== effectiveTitle) {
+					const targetPath = `${canonical.parent?.path ?? ''}/${effectiveTitle}.md`
+					if (!this.app.vault.getAbstractFileByPath(targetPath)) {
+						try {
+							await this.app.fileManager.renameFile(canonical, targetPath)
+						} catch {
+							// ignore rename error
+						}
+					}
+				}
+
+				for (const item of g.notes) {
+					if (item.file !== canonical && item.file.path !== canonical.path) {
+						this.nftTrashing.add(item.file.path)
+						try {
+							await this.app.fileManager.trashFile(item.file)
+							trashed++
+						} catch {
+							// ignore trash error
+						}
+					}
+				}
+				consolidated++
+			} catch (err) {
+				console.error('Library: consolidate error for', g.cleanName, err)
+			}
+		}
+
+		await this.pause(50)
+		if (!this.unloaded) await this.cleanVaultNftTransactionTables()
+
+		const badCover = this.app.vault.getAbstractFileByPath('Library/Covers/nft-ccce32a1baf127c5.png')
+		if (badCover instanceof TFile) {
+			try {
+				await this.app.fileManager.trashFile(badCover)
+			} catch {
+				// ignore
+			}
+		}
+
+		if (loud) {
+			new Notice(`NFT: ${consolidated} collections consolidated, ${trashed} duplicate notes removed`)
+		}
+		return { consolidated, trashed }
+	}
+
+	async cleanVaultNftTransactionTables(): Promise<number> {
+		const files = this.app.vault.getMarkdownFiles()
+		let cleanedCount = 0
+		let fileCount = 0
+		for (const file of files) {
+			if (this.unloaded) return cleanedCount
+			fileCount++
+			if (fileCount % 20 === 0) await this.pause(20)
+			if (isTemplateFile(file.path)) continue
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (!fm || (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE)) continue
+
+			const content = await this.app.vault.read(file)
+			if (!content.includes('| Token ID |') && !content.includes('### Transaction History')) continue
+
+			const tableMatch = content.match(/###\s*Transaction History[\s\S]*?(?:\|[^\n]+\|\n?)+/i)
+				|| content.match(/(?:\|[^\n]+\|\n?){2,}/)
+			if (!tableMatch) continue
+
+			const tableText = tableMatch[0]
+			const lines = tableText.split('\n').filter(l => l.trim().startsWith('|') && l.trim().endsWith('|'))
+			const parsedRows: Array<Record<string, string>> = []
+			for (const line of lines) {
+				const cells = line.split('|').map(c => c.trim()).slice(1, -1)
+				const firstCell = cells[0]
+				if (cells.length < 4 || !firstCell || firstCell === 'Token ID' || /^:?-+:?$/.test(firstCell)) continue
+				const tid = firstCell.replace(/^#/, '').trim()
+				const date = cells[1] || ''
+				const from = (cells[2] || '').replace(/[`]/g, '').trim()
+				const txCell = cells[3] || ''
+				const hashMatch = txCell.match(/\[([^\]]+)\]\(([^)]+)\)/) || txCell.match(/0x[a-fA-F0-9]{40,64}/)
+				const hash = hashMatch ? (hashMatch[2] || hashMatch[0] || '') : txCell
+				const block = cells[4] || ''
+				if (tid || hash) {
+					parsedRows.push({ tokenId: tid, date, from, hash, blockNumber: block })
+				}
+			}
+
+			const newContent = content.replace(tableMatch[0], '').replace(/\n{3,}/g, '\n\n').trim() + '\n'
+			await this.app.vault.modify(file, newContent)
+
+			if (parsedRows.length > 0 && (!Array.isArray(fm.History) || (fm.History as unknown[]).length === 0)) {
+				await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+					cur.History = parsedRows
+				})
+			}
+			cleanedCount++
+		}
+		return cleanedCount
+	}
+
+	private nftBody(_contract: HeldContract): string {
+		return ''
+	}
+
 	// A picture given as data (an on-chain SVG, say) becomes a file in Covers, shared by notes with the same one.
 	private async nftPicture(image: string): Promise<string> {
-		const data = /^data:image\/(png|jpeg|gif|webp|svg\+xml)(;base64)?,([\s\S]*)$/i.exec(image)
+		const data = /^data:image\/(png|jpeg|gif|webp|svg\+xml)(?:;[a-z0-9_=-]+)*?(;base64)?,([\s\S]*)$/i.exec(image)
 		if (!data) return image
 		const ext = data[1] === 'jpeg' ? 'jpg' : data[1] === 'svg+xml' ? 'svg' : data[1] ?? 'png'
 		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
@@ -1954,24 +2565,49 @@ export default class LibraryPlugin extends Plugin {
 			if (data[2]) {
 				const bytes = Uint8Array.from(atob(body), c => c.charCodeAt(0))
 				await this.app.vault.createBinary(path, bytes.buffer)
-			} else await this.app.vault.create(path, decodeURIComponent(body))
+			} else {
+				let decoded = body
+				try {
+					decoded = decodeURIComponent(body)
+				} catch {
+					decoded = body
+				}
+				await this.app.vault.create(path, decoded)
+			}
 			return `[[${path}]]`
 		} catch (e) {
 			console.error('Library: NFT picture not saved', e)
-			return ''
+			return image
 		}
 	}
 
 	// when the token was minted and reached the wallet, as the note's dd.mm.yyyy; a known mint date passes through
-	private nftDates(token: { minted?: string; acquired?: string }): { Minted?: string; Acquired?: string } {
-		const minted = token.minted && /^\d{2}\.\d{2}\.\d{4}$/.test(token.minted) ? token.minted : token.minted ? dmyOf(token.minted) : ''
-		const acquired = token.acquired ? dmyOf(token.acquired) : ''
-		return { ...(minted ? { Minted: minted } : {}), ...(acquired ? { Acquired: acquired } : {}) }
+	private nftDates(token: { minted?: string; acquired?: string; history?: { from?: unknown; timeStamp?: unknown; timestamp?: unknown; date?: unknown }[] }): { Minted?: string; Acquired?: string; Date?: string } {
+		const read = historyDates(token.history ?? [])
+		const minted = dmyOf(token.minted) || token.minted || read.minted
+		const acquired = dmyOf(token.acquired) || token.acquired || read.acquired
+		const date = minted || acquired
+		return {
+			...(minted ? { Minted: minted } : {}),
+			...(acquired ? { Acquired: acquired } : {}),
+			...(date ? { Date: date } : {}),
+		}
 	}
 
 	private trackNft(file: TFile): void {
 		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-		if (fm && toStr(fm.Source) === NFT_SOURCE && toStr(fm['Source ID'])) this.nftPaths.set(file.path, toStr(fm['Source ID']))
+		if (!fm) return
+		const isNft = toStr(fm.Source) === NFT_SOURCE || fm.Type === NFT_TYPE || toStr(fm.Type) === 'NFT'
+		if (isNft) {
+			const sourceId = toStr(fm['Source ID'])
+			const contract = toStr(fm.Contract)
+			const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || (sourceId.includes(':') ? (sourceId.split(':')[0] || '') : '')
+			const name = toStr(fm.Name)
+			const tokenIds = toStrArray(fm.Tokens)
+			const single = toStr(fm['Token ID'])
+			if (single && tokenIds.indexOf(single) < 0) tokenIds.unshift(single)
+			this.nftPaths.set(file.path, { sourceId, contract, chain, name, tokenIds })
+		}
 	}
 
 	private async nftCategory(): Promise<ICategory> {
@@ -1984,8 +2620,378 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async nftSyncIfDue(): Promise<void> {
-		if (walletPairs(this.settings.nftWallets).length === 0 || Date.now() - this.settings.nftLastImport < 24 * 3600000) return
+		if (!Platform.isDesktopApp || walletPairs(this.settings.nftWallets).length === 0 || Date.now() - this.settings.nftLastImport < 24 * 3600000) return
 		await this.nftImport(false)
+	}
+
+	// Who deployed each contract, and the project's site and socials: once per note, a few dozen per import.
+	private async fillNftProjects(): Promise<void> {
+		let budget = 40
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (this.unloaded || budget <= 0) return
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			const contract = toStr(fm?.Contract)
+			const chain = toStrArray(fm?.Platforms)[0] ?? ''
+			if (toStr(fm?.Source) !== NFT_SOURCE || fm?.Spam === true || (fm?.['Project Links'] !== undefined && fm?.['Contract Creator'] !== undefined)) continue
+			if (!/^0x[0-9a-fA-F]{40}$/.test(contract) || EVM_NETWORKS.indexOf(chain) < 0) continue
+			budget--
+			const creator = await contractCreator(chain, contract, this.apiKey('etherscanApiKey'))
+			const links = await openseaLinks(chain, contract, this.apiKey('openseaApiKey'))
+			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+				// asked once: an empty value says so
+				cur['Contract Creator'] = creator
+				if (links.length > 0 || cur['Project Links'] === undefined) cur['Project Links'] = links
+			})
+			await this.pause(300)
+		}
+	}
+
+	// Transfers read without a block number get it from the chain, a few dozen per import.
+	async fillNftBlocks(): Promise<number> {
+		let budget = 60
+		let filled = 0
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (this.unloaded || budget <= 0) break
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (toStr(fm?.Source) !== NFT_SOURCE || !Array.isArray(fm?.History)) continue
+			const chain = toStrArray(fm?.Platforms)[0] ?? ''
+			if (EVM_NETWORKS.indexOf(chain) < 0) continue
+			const found = new Map<string, string>()
+			for (const row of fm?.History as Record<string, unknown>[]) {
+				const hash = txHashOf(row.hash)
+				if (!hash || /^\d+$/.test(toStr(row.blockNumber)) || found.has(hash) || budget <= 0) continue
+				budget--
+				const block = await txBlock(chain, hash)
+				if (block) found.set(hash, block)
+				await this.pause(100)
+			}
+			if (found.size === 0) continue
+			filled += found.size
+			await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+				for (const row of (Array.isArray(cur.History) ? cur.History : []) as Record<string, unknown>[]) {
+					const block = found.get(txHashOf(row.hash))
+					if (block) row.blockNumber = block
+				}
+			})
+		}
+		return filled
+	}
+
+	private enqueueNftToken(item: {
+		key: string
+		chain: string
+		contract: string
+		tokenId: string
+		file: TFile
+		title: string
+		renderMedia?: (wrap: HTMLElement, media: string) => void
+		imgWrap?: HTMLElement | null
+		card?: HTMLElement | null
+		onTokenImageResolved?: (url: string) => void
+	}): void {
+		if (this.unloaded || this.nftImageNegative.has(item.key)) return
+		if (!this.nftTokenQueue.some(q => q.key === item.key)) {
+			this.nftTokenQueue.push(item)
+		}
+		void this.workNftTokenQueue()
+	}
+
+	private async workNftTokenQueue(): Promise<void> {
+		if (this.nftTokenQueueWorking || this.unloaded) return
+		this.nftTokenQueueWorking = true
+		try {
+			while (this.nftTokenQueue.length > 0 && !this.unloaded) {
+				const item = this.nftTokenQueue.shift()
+				if (!item) break
+				if (this.nftImageNegative.has(item.key)) continue
+				let cached = this.nftImageCache.get(item.key)
+				if (!cached) {
+					try {
+						const resolved = await fetchNftTokenImage(item.chain, item.contract, item.tokenId, this.apiKey('openseaApiKey'))
+						if (resolved && !isInvalidNftMedia(resolved) && !this.unloaded) {
+							const pic = await this.nftPicture(resolved)
+							cached = pic || resolved
+							this.nftImageCache.set(item.key, cached)
+						} else {
+							this.nftImageNegative.add(item.key)
+						}
+					} catch {
+						this.nftImageNegative.add(item.key)
+					}
+				}
+				if (cached && !this.unloaded) {
+					if (item.imgWrap && item.renderMedia) {
+						item.renderMedia(item.imgWrap, cached)
+					}
+					if (item.card) {
+						const mediaToOpen = cached
+						item.card.addEventListener('click', (e) => {
+							const target = e.target as HTMLElement | null
+							if (target?.closest('a')) return
+							e.preventDefault()
+							e.stopPropagation()
+							this.lightbox?.close()
+							this.lightbox = new Lightbox(`${item.title} #${item.tokenId}`, [mediaToOpen], 0, this.app)
+							this.lightbox.open()
+						})
+					}
+					this.scheduleBatchNftSave(item.file, cached, item.onTokenImageResolved)
+				}
+				await this.pause(250)
+			}
+		} finally {
+			this.nftTokenQueueWorking = false
+		}
+	}
+
+	private scheduleBatchNftSave(file: TFile, newMedia: string, onResolved?: (url: string) => void): void {
+		if (this.unloaded) return
+		let entry = this.nftPendingSaves.get(file.path)
+		if (!entry) {
+			entry = { file, images: [], timer: 0, onTokenImageResolved: onResolved }
+			this.nftPendingSaves.set(file.path, entry)
+		}
+		if (entry.images.indexOf(newMedia) < 0) entry.images.push(newMedia)
+		if (entry.timer) window.clearTimeout(entry.timer)
+		entry.timer = window.setTimeout(() => {
+			this.nftPendingSaves.delete(file.path)
+			void this.flushBatchNftSave(entry.file, entry.images, entry.onTokenImageResolved)
+		}, 1000)
+	}
+
+	private async flushBatchNftSave(file: TFile, newImages: string[], onResolved?: (url: string) => void): Promise<void> {
+		if (this.unloaded || newImages.length === 0) return
+		let shouldUpdateCover = false
+		let chosenCover = ''
+		try {
+			await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+				const curGal = toStrArray(current.Gallery)
+				for (const img of newImages) {
+					if (curGal.indexOf(img) < 0) curGal.push(img)
+				}
+				current.Gallery = curGal
+				const curCover = toStr(current.Cover)
+				const curCoverSrc = coverSrc(this.app, curCover)
+				if (!curCover || !curCoverSrc || isInvalidNftMedia(curCover) || isInvalidNftMedia(curCoverSrc)) {
+					current.Cover = newImages[0]
+					chosenCover = newImages[0] ?? ''
+					shouldUpdateCover = true
+				}
+			})
+			if (shouldUpdateCover && chosenCover) {
+				onResolved?.(chosenCover)
+				this.queueCover(file)
+			}
+		} catch (e) {
+			console.error('Library: failed to save batch NFT images', file.path, e)
+		}
+	}
+
+	private async lazyNftBackgroundEnrich(): Promise<void> {
+		if (this.unloaded || !Platform.isDesktopApp || this.nftTokenQueueWorking || this.nftImporting) return
+		const now = Date.now()
+		if (now - this.lastNftEnrichTime < 1800000) return
+		this.lastNftEnrichTime = now
+
+		const files = this.app.vault.getMarkdownFiles()
+		let enqueuedCount = 0
+		for (const file of files) {
+			if (this.unloaded || enqueuedCount >= 3) break
+			if (isTemplateFile(file.path)) continue
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			if (!fm || (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE)) continue
+			if (fm.Spam === true) continue
+
+			const tokenIds = toStrArray(fm.Tokens)
+			const single = toStr(fm['Token ID'])
+			if (single && tokenIds.indexOf(single) < 0) tokenIds.unshift(single)
+			if (tokenIds.length === 0) continue
+
+			const contract = toStr(fm.Contract)
+			const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+			const gallery = toStrArray(fm.Gallery)
+			const cover = toStr(fm.Cover)
+
+			for (let i = 0; i < tokenIds.length; i++) {
+				const tid = tokenIds[i] ?? ''
+				if (!tid) continue
+				const key = `${chain}:${contract.toLowerCase()}:${tid}`
+				if (this.nftImageNegative.has(key) || this.nftImageCache.has(key)) continue
+				const gImg = gallery[i]
+				const hasMedia = (gImg && !isInvalidNftMedia(gImg)) || (tokenIds.length === 1 && cover && !isInvalidNftMedia(cover))
+				if (!hasMedia) {
+					this.enqueueNftToken({
+						key,
+						chain,
+						contract,
+						tokenId: tid,
+						file,
+						title: toStr(fm.Name) || file.basename
+					})
+					enqueuedCount++
+					if (enqueuedCount >= 3) break
+				}
+			}
+		}
+	}
+
+	async importGoogleBooksLibrary(): Promise<void> {
+		new PromptModal(
+			this.app,
+			'Google Books User ID',
+			userId => {
+				void (async () => {
+					this.settings.googleBooksUserId = userId
+					await this.saveSettings()
+					let created = 0
+					let category = this.settings.categories.find(c => c.contentType === 'book')
+					if (!category) return
+					new Notice(tr('notice.site.importing', { site: 'Google Books' }))
+					const shelves = [4, 3, 2, 1]
+					for (const shelf of shelves) {
+						try {
+							const url = `https://www.googleapis.com/books/v1/users/${encodeURIComponent(userId)}/bookshelves/${String(shelf)}/volumes?maxResults=40`
+							const res = await requestUrl({ url, throw: false })
+							if (res.status !== 200 || !res.json) continue
+							const items = (res.json as { items?: Array<{ id: string; volumeInfo: Record<string, unknown> }> }).items ?? []
+							for (const item of items) {
+								const info = item.volumeInfo
+								const title = typeof info.title === 'string' ? info.title : ''
+								if (!title) continue
+								const authors = Array.isArray(info.authors) ? info.authors.map(String) : []
+								const img = (info.imageLinks as { thumbnail?: string } | undefined)?.thumbnail || ''
+								const published = typeof info.publishedDate === 'string' ? info.publishedDate : ''
+								const complete = shelf === 4
+								const meta: NormalizedMetadata = {
+									fields: {
+										Name: title,
+										Creator: authors,
+										...(img ? { Cover: img.replace(/^http:\/\//i, 'https://') } : {}),
+										...(published ? { Date: published } : {}),
+									},
+									progressTotal: null,
+									imdbId: null,
+								}
+								await this.newNote(category, 'googlebooks', item.id, title, meta, { Complete: complete })
+								created++
+							}
+						} catch (e) {
+							console.error('Library: Google Books import error', e)
+						}
+					}
+					new Notice(tr('notice.site.imported', { site: 'Google Books', created, updated: 0 }))
+				})()
+			},
+			'Google Books Library Import',
+			'Import'
+		).open()
+	}
+
+	async importOpenLibraryLog(): Promise<void> {
+		new PromptModal(
+			this.app,
+			'Open Library Username',
+			username => {
+				void (async () => {
+					this.settings.openLibraryUsername = username
+					await this.saveSettings()
+					let created = 0
+					let category = this.settings.categories.find(c => c.contentType === 'book')
+					if (!category) return
+					new Notice(tr('notice.site.importing', { site: 'Open Library' }))
+					const lists = ['already-read', 'currently-reading', 'want-to-read']
+					for (const list of lists) {
+						try {
+							const url = `https://openlibrary.org/people/${encodeURIComponent(username)}/books/${list}.json`
+							const res = await requestUrl({ url, throw: false })
+							if (res.status !== 200 || !res.json) continue
+							const entries = (res.json as { reading_log_entries?: Array<{ work: Record<string, unknown>; logged_date?: string }> }).reading_log_entries ?? []
+							for (const entry of entries) {
+								const w = entry.work
+								const title = typeof w.title === 'string' ? w.title : ''
+								const key = typeof w.key === 'string' ? w.key : ''
+								if (!title || !key) continue
+								const authors = Array.isArray(w.author_names) ? w.author_names.map(String) : []
+								const coverId = typeof w.cover_id === 'number' || typeof w.cover_id === 'string' ? String(w.cover_id) : ''
+								const cover = coverId ? `https://covers.openlibrary.org/b/id/${coverId}-L.jpg` : ''
+								const complete = list === 'already-read'
+								const meta: NormalizedMetadata = {
+									fields: {
+										Name: title,
+										Creator: authors,
+										...(cover ? { Cover: cover } : {}),
+									},
+									progressTotal: null,
+									imdbId: null,
+								}
+								await this.newNote(category, 'openlibrary', key, title, meta, { Complete: complete })
+								created++
+							}
+						} catch (e) {
+							console.error('Library: Open Library import error', e)
+						}
+					}
+					new Notice(tr('notice.site.imported', { site: 'Open Library', created, updated: 0 }))
+				})()
+			},
+			'Open Library Reading Log Import',
+			'Import'
+		).open()
+	}
+
+	async importBooksCsv(): Promise<void> {
+		new PromptModal(
+			this.app,
+			'Vault path to CSV (e.g. goodreads.csv)',
+			csvPath => {
+				void (async () => {
+					const file = this.app.vault.getFileByPath(csvPath)
+					if (!file) {
+						new Notice('File not found: ' + csvPath)
+						return
+					}
+					const text = await this.app.vault.read(file)
+					let created = 0
+					let category = this.settings.categories.find(c => c.contentType === 'book')
+					if (!category) return
+					const lines = text.split(/\r?\n/).filter(Boolean)
+					if (lines.length < 2) return
+					const header = lines[0]?.split(',').map(s => s.trim().replace(/^"|"$/g, '').toLowerCase()) ?? []
+					const titleIdx = header.indexOf('title')
+					const authorIdx = header.indexOf('author') >= 0 ? header.indexOf('author') : header.indexOf('authors')
+					const ratingIdx = header.indexOf('my rating') >= 0 ? header.indexOf('my rating') : header.indexOf('rating')
+					const shelfIdx = header.indexOf('exclusive shelf')
+					const dateIdx = header.indexOf('date read') >= 0 ? header.indexOf('date read') : header.indexOf('pubdate')
+
+					for (let i = 1; i < lines.length; i++) {
+						const line = lines[i]
+						if (!line) continue
+						const row = line.match(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g)?.map(col => col.replace(/^,/, '').trim().replace(/^"|"$/g, '').replace(/""/g, '"')) ?? []
+						const title = row[titleIdx]
+						if (!title) continue
+						const author = row[authorIdx] ? [row[authorIdx]] : []
+						const rating = Number(row[ratingIdx]) || undefined
+						const shelf = row[shelfIdx]?.toLowerCase()
+						const complete = shelf === 'read' || !!row[dateIdx]
+						const meta: NormalizedMetadata = {
+							fields: {
+								Name: title,
+								Creator: author,
+							},
+							progressTotal: null,
+							imdbId: null,
+						}
+						const extra: Record<string, unknown> = { Complete: complete }
+						if (rating) extra['My Rating'] = rating
+						await this.newNote(category, 'manual', title, title, meta, extra)
+						created++
+					}
+					new Notice(tr('notice.site.imported', { site: 'CSV', created, updated: 0 }))
+				})()
+			},
+			'Import Books from CSV',
+			'Import'
+		).open()
 	}
 
 	private async youtubeCategory(): Promise<ICategory> {
@@ -2006,13 +3012,69 @@ export default class LibraryPlugin extends Plugin {
 		let changed = false
 		await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
 			const seasons = seasonsOf(fm)
-			const index = seasonIndex(seasons.map(s => s.name), rated.season)
-			const episode = seasons[index]?.episodes[rated.episode - 1]
-			if (!episode) return
-			if (!episode.watched) { applyEpisodeChange(fm, { season: index, episode: rated.episode - 1, watched: true }); changed = true }
-			if (episode.rating === null) { applyEpisodeChange(fm, { season: index, episode: rated.episode - 1, rating: rated.rating }); changed = true }
-			const echo = this.settings.imdbEcho[rated.series.id] ?? (this.settings.imdbEcho[rated.series.id] = { r: 0 })
-			echo.e = { ...echo.e, [`${String(rated.season)}:${String(rated.episode)}`]: Math.round(rated.rating) }
+			let index = rated.season > 0 ? seasonIndex(seasons.map(s => s.name), rated.season) : -1
+			let epIndex = rated.episode > 0 ? rated.episode - 1 : -1
+			let episode = index >= 0 && epIndex >= 0 ? seasons[index]?.episodes[epIndex] : undefined
+
+			if (!episode && rated.title) {
+				const plainTitle = rated.title.trim().toLowerCase()
+				for (let sIdx = 0; sIdx < seasons.length; sIdx++) {
+					const s = seasons[sIdx]
+					if (!s) continue
+					const eIdx = s.episodes.findIndex(e => e.title && e.title.trim().toLowerCase() === plainTitle)
+					if (eIdx >= 0) {
+						index = sIdx
+						epIndex = eIdx
+						episode = s.episodes[eIdx]
+						break
+					}
+				}
+			}
+
+			if (!episode) {
+				const specialsIdx = seasons.findIndex(s => s.name.toLowerCase() === 'specials' || s.name.toLowerCase() === 'спецвыпуски')
+				const epTitle = rated.title || `Special ${rated.episodeId || ''}`.trim()
+				if (specialsIdx < 0) {
+					const raw = Array.isArray(fm.Seasons) ? (fm.Seasons as Array<Record<string, unknown>>) : []
+					const newSeason: Record<string, unknown> = {
+						name: 'Specials',
+						episodes: 1,
+						episode_list: [{ title: epTitle, watched: true, my_rating: rated.rating }]
+					}
+					fm.Seasons = raw.concat([newSeason])
+					const states = seasonsOf(fm)
+					states.forEach(recompute)
+					writeBack(fm, states)
+					changed = true
+					const echo = this.settings.imdbEcho[rated.series.id] ?? (this.settings.imdbEcho[rated.series.id] = { r: 0 })
+					echo.e = Object.assign({}, echo.e, { [`0:${rated.episodeId || epTitle}`]: Math.round(rated.rating) })
+					return
+				} else {
+					const s = seasons[specialsIdx]
+					if (s) {
+						const existingEp = s.episodes.find(e => e.title.toLowerCase() === epTitle.toLowerCase())
+						if (existingEp) {
+							existingEp.watched = true
+							existingEp.rating = rated.rating
+						} else {
+							s.episodes.push({ title: epTitle, watched: true, rating: rated.rating })
+						}
+						seasons.forEach(recompute)
+						writeBack(fm, seasons)
+						changed = true
+						const echo = this.settings.imdbEcho[rated.series.id] ?? (this.settings.imdbEcho[rated.series.id] = { r: 0 })
+						echo.e = Object.assign({}, echo.e, { [`0:${rated.episodeId || epTitle}`]: Math.round(rated.rating) })
+						return
+					}
+				}
+			}
+
+			if (index >= 0 && epIndex >= 0 && episode) {
+				if (!episode.watched) { applyEpisodeChange(fm, { season: index, episode: epIndex, watched: true }); changed = true }
+				if (episode.rating === null || (episode.rating !== rated.rating && !this.imdbPushTimers.has(file.path))) { applyEpisodeChange(fm, { season: index, episode: epIndex, rating: rated.rating }); changed = true }
+				const echo = this.settings.imdbEcho[rated.series.id] ?? (this.settings.imdbEcho[rated.series.id] = { r: 0 })
+				echo.e = Object.assign({}, echo.e, { [`${String(rated.season)}:${String(rated.episode)}`]: Math.round(rated.rating) })
+			}
 		})
 		return made ? 'created' : changed ? 'updated' : null
 	}
@@ -2235,17 +3297,18 @@ export default class LibraryPlugin extends Plugin {
 		}) : undefined
 		if (!byNetflix && title.anime) return this.importNetflixAnime(title, title.anime)
 		// an IMDb id names one title, movie or series
-		const imdbUrl = title.imdb ? `https://www.imdb.com/title/${title.imdb}/` : ''
-		const byImdb = !byNetflix && title.imdb ? notes.find(file => {
+		const imdbId = title.imdb || (/^tt\d+$/.test(title.id) ? title.id : '')
+		const imdbUrl = imdbId ? `https://www.imdb.com/title/${imdbId}/` : ''
+		const byImdb = !byNetflix && imdbId ? notes.find(file => {
 			const fm = fmOf(file)
-			return !!fm && watchTypes.indexOf(toStr(fm.Type)) >= 0 && (toStr(fm['Source ID']) === title.imdb || toStr(fm.URL) === imdbUrl)
+			return !!fm && watchTypes.indexOf(toStr(fm.Type)) >= 0 && (toStr(fm['Source ID']) === imdbId || toStr(fm.URL) === imdbUrl)
 		}) : undefined
-		const existing = byNetflix ?? byImdb ?? (title.imdb ? undefined : notes.find(file => {
+		const existing = byNetflix ?? byImdb ?? notes.find(file => {
 			const fm = fmOf(file)
 			if (!fm || (title.guessed ? watchTypes : typeValues).indexOf(toStr(fm.Type)) < 0) return false
 			if (title.id) return toStr(fm['Source ID']) === title.id || toStr(fm.URL) === url
 			return sameTitle(toStr(fm.Name) || file.basename, title.name)
-		}))
+		})
 		// no viewing, no note: not enough to make one, and a series would come in as a movie
 		if (!existing && title.guessed) return null
 		const watched = title.watched
@@ -2253,9 +3316,11 @@ export default class LibraryPlugin extends Plugin {
 		if (existing) {
 			this.watchNotes.set(key, existing)
 			const fm = this.app.metadataCache.getFileCache(existing)?.frontmatter
-			const seen = (title.trakt ? this.settings.traktEcho : this.settings.imdbEcho)[title.id]
-			const rerated = !!seen && seen.r > 0 && title.rating !== null && Math.round(title.rating) !== seen.r && Math.round(Number(toStr(fm?.['My Rating']))) === seen.r
-			const rate = title.rating !== null && (isEmptyValue(fm?.['My Rating']) || rerated)
+			const currentRating = Number(toStr(fm?.['My Rating']))
+			const hasCurrent = !isEmptyValue(fm?.['My Rating']) && Number.isFinite(currentRating)
+			const pushing = this.imdbPushTimers.has(existing.path) || this.traktPushTimers.has(existing.path)
+			const rerated = !pushing && title.rating !== null && (!hasCurrent || currentRating !== title.rating)
+			const rate = title.rating !== null && rerated
 			// a guessed title may be a series: only a viewing finishes a movie
 			const finish = title.kind === 'movie' && watched && !title.guessed && fm?.Complete !== true
 			const link = !!title.netflixId && (toStr(fm?.['Netflix ID']) !== String(title.netflixId) || toStrArray(fm?.Platforms).indexOf('Netflix') < 0)
@@ -2293,18 +3358,21 @@ export default class LibraryPlugin extends Plugin {
 				if (meta && hits > best) { best = hits; sourceId = result.sourceId; picked = meta }
 			}
 		}
-		// Netflix's name found a note the library already has under another name: link it, no second note
-		const same = !known && sourceId ? notes.find(file => {
+		// A note already in the library under that Source ID: update it, never create a duplicate note
+		const same = sourceId ? notes.find(file => {
 			const fm = fmOf(file)
-			return !!fm && typeValues.indexOf(toStr(fm.Type)) >= 0 && toStr(fm['Source ID']) === sourceId
+			return !!fm && watchTypes.indexOf(toStr(fm.Type)) >= 0 && (toStr(fm['Source ID']) === sourceId || toStr(fm.URL) === `https://www.imdb.com/title/${sourceId}/`)
 		}) : undefined
-		if (same && title.netflixId) {
+		if (same) {
 			this.watchNotes.set(key, same)
-			if (toStr(fmOf(same)?.['Netflix ID']) !== String(title.netflixId)) this.netflixFresh.add(title.netflixId)
+			if (title.netflixId && toStr(fmOf(same)?.['Netflix ID']) !== String(title.netflixId)) this.netflixFresh.add(title.netflixId)
 			await this.app.fileManager.processFrontMatter(same, (current: Record<string, unknown>) => {
-				if (title.rating !== null && isEmptyValue(current['My Rating'])) current['My Rating'] = title.rating
-				current['Netflix ID'] = title.netflixId
-				addPlatform(current, 'Netflix', null)
+				if (title.rating !== null && (isEmptyValue(current['My Rating']) || current['My Rating'] !== title.rating)) current['My Rating'] = title.rating
+				if (title.netflixId) {
+					current['Netflix ID'] = title.netflixId
+					addPlatform(current, 'Netflix', null)
+				}
+				if (title.kind === 'movie' && watched) current.Complete = true
 			})
 			this.noteImdbHas({ ...title, id: '' })
 			return 'updated'
@@ -2851,7 +3919,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).then(() => this.lazyNftBackgroundEnrich()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first — a third-party signing service carries the requests
@@ -4049,18 +5117,26 @@ export default class LibraryPlugin extends Plugin {
 			const watched = Math.max(parseWatched(existingFm?.Progress), row.progress)
 			const rating = Number(toStr(existingFm?.['My Rating']))
 			const score = Number.isFinite(rating) && rating > 0 ? rating : 0
-			const progress = `${String(watched)}/${String(total)}`
+			const tracking = trackingOf(category.contentType)
+			// a list's "completed" fills the progress of a note that tracks progress; Complete would be taken off right after
+			const progress = row.complete && tracking === 'progress' ? `${String(total)}/${String(total)}` : `${String(watched)}/${String(total)}`
+			const finishes = row.complete && tracking !== 'progress'
 			try {
 				if (existing) {
 					// a note edited since the last sync keeps its progress and rating; the list fills gaps
 					if (editedSince(this.settings.malEcho[existing.path], progressStr, score)) continue
-					await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
-						current.Progress = progress
-						if (row.complete) current.Complete = true
-						if (row.score > 0 && score === 0) current['My Rating'] = row.score
-					})
+					const finish = finishes && existingFm?.Complete !== true
+					const rate = row.score > 0 && score === 0
 					// record it so the next import can tell their edit from this write
 					this.settings.malEcho[existing.path] = { p: progress, r: score || row.score }
+					if (progress === progressStr && !finish && !rate) continue
+					await this.app.fileManager.processFrontMatter(existing, (current: Record<string, unknown>) => {
+						current.Progress = progress
+						const list = this.trackKind(current)
+						if (list) followProgress(current, list)
+						if (finish) current.Complete = true
+						if (rate) current['My Rating'] = row.score
+					})
 					updated++
 					continue
 				}
@@ -4068,7 +5144,7 @@ export default class LibraryPlugin extends Plugin {
 				const extra: Record<string, unknown> = { Name: row.title }
 				if (row.score > 0) extra['My Rating'] = row.score
 				extra.Progress = progress
-				if (row.complete) extra.Complete = true
+				if (finishes) extra.Complete = true
 				const file = await this.newNote(category, source, sourceId, row.title, { fields: { Name: row.title }, progressTotal: null, imdbId: null }, extra)
 				bySourceId.set(sourceId, file)
 				this.settings.malEcho[file.path] = { p: progress, r: row.score }
@@ -4183,25 +5259,51 @@ export default class LibraryPlugin extends Plugin {
 		if (!fm || isTemplateFile(file.path) || !this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
 		const key = coverKey(fm, this.coverProperty())
 		const remote = key ? toStr(fm[key]) : ''
+		const isNft = toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT'
+		if (isNft && remote && isInvalidNftMedia(remote) && key) {
+			const k = key
+			const gallery = toStrArray(fm.Gallery).filter(g => g && !isInvalidNftMedia(g) && !this.coverFailed.has(g))
+			if (gallery.length > 0) {
+				await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+					current[k] = gallery[0]
+				})
+				this.queueCover(file)
+			}
+			return
+		}
 		const url = publicHttpsUrl(remote)
 		if (!key || !url || this.coverFailed.has(url)) return
+		const k = key
 		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
 		// tokens of one collection often share a picture: one file named after its address serves them all
 		const shared = toStr(fm.Source) === NFT_SOURCE ? `nft-${urlHash(url)}` : ''
 		const link = (path: string): Promise<void> => this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 			if (toStr(current[key]) === remote) current[key] = `[[${path}]]`
 		})
-		const known = shared ? ['png', 'jpg', 'webp', 'gif', 'avif'].map(ext => `${dir}/${shared}.${ext}`).find(path => this.app.vault.getAbstractFileByPath(path)) : undefined
+		const known = shared ? ['png', 'jpg', 'webp', 'gif', 'avif', 'mp4', 'webm'].map(ext => `${dir}/${shared}.${ext}`).find(path => this.app.vault.getAbstractFileByPath(path)) : undefined
 		if (known) {
 			await link(known)
 			return
 		}
 		try {
-			const resp = await requestUrl({ url, throw: false })
+			let fetchUrl = url
+			if (fetchUrl.includes('ipfs.filebase.io/ipfs/')) {
+				fetchUrl = fetchUrl.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
+			}
+			const resp = await requestUrl({ url: fetchUrl, throw: false })
 			const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
 			const ext = imageExtension(type ? resp.headers[type] ?? '' : '') ?? sniffImage(resp.arrayBuffer)
 			if (resp.status !== 200 || !ext || resp.arrayBuffer.byteLength === 0) {
 				this.coverFailed.add(url)
+				if (isNft) {
+					const gallery = toStrArray(fm.Gallery).filter(g => g && !isInvalidNftMedia(g) && !this.coverFailed.has(g))
+					if (gallery.length > 0 && gallery[0] !== remote) {
+						await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+							current[k] = gallery[0]
+						})
+						this.queueCover(file)
+					}
+				}
 				return
 			}
 			await this.ensureFolder(dir)
@@ -4214,6 +5316,15 @@ export default class LibraryPlugin extends Plugin {
 			await link(path)
 		} catch (e) {
 			this.coverFailed.add(url)
+			if (isNft) {
+				const gallery = toStrArray(fm.Gallery).filter(g => g && !isInvalidNftMedia(g) && !this.coverFailed.has(g))
+				if (gallery.length > 0 && gallery[0] !== remote) {
+					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+						current[k] = gallery[0]
+					})
+					this.queueCover(file)
+				}
+			}
 			console.error('Library: cover download error', file.path, e)
 		}
 	}
@@ -4331,16 +5442,21 @@ export default class LibraryPlugin extends Plugin {
 		return false
 	}
 
-	private async uniqueNotePath(title: string, categoryFolder: string): Promise<string> {
+	private async uniqueNotePath(title: string, categoryFolder: string, disambiguator?: string): Promise<string> {
 		const folder = cleanFolder(categoryFolder)
 		const base = sanitizeFilename(title)
 		const dir = folder ? normalizePath(folder) : ''
 		await this.ensureFolder(dir)
 		const build = (name: string): string => normalizePath(dir ? `${dir}/${name}.md` : `${name}.md`)
 		let candidate = build(base)
+		if (!this.app.vault.getAbstractFileByPath(candidate)) return candidate
+		if (disambiguator && disambiguator !== base) {
+			const withYear = build(`${base} (${disambiguator})`)
+			if (!this.app.vault.getAbstractFileByPath(withYear)) return withYear
+		}
 		let counter = 2
 		while (this.app.vault.getAbstractFileByPath(candidate)) {
-			candidate = build(`${base} (${String(counter)})`)
+			candidate = build(disambiguator ? `${base} (${disambiguator}) (${String(counter)})` : `${base} (${String(counter)})`)
 			counter++
 		}
 		return candidate
@@ -4359,6 +5475,10 @@ export default class LibraryPlugin extends Plugin {
 			this.enrichTimer = null
 			void this.enrichPass(false)
 		}, delay)
+	}
+
+	refreshAll(): Promise<void> {
+		return this.enrichPass(true)
 	}
 
 	private async enrichPass(force: boolean): Promise<void> {
@@ -4638,7 +5758,7 @@ export default class LibraryPlugin extends Plugin {
 			const present = key === 'Cover' ? coverValue(current, this.coverProperty()) : current[target]
 			if (key === 'Seasons' && !isEmptyValue(present)) {
 				const merged = mergeSeasons(present, value)
-				if (JSON.stringify(merged) !== JSON.stringify(present)) {
+				if (areSeasonsChanged(present, merged)) {
 					current[target] = merged
 					changed = true
 				}
@@ -4753,15 +5873,117 @@ export default class LibraryPlugin extends Plugin {
 
 		const imgSide = createDiv()
 		imgSide.classList.add('note-header-cover')
-		const headerCover = coverSrc(this.app, cover)
-		if (headerCover) {
-			const img = createEl('img')
-			img.src = headerCover
-			imgSide.appendChild(img)
-			// a token's picture can be a video at an address with no extension
-			if (toStr(fm.Source) === NFT_SOURCE) img.addEventListener('error', () => {
-				img.replaceWith(createEl('video', { attr: { src: headerCover, muted: '', loop: '', autoplay: '', playsinline: '' } }))
-			}, { once: true })
+		const isNft = toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT'
+		const nftCandidates: string[] = []
+		if (isNft) {
+			const rawCover = toStr(cover)
+			if (rawCover && !isInvalidNftMedia(rawCover)) {
+				const src = coverSrc(this.app, rawCover)
+				if (src && !isInvalidNftMedia(src)) nftCandidates.push(src)
+			}
+			const gallery = toStrArray(fm.Gallery)
+			for (let i = 0; i < gallery.length; i++) {
+				const g = gallery[i]
+				if (!g || isInvalidNftMedia(g)) continue
+				const src = coverSrc(this.app, g) || g
+				if (src && !isInvalidNftMedia(src) && nftCandidates.indexOf(src) < 0) {
+					nftCandidates.push(src)
+				}
+			}
+		}
+
+		const renderHeaderMedia = (targetUrl: string, candidateIndex = 0) => {
+			imgSide.empty()
+			if (isNft && (fm.Spam === true || (fm.Spam !== false && looksLikeSpam(name, toStr(fm.Contract))))) {
+				imgSide.createDiv({ cls: 'note-header-spam-badge', text: tr('nft.spamBadge') || 'SPAM' })
+			}
+			if (!targetUrl) {
+				if (isNft) {
+					const ph = imgSide.createDiv({ cls: 'note-header-cover-placeholder' })
+					setIcon(ph, 'image')
+				}
+				return
+			}
+			if (/\.(mp4|webm|mov)(\?|$)/i.test(targetUrl)) {
+				const video = imgSide.createEl('video', { attr: { src: targetUrl, muted: '', loop: '', autoplay: '', playsinline: '' } })
+				if (isNft) {
+					video.addEventListener('error', () => {
+						const nextIdx = candidateIndex + 1
+						const next = nftCandidates[nextIdx]
+						if (next) {
+							renderHeaderMedia(next, nextIdx)
+						} else {
+							video.remove()
+							if (!imgSide.querySelector('.note-header-cover-placeholder')) {
+								const ph = imgSide.createDiv({ cls: 'note-header-cover-placeholder' })
+								setIcon(ph, 'image')
+							}
+						}
+					}, { once: true })
+				}
+			} else {
+				const img = createEl('img')
+				img.src = targetUrl
+				imgSide.appendChild(img)
+				if (isNft) {
+					img.addEventListener('error', () => {
+						if (!/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(targetUrl)) {
+							let videoSrc = targetUrl
+							if (videoSrc.includes('ipfs.filebase.io/ipfs/')) {
+								videoSrc = videoSrc.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
+							}
+							const video = createEl('video', { attr: { src: videoSrc, muted: '', loop: '', autoplay: '', playsinline: '' } })
+							video.addEventListener('error', () => {
+								const nextIdx = candidateIndex + 1
+								const next = nftCandidates[nextIdx]
+								if (next) {
+									renderHeaderMedia(next, nextIdx)
+								} else {
+									video.remove()
+									if (!imgSide.querySelector('.note-header-cover-placeholder')) {
+										const ph = imgSide.createDiv({ cls: 'note-header-cover-placeholder' })
+										setIcon(ph, 'image')
+									}
+								}
+							}, { once: true })
+							img.replaceWith(video)
+						} else {
+							const nextIdx = candidateIndex + 1
+							const next = nftCandidates[nextIdx]
+							if (next) {
+								renderHeaderMedia(next, nextIdx)
+							} else {
+								img.remove()
+								if (!imgSide.querySelector('.note-header-cover-placeholder')) {
+									const ph = imgSide.createDiv({ cls: 'note-header-cover-placeholder' })
+									setIcon(ph, 'image')
+								}
+							}
+						}
+					}, { once: true })
+				}
+			}
+		}
+
+		if (isNft) {
+			const first = nftCandidates[0]
+			if (first) {
+				renderHeaderMedia(first, 0)
+				const curCover = toStr(cover)
+				const curCoverSrc = coverSrc(this.app, curCover)
+				if (!curCover || !curCoverSrc || isInvalidNftMedia(curCover) || isInvalidNftMedia(curCoverSrc)) {
+					void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+						current.Cover = first
+					})
+				}
+			} else {
+				renderHeaderMedia('', 0)
+			}
+		} else {
+			const headerCover = coverSrc(this.app, cover)
+			if (headerCover && !isInvalidNftMedia(headerCover)) {
+				renderHeaderMedia(headerCover, 0)
+			}
 		}
 		header.appendChild(imgSide)
 
@@ -4854,8 +6076,6 @@ export default class LibraryPlugin extends Plugin {
 		const nft = toStr(fm.Source) === NFT_SOURCE
 		addNames(tr(nft ? 'header.collection' : 'header.creator'), creators)
 		if (nft) {
-			const chains = toStrArray(fm.Platforms)
-			if (chains.length > 0) addRow(tr('header.chain'), chains.join(', '))
 			const standard = toStr(fm.Standard)
 			if (standard) addRow(tr('header.standard'), standard)
 			// a long id or address is shortened to its ends; the whole value is in the properties
@@ -4863,7 +6083,34 @@ export default class LibraryPlugin extends Plugin {
 			const tokenId = toStr(fm['Token ID'])
 			if (tokenId) addRow(tr('header.tokenId'), short(tokenId))
 			const contract = toStr(fm.Contract)
-			if (contract) addRow(tr('header.contract'), short(contract))
+			if (contract) {
+				const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+				const expUrl = explorerContractUrl(chain, contract)
+				const row = infoSide.createDiv({ cls: 'note-header-row' })
+				row.createEl('b', { text: tr('header.contract') + ': ' })
+				row.createEl('a', {
+					cls: 'external-link',
+					href: expUrl,
+					text: short(contract),
+					attr: { target: '_blank', rel: 'noopener noreferrer', title: contract }
+				})
+			}
+			const creatorAddress = toStr(fm['Contract Creator'])
+			const site = toStrArray(fm.Platforms)[0] ?? ''
+			if (creatorAddress && site) {
+				const row = infoSide.createDiv({ cls: 'note-header-row' })
+				row.createEl('b', { text: tr('header.contractCreator') + ': ' })
+				row.createEl('a', { cls: 'external-link', href: explorerAddressUrl(site, creatorAddress), text: short(creatorAddress), attr: { target: '_blank', rel: 'noopener noreferrer', title: creatorAddress } })
+			}
+			const projectLinks = toStrArray(fm['Project Links']).map(value => safeUrl(value)).filter((value): value is string => value !== null)
+			if (projectLinks.length > 0) {
+				const row = infoSide.createDiv({ cls: 'note-header-row' })
+				row.createEl('b', { text: tr('header.links') + ': ' })
+				projectLinks.forEach((url, i) => {
+					if (i > 0) row.appendText(' · ')
+					row.createEl('a', { cls: 'external-link', href: url, text: linkName(url), attr: { target: '_blank', rel: 'noopener noreferrer' } })
+				})
+			}
 			// a wallet is a link like a person: its canvas holds its tokens, and the graph joins them
 			const wallets = toStrArray(fm.Wallet)
 			if (wallets.length > 0) {
@@ -4874,10 +6121,44 @@ export default class LibraryPlugin extends Plugin {
 					this.linkName(row.createSpan({ text: short(linkLabel(wallet)) }), linkLabel(wallet))
 				})
 			}
+			// a network is a link too: its canvas holds its collections
+			const network = toStrArray(fm.Platforms)[0]
+			if (network) {
+				const row = infoSide.createDiv({ cls: 'note-header-row' })
+				row.createEl('b', { text: tr('header.chain') + ': ' })
+				this.linkName(row.createSpan({ text: network }), network)
+			}
 			const minted = toStr(fm.Minted)
-			if (minted) addRow(tr('header.minted'), minted)
 			const acquired = toStr(fm.Acquired)
-			if (acquired) addRow(tr('header.acquired'), acquired)
+			const sameDate = Boolean(minted && acquired && (minted === acquired || (parseDate(minted) > 0 && parseDate(minted) === parseDate(acquired))))
+			if (sameDate) {
+				addRow(tr('header.minted'), minted)
+			} else {
+				if (minted) addRow(tr('header.minted'), minted)
+				if (acquired) addRow(tr('header.acquired'), acquired)
+			}
+
+			const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+			const rawHistory = Array.isArray(fm.History) ? (fm.History as Array<Record<string, unknown>>) : []
+			const heldTokens = new Set(toStrArray(fm.Tokens).map(t => toStr(t).trim().replace(/^#/, '')))
+			const filteredHistory = heldTokens.size > 0
+				? rawHistory.filter(tx => {
+					const tid = (toStr(tx.tokenId) || toStr(tx['Token ID'])).trim().replace(/^#/, '')
+					return !tid || heldTokens.has(tid)
+				})
+				: rawHistory
+
+			if (!toStr(fm.Block)) {
+				const firstBlock = toStr(filteredHistory[0]?.blockNumber || filteredHistory[0]?.block).trim()
+				if (firstBlock && firstBlock !== '-' && /^\d+$/.test(firstBlock)) {
+					const firstUrl = explorerBlockUrl(chain, firstBlock)
+					if (firstUrl) {
+						void this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
+							if (!current.Block) current.Block = firstUrl
+						})
+					}
+				}
+			}
 			if (Number(fm.Count) > 1) addRow(tr('header.count'), String(Number(fm.Count)))
 		}
 		// the channel: its canvas by name, the channel itself on YouTube, and the subscription
@@ -4902,6 +6183,8 @@ export default class LibraryPlugin extends Plugin {
 		if (video && Number(fm.Views) > 0) addRow(tr('header.views'), formatNumber(Number(fm.Views)))
 		if (video && Number(fm.Rewatched) > 0) addRow(tr('header.rewatched'), String(Number(fm.Rewatched)))
 		addNames(tr('header.cast'), cast)
+		const narrators = toStrArray(fm.Narrator).map(linkLabel).filter(Boolean)
+		if (narrators.length > 0) addNames(tr('header.narrator'), narrators)
 		const yearsStr = year + (endYear ? '–' + endYear : '')
 		if (yearsStr && !video) addRow(tr('header.years'), yearsStr)
 		if (season) addRow(tr('header.seasons'), season)
@@ -4912,7 +6195,7 @@ export default class LibraryPlugin extends Plugin {
 		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
-		if (kind === 'book') this.addFormats(infoSide, file, fm)
+		if (kind === 'book' || kind === 'comic') this.addFormats(infoSide, file, fm, kind)
 
 		const runtime = runtimeMinutes(fm.Runtime)
 		if (runtime !== null) addRow(tr('header.runtime'), formatRuntime(totalRuntimeMinutes(fm, runtime, kind)))
@@ -4954,7 +6237,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
-		if (trackingOf(kind) !== 'progress' && toStr(fm.Source) !== NFT_SOURCE) {
+		if (trackingOf(kind) !== 'progress' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
 			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
@@ -4970,35 +6253,87 @@ export default class LibraryPlugin extends Plugin {
 		const wrap = createDiv()
 		wrap.classList.add('note-header-wrap')
 		wrap.appendChild(header)
-		this.buildMediaBlock(wrap, fm, name)
+		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(wrap, fm, name)
+		this.buildNftTokensBlock(wrap, fm, file, (resolvedMedia) => {
+			const currentMedia = imgSide.querySelector('img, video')
+			if (!currentMedia) {
+				renderHeaderMedia(coverSrc(this.app, resolvedMedia) || resolvedMedia, 0)
+			}
+		})
+		this.buildNftHistoryBlock(wrap, fm, file)
 		this.buildSeasonsBlock(wrap, fm, file)
 		this.buildTrophiesBlock(wrap, fm, file)
 		this.buildRecommendations(wrap, fm)
 		return wrap
 	}
 
-	// paper, ebook, audiobook: a book can be owned in several, each pill toggles its own
-	private addFormats(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
+	// paper, ebook, audiobook: a book or comic can be owned in several, each pill toggles its own
+	private addFormats(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>, kind?: string): void {
 		const current = toStrArray(fm.Format).map(v => v.toLowerCase())
 		const row = infoSide.createDiv({ cls: 'note-header-row note-header-formats' })
 		row.createEl('b', { text: tr('header.format') + ': ' })
-		for (const [value, key] of BOOK_FORMATS) {
-			const on = current.indexOf(value.toLowerCase()) >= 0
-			const pill = row.createEl('button', { cls: `note-header-pill${on ? ' is-on' : ''}`, text: tr(key), attr: { 'aria-pressed': on ? 'true' : 'false' } })
-			pill.addEventListener('click', (e) => {
-				e.preventDefault()
-				pill.disabled = true
-				void this.app.fileManager.processFrontMatter(file, (front: Record<string, unknown>) => {
-					const kept = toStrArray(front.Format).filter(v => v.toLowerCase() !== value.toLowerCase())
-					const next = on ? kept : kept.concat(value)
-					if (next.length === 0) delete front.Format
-					else front.Format = next.length === 1 ? next[0] : next
-				}).catch((err: unknown) => {
-					pill.disabled = false
-					console.error('Library: format not saved', file.path, err)
-				})
-			})
+
+		const formatList = kind === 'comic' ? COMIC_FORMATS : BOOK_FORMATS
+		const iconFor = (val: string): string => {
+			const v = val.toLowerCase()
+			if (v === 'paper') return 'book-open'
+			if (v === 'ebook') return 'tablet'
+			return 'headphones'
 		}
+
+		const activeFormats = formatList.filter(([value]) => current.indexOf(value.toLowerCase()) >= 0)
+		let expanded = activeFormats.length === 0
+
+		const renderPills = (): void => {
+			row.querySelectorAll('button').forEach(btn => btn.remove())
+			const shown = expanded ? formatList : activeFormats
+			for (const [value, key] of shown) {
+				const on = current.indexOf(value.toLowerCase()) >= 0
+				const pill = row.createEl('button', {
+					cls: `note-header-pill note-header-format-pill is-${value.toLowerCase()}${on ? ' is-on' : ''}`,
+					attr: { 'aria-pressed': on ? 'true' : 'false' }
+				})
+				setIcon(pill.createSpan({ cls: 'note-header-format-icon' }), iconFor(value))
+				pill.createSpan({ text: tr(key) })
+				pill.addEventListener('click', (e) => {
+					e.preventDefault()
+					pill.disabled = true
+					void this.app.fileManager.processFrontMatter(file, (front: Record<string, unknown>) => {
+						const kept = toStrArray(front.Format).filter(v => v.toLowerCase() !== value.toLowerCase())
+						const next = on ? kept : kept.concat(value)
+						if (next.length === 0) delete front.Format
+						else front.Format = next.length === 1 ? next[0] : next
+					}).then(() => {
+						const idx = current.indexOf(value.toLowerCase())
+						if (on && idx >= 0) current.splice(idx, 1)
+						else if (!on && idx < 0) current.push(value.toLowerCase())
+						pill.disabled = false
+						renderPills()
+					}).catch((err: unknown) => {
+						pill.disabled = false
+						console.error('Library: format not saved', file.path, err)
+					})
+				})
+			}
+
+			if (activeFormats.length > 0) {
+				const toggleBtn = row.createEl('button', {
+					cls: 'note-header-formats-toggle',
+					attr: {
+						'aria-label': tr(expanded ? 'format.collapse' : 'format.expand'),
+						title: tr(expanded ? 'format.collapse' : 'format.expand')
+					}
+				})
+				setIcon(toggleBtn, expanded ? 'check' : 'plus')
+				toggleBtn.addEventListener('click', (e) => {
+					e.preventDefault()
+					expanded = !expanded
+					renderPills()
+				})
+			}
+		}
+
+		renderPills()
 	}
 
 	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and
@@ -5073,6 +6408,388 @@ export default class LibraryPlugin extends Plugin {
 		})
 	}
 
+	private buildNftTokensBlock(wrap: HTMLElement, fm: Record<string, unknown>, file: TFile, onTokenImageResolved?: (url: string) => void): void {
+		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) return
+		const tokenIds = toStrArray(fm.Tokens)
+		const single = toStr(fm['Token ID'])
+		if (single && tokenIds.indexOf(single) < 0) tokenIds.unshift(single)
+		if (tokenIds.length === 0) return
+
+		const contract = toStr(fm.Contract)
+		const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+		const gallery = toStrArray(fm.Gallery)
+		const cover = toStr(fm.Cover)
+		const rawHistory = Array.isArray(fm.History) ? (fm.History as Array<Record<string, unknown>>) : []
+		let historyDefaultDate = ''
+		for (const tx of rawHistory) {
+			const s = toStr(tx.timeStamp || tx.timestamp || tx.date)
+			if (s && s !== '-') {
+				historyDefaultDate = dmyOf(s) || s
+				break
+			}
+		}
+		const defaultDate = toStr(fm.Minted) || toStr(fm.Acquired) || historyDefaultDate || toStr(fm.Date)
+		const tokenDates = (typeof fm.TokenDates === 'object' && fm.TokenDates !== null) ? { ...(fm.TokenDates as Record<string, string>) } : {}
+		for (const tx of rawHistory) {
+			const tid = toStr(tx.tokenId || tx['Token ID']).trim().replace(/^#/, '')
+			const s = toStr(tx.timeStamp || tx.timestamp || tx.date)
+			if (tid && s && s !== '-' && !tokenDates[tid]) {
+				tokenDates[tid] = dmyOf(s) || s
+			}
+		}
+
+		const container = createDiv({ cls: 'note-header-nft-tokens' })
+		const titleRow = container.createDiv({ cls: 'note-header-nft-tokens-title' })
+		titleRow.createSpan({ text: tr('header.tokens') || 'Tokens' })
+		titleRow.createSpan({ cls: 'note-header-nft-tokens-count', text: ` (${String(tokenIds.length)})` })
+
+		let sortDescending = true
+		const grid = container.createDiv({ cls: 'note-header-nft-tokens-grid' })
+
+		const renderGrid = (): void => {
+			grid.empty()
+			const sortedIndices = tokenIds.map((_, i) => i).sort((i, j) => {
+				const idA = tokenIds[i] ?? ''
+				const idB = tokenIds[j] ?? ''
+				const rawA = tokenDates[idA] || defaultDate
+				const rawB = tokenDates[idB] || defaultDate
+				const dateA = rawA ? parseDate(rawA) : 0
+				const dateB = rawB ? parseDate(rawB) : 0
+				let cmp = 0
+				if (dateA !== dateB) {
+					cmp = dateA - dateB
+				} else {
+					const numA = Number(idA)
+					const numB = Number(idB)
+					if (!isNaN(numA) && !isNaN(numB)) cmp = numA - numB
+					else cmp = idA.localeCompare(idB)
+				}
+				return sortDescending ? -cmp : cmp
+			})
+
+			for (const origIdx of sortedIndices) {
+				const tokenId = tokenIds[origIdx] ?? ''
+				const card = grid.createDiv({ cls: 'note-header-nft-token-card' })
+				const imgWrap = card.createDiv({ cls: 'nft-token-img-wrap' })
+				const isSpamToken = fm.Spam === true || (fm.Spam !== false && looksLikeSpam(toStr(fm.Name), toStr(fm.Contract)))
+
+				const renderMedia = (wrap: HTMLElement, rawMedia: string): void => {
+					wrap.empty()
+					if (isSpamToken) {
+						wrap.createDiv({ cls: 'nft-token-spam-badge', text: tr('nft.spamBadge') || 'SPAM' })
+					}
+					if (isInvalidNftMedia(rawMedia)) {
+						const ph = wrap.createDiv({ cls: 'nft-token-placeholder' })
+						setIcon(ph, 'image')
+						return
+					}
+					const src = coverSrc(this.app, rawMedia) || rawMedia
+					if (/\.(mp4|webm|mov)(\?|$)/i.test(src)) {
+						const shouldAutoplay = tokenIds.length <= 6
+						const video = wrap.createEl('video', { attr: { src, muted: '', loop: '', playsinline: '', ...(shouldAutoplay ? { autoplay: '' } : { preload: 'metadata' }) } })
+						video.addEventListener('error', () => {
+							video.remove()
+							const ph = wrap.createDiv({ cls: 'nft-token-placeholder' })
+							setIcon(ph, 'image')
+						}, { once: true })
+					} else {
+						const imgEl = wrap.createEl('img', { attr: { src, loading: 'lazy' } })
+						imgEl.addEventListener('error', () => {
+							if (!/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(src) && !src.startsWith('data:image/')) {
+								const video = createEl('video', { attr: { src, muted: '', loop: '', playsinline: '', ...(tokenIds.length <= 6 ? { autoplay: '' } : { preload: 'metadata' }) } })
+								video.addEventListener('error', () => {
+									video.remove()
+									const ph = wrap.createDiv({ cls: 'nft-token-placeholder' })
+									setIcon(ph, 'image')
+								}, { once: true })
+								imgEl.replaceWith(video)
+							} else {
+								const coverMedia = coverSrc(this.app, cover) || cover
+								if (coverMedia && coverMedia !== src && !isInvalidNftMedia(coverMedia)) {
+									renderMedia(wrap, coverMedia)
+								} else {
+									imgEl.remove()
+									const ph = wrap.createDiv({ cls: 'nft-token-placeholder' })
+									setIcon(ph, 'image')
+								}
+							}
+						}, { once: true })
+					}
+				}
+
+				const tokenKey = `${chain}:${contract.toLowerCase()}:${tokenId}`
+				const cachedMedia = this.nftImageCache.get(tokenKey)
+				const tokenMedia = (gallery[origIdx] && !isInvalidNftMedia(gallery[origIdx])) ? gallery[origIdx] : ''
+				const candidate = tokenMedia || (tokenIds.length === 1 && cover && !isInvalidNftMedia(cover) ? cover : '') || cachedMedia || ''
+				const knownImg = candidate && !isInvalidNftMedia(candidate) ? candidate : ''
+				if (knownImg) {
+					renderMedia(imgWrap, knownImg)
+					card.addEventListener('click', (e) => {
+						const target = e.target as HTMLElement | null
+						if (target?.closest('a')) return
+						e.preventDefault()
+						e.stopPropagation()
+						this.lightbox?.close()
+						this.lightbox = new Lightbox(`${toStr(fm.Name) || file.basename} #${tokenId}`, [knownImg], 0, this.app)
+						this.lightbox.open()
+					})
+				} else {
+					const placeholder = imgWrap.createDiv({ cls: 'nft-token-placeholder' })
+					setIcon(placeholder, 'image')
+					if (!this.nftImageNegative.has(tokenKey)) {
+						this.enqueueNftToken({
+							key: tokenKey,
+							chain,
+							contract,
+							tokenId,
+							file,
+							title: toStr(fm.Name) || file.basename,
+							renderMedia,
+							imgWrap,
+							card,
+							onTokenImageResolved
+						})
+					}
+				}
+
+				const infoEl = card.createDiv({ cls: 'nft-token-info' })
+				const idRow = infoEl.createDiv({ cls: 'nft-token-id-row' })
+				const tokenUrl = explorerTokenUrl(chain, contract, tokenId)
+				idRow.createEl('a', {
+					cls: 'nft-token-id-link external-link',
+					href: tokenUrl,
+					text: `#${tokenId}`,
+					attr: { target: '_blank', rel: 'noopener noreferrer', title: `#${tokenId}` }
+				})
+
+				const tokenDate = tokenDates[tokenId] || defaultDate
+				if (tokenDate) {
+					const dateRow = infoEl.createDiv({ cls: 'nft-token-date-row' })
+					setIcon(dateRow.createSpan({ cls: 'nft-token-date-icon' }), 'calendar')
+					dateRow.createSpan({ cls: 'nft-token-date-text', text: tokenDate })
+				}
+			}
+		}
+
+		if (tokenIds.length > 1) {
+			const sortBtn = titleRow.createEl('button', {
+				cls: 'note-header-nft-tokens-sort-btn',
+				text: (sortDescending ? '↓ ' : '↑ ') + (tr('header.minted') || 'Minted')
+			})
+			sortBtn.addEventListener('click', (e) => {
+				e.preventDefault()
+				sortDescending = !sortDescending
+				sortBtn.setText((sortDescending ? '↓ ' : '↑ ') + (tr('header.minted') || 'Minted'))
+				renderGrid()
+			})
+		}
+
+		renderGrid()
+		wrap.appendChild(container)
+	}
+
+	private buildNftHistoryBlock(wrap: HTMLElement, fm: Record<string, unknown>, file?: TFile): void {
+		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) return
+		const rawHistory = Array.isArray(fm.History) ? (fm.History as Array<Record<string, unknown>>) : []
+
+		const heldTokens = new Set(toStrArray(fm.Tokens).map(t => toStr(t).trim().replace(/^#/, '')))
+		let history = heldTokens.size > 0
+			? rawHistory.filter(tx => {
+				const tid = (toStr(tx.tokenId) || toStr(tx['Token ID'])).trim().replace(/^#/, '')
+				return !tid || heldTokens.has(tid)
+			})
+			: rawHistory
+
+		const chain = toStrArray(fm.Platforms)[0] || toStr(fm.Platforms) || toStr(fm['Source ID']).split(':')[0] || 'Ethereum'
+
+		// A table with transactions must be present for all NFT notes: synthesize if missing
+		if (history.length === 0) {
+			const tokenIds = toStrArray(fm.Tokens)
+			const single = toStr(fm['Token ID'])
+			if (single && tokenIds.indexOf(single) < 0) tokenIds.unshift(single)
+			const fallbackTokens = tokenIds.length > 0 ? tokenIds : ['0']
+			const defaultDate = toStr(fm.Minted) || toStr(fm.Acquired) || toStr(fm.Date) || '-'
+			const blockVal = toStr(fm.Block)
+			const blockNum = blockVal ? blockVal.replace(/^.*\/block(?:s)?\//i, '').trim() : '-'
+			const fallbackRows: Array<Record<string, unknown>> = []
+			for (const tid of fallbackTokens) {
+				const cleanId = tid.trim().replace(/^#/, '')
+				fallbackRows.push({ tokenId: cleanId, date: defaultDate, from: '-', hash: '', blockNumber: blockNum })
+			}
+			history = fallbackRows
+		}
+
+		const getTxTimestamp = (tx: Record<string, unknown>): number => {
+			if (tx.timeStamp) {
+				const t = parseDate(tx.timeStamp)
+				if (t > 0) return t
+			}
+			const d = toStr(tx.date)
+			if (d && d !== '-') {
+				const t = parseDate(d)
+				if (t > 0) return t
+			}
+			return 0
+		}
+
+		const getTxBlock = (tx: Record<string, unknown>): number => {
+			const b = toStr(tx.blockNumber || tx.block).replace(/\D/g, '')
+			return b ? Number(b) : 0
+		}
+
+		const getTxTokenId = (tx: Record<string, unknown>): number => {
+			const tid = toStr(tx.tokenId || tx['Token ID']).trim().replace(/^#/, '')
+			const num = Number(tid)
+			return !isNaN(num) ? num : 0
+		}
+
+		let sortCol: 'date' | 'tokenId' | 'block' = 'date'
+		let sortAsc = false // newest first by default
+
+		const sortHistory = (): void => {
+			history.sort((a, b) => {
+				let diff = 0
+				if (sortCol === 'date') {
+					diff = getTxTimestamp(a) - getTxTimestamp(b)
+					if (diff === 0) diff = getTxBlock(a) - getTxBlock(b)
+					if (diff === 0) diff = getTxTokenId(a) - getTxTokenId(b)
+				} else if (sortCol === 'block') {
+					diff = getTxBlock(a) - getTxBlock(b)
+					if (diff === 0) diff = getTxTimestamp(a) - getTxTimestamp(b)
+				} else if (sortCol === 'tokenId') {
+					diff = getTxTokenId(a) - getTxTokenId(b)
+					if (diff === 0) diff = getTxTimestamp(a) - getTxTimestamp(b)
+				}
+				return sortAsc ? diff : -diff
+			})
+		}
+		sortHistory()
+
+		const container = createDiv({ cls: 'note-header-nft-history' })
+		const titleRow = container.createDiv({ cls: 'note-header-nft-history-title' })
+		titleRow.createSpan({ text: tr('header.txHistory') })
+		titleRow.createSpan({ cls: 'note-header-nft-tokens-count', text: ` (${String(history.length)})` })
+
+		const tableWrap = container.createDiv({ cls: 'note-header-nft-history-wrap' })
+		const table = tableWrap.createEl('table', { cls: 'note-header-nft-history-table' })
+		const thead = table.createEl('thead')
+		const headRow = thead.createEl('tr')
+		const thTokenId = headRow.createEl('th', { cls: 'is-sortable' })
+		const thDate = headRow.createEl('th', { cls: 'is-sortable' })
+		headRow.createEl('th', { text: tr('header.from') })
+		headRow.createEl('th', { text: tr('header.txHash') })
+		const thBlock = headRow.createEl('th', { cls: 'is-sortable' })
+
+		const updateHeaders = (): void => {
+			thTokenId.empty()
+			thTokenId.createSpan({ text: tr('header.tokenId') || 'Token ID' })
+			if (sortCol === 'tokenId') thTokenId.createSpan({ cls: 'nft-sort-arrow', text: sortAsc ? ' ▲' : ' ▼' })
+
+			thDate.empty()
+			thDate.createSpan({ text: tr('sort.date') })
+			if (sortCol === 'date') thDate.createSpan({ cls: 'nft-sort-arrow', text: sortAsc ? ' ▲' : ' ▼' })
+
+			thBlock.empty()
+			thBlock.createSpan({ text: tr('header.block') })
+			if (sortCol === 'block') thBlock.createSpan({ cls: 'nft-sort-arrow', text: sortAsc ? ' ▲' : ' ▼' })
+		}
+
+		thTokenId.addEventListener('click', () => {
+			if (sortCol === 'tokenId') sortAsc = !sortAsc
+			else { sortCol = 'tokenId'; sortAsc = true }
+			sortHistory()
+			updateHeaders()
+			renderTbody()
+		})
+
+		thDate.addEventListener('click', () => {
+			if (sortCol === 'date') sortAsc = !sortAsc
+			else { sortCol = 'date'; sortAsc = false }
+			sortHistory()
+			updateHeaders()
+			renderTbody()
+		})
+
+		thBlock.addEventListener('click', () => {
+			if (sortCol === 'block') sortAsc = !sortAsc
+			else { sortCol = 'block'; sortAsc = false }
+			sortHistory()
+			updateHeaders()
+			renderTbody()
+		})
+
+		const tbody = table.createEl('tbody')
+		const renderTbody = (): void => {
+			tbody.empty()
+			for (const tx of history) {
+				const trEl = tbody.createEl('tr')
+				const tokenId = toStr(tx.tokenId) || toStr(tx['Token ID']) || ''
+				const rawDate = toStr(tx.date)
+				let date = '-'
+				if (tx.timeStamp) {
+					date = dmyOf(toStr(tx.timeStamp)) || '-'
+				} else if (rawDate && rawDate !== '-') {
+					if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(rawDate)) {
+						date = rawDate
+					} else {
+						date = dmyOf(rawDate) || rawDate
+					}
+				}
+				const from = toStr(tx.from) || '-'
+				const hash = toStr(tx.hash) || toStr(tx.txHash) || ''
+				const block = toStr(tx.blockNumber) || toStr(tx.block) || '-'
+
+				trEl.createEl('td', { text: tokenId ? `#${tokenId.replace(/^#/, '')}` : '-' })
+				trEl.createEl('td', { text: date })
+
+				const fromTd = trEl.createEl('td')
+				if (from && from !== '-') {
+					const fromText = from.length > 12 ? `${from.slice(0, 6)}...${from.slice(-4)}` : from
+					fromTd.createEl('code', { text: fromText })
+				} else {
+					fromTd.setText('-')
+				}
+
+				const txTd = trEl.createEl('td')
+				if (hash && hash !== '-') {
+					const txUrl = explorerTxUrl(chain, hash)
+					const displayHash = hash.replace(/^https?:\/\/[^/]+\/(?:tx|nft|tokens?|instance)\//i, '').replace(/^.*#/, '')
+					const linkText = displayHash.length > 12 ? `${displayHash.slice(0, 8)}...` : (displayHash || 'Link')
+					txTd.createEl('a', {
+						cls: 'nft-tx-link external-link',
+						href: txUrl,
+						text: linkText,
+						attr: { target: '_blank', rel: 'noopener noreferrer' }
+					})
+				} else {
+					txTd.setText('-')
+				}
+
+				const blockTd = trEl.createEl('td')
+				const blockClean = block.replace(/^.*\/block(?:s)?\//i, '').trim()
+				if (block && block !== '-' && /^\d+$/.test(blockClean)) {
+					const blockUrl = safeUrl(tx.blockUrl) ?? (/^https?:\/\//i.test(block) ? block : explorerBlockUrl(chain, blockClean))
+					if (blockUrl) {
+						blockTd.createEl('a', {
+							cls: 'nft-tx-link external-link',
+							href: blockUrl,
+							text: blockClean,
+							attr: { target: '_blank', rel: 'noopener noreferrer' }
+						})
+					} else {
+						blockTd.setText(blockClean)
+					}
+				} else {
+					blockTd.setText(blockClean && blockClean !== '-' ? blockClean : '-')
+				}
+			}
+		}
+
+		updateHeaders()
+		renderTbody()
+		wrap.appendChild(container)
+	}
+
 	private buildMediaBlock(wrap: HTMLElement, fm: Record<string, unknown>, name: string): void {
 		// a video note plays the video itself
 		const trailer = toStr(fm.Trailer).trim() || (toStr(fm.Source) === YOUTUBE_SOURCE ? toStr(fm.URL).trim() : '')
@@ -5123,7 +6840,7 @@ export default class LibraryPlugin extends Plugin {
 					if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
 					event.preventDefault()
 					this.lightbox?.close()
-					this.lightbox = new Lightbox(name, gallery, i)
+					this.lightbox = new Lightbox(name, gallery, i, this.app)
 					this.lightbox.open()
 				})
 				strip.appendChild(link)
@@ -5534,6 +7251,9 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.soonAt !== 'number') this.settings.soonAt = 0
 		if (typeof this.settings.upNextAt !== 'number') this.settings.upNextAt = 999
 		if (typeof this.settings.localCovers !== 'boolean') this.settings.localCovers = false
+		if (typeof this.settings.enableItunesAudiobooks !== 'boolean') this.settings.enableItunesAudiobooks = true
+		if (typeof this.settings.enableLibrivox !== 'boolean') this.settings.enableLibrivox = true
+		if (typeof this.settings.enableOpenLibrary !== 'boolean') this.settings.enableOpenLibrary = true
 		if (!['english', 'romaji', 'native'].includes(this.settings.titleLanguage)) this.settings.titleLanguage = 'english'
 		if (typeof this.settings.adultTitles !== 'boolean') this.settings.adultTitles = false
 		if (typeof this.settings.offerRemoteDelete !== 'boolean') this.settings.offerRemoteDelete = true
@@ -5555,21 +7275,18 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.airingChecked !== 'number') this.settings.airingChecked = 0
 		if (typeof this.settings.upNextCategory !== 'string') this.settings.upNextCategory = ''
 		if (typeof this.settings.steamLastImport !== 'number') this.settings.steamLastImport = 0
-		// earlier builds kept one list, then a field per network; each address goes to the field of its kind
+		// earlier builds kept a field per network; now one list, sorted by what each address looks like
 		const savedWallets = this.settings.nftWallets as unknown
 		const savedText = typeof savedWallets === 'string' ? savedWallets
 			: savedWallets && typeof savedWallets === 'object' ? Object.keys(savedWallets).map(k => toStr((savedWallets as Record<string, unknown>)[k])).join('\n') : ''
-		this.settings.nftWallets = {}
-		for (const wallet of parseWallets(savedText)) {
-			const field = wallet.kind === 'evm' ? 'EVM' : wallet.kind === 'ton' ? 'TON' : 'Solana'
-			const known = (this.settings.nftWallets[field] ?? '').split('\n')
-			if (known.indexOf(wallet.address) < 0) this.settings.nftWallets[field] = known.concat(wallet.address).filter(Boolean).join('\n')
-		}
+		const addresses = parseWallets(savedText).map(wallet => wallet.address).join('\n')
+		this.settings.nftWallets = addresses ? { [WALLET_FIELD]: addresses } : {}
 		if (typeof this.settings.etherscanApiKey !== 'string') this.settings.etherscanApiKey = ''
 		if (typeof this.settings.nftLastImport !== 'number') this.settings.nftLastImport = 0
 		if (typeof this.settings.showNftSpam !== 'boolean') this.settings.showNftSpam = false
 		if (!Array.isArray(this.settings.nftHidden)) this.settings.nftHidden = []
 		if (typeof this.settings.showNftOat !== 'boolean') this.settings.showNftOat = true
+		if (this.settings.nftDisplayMode !== 'all' && this.settings.nftDisplayMode !== 'collections') this.settings.nftDisplayMode = 'collections'
 		const secrets = (this.settings.keySecrets && typeof this.settings.keySecrets === 'object' ? this.settings.keySecrets : {}) as Record<string, unknown>
 		this.settings.keySecrets = {}
 		for (const name of API_KEY_NAMES) {
@@ -5632,6 +7349,8 @@ export default class LibraryPlugin extends Plugin {
 			if (typeof key !== 'string' || !key.trim()) return
 			const name = key.trim()
 			const within = kind === 'property' && typeof scope === 'string' && scope ? scope : undefined
+			if (within === NFT_CATEGORY || (within && this.settings.categories.some(c => c.typeValue === within && isNftCategory(c)))) return
+			if (kind === 'category' && (name === NFT_CATEGORY || this.settings.categories.some(c => c.typeValue === name && isNftCategory(c)))) return
 			if (stats.tops.some(top => top.kind === kind && top.key.toLowerCase() === name.toLowerCase() && top.scope === within)) return
 			stats.tops.push(within ? { kind, key: name, scope: within } : { kind, key: name })
 		}

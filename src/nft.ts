@@ -1,6 +1,6 @@
 import { requestUrl } from 'obsidian'
 import { NFT_CATEGORY } from './categories'
-import { publicHttpsUrl } from './util'
+import { dmyOf, parseDate, publicHttpsUrl, sleep } from './util'
 import { readPage } from './watchSites'
 
 // NFTs held by the wallets you list, read from each chain's explorer: Blockscout for
@@ -10,7 +10,7 @@ import { readPage } from './watchSites'
 export const NFT_TYPE = NFT_CATEGORY
 export const NFT_SOURCE = 'nft'
 
-export type WalletKind = 'evm' | 'solana' | 'ton'
+export type WalletKind = 'evm' | 'solana' | 'ton' | 'near' | 'tezos'
 
 export interface Wallet {
 	kind: WalletKind
@@ -29,6 +29,7 @@ export interface HeldNft {
 	count: number
 	// looks like a phishing drop: amounts, rewards, claim or airdrop calls, links
 	spam: boolean
+	unverified?: boolean
 	// an achievement or attendance token (Galxe OAT, POAP, Layer3 CUBE), not a collectible
 	oat: boolean
 	// the user's wallets that hold it
@@ -44,6 +45,40 @@ export interface HeldNft {
 	trusted?: boolean
 	// the token's contract (a TON or Solana collection), and when the token was minted and reached the wallet (ISO)
 	contract?: string
+	minted?: string
+	acquired?: string
+	tx?: NftTx
+}
+
+export interface NftTx {
+	hash?: string
+	from?: string
+	to?: string
+	blockNumber?: string
+	// TON and NEAR name a block by more than its number
+	blockUrl?: string
+	timeStamp?: string
+	tokenId?: string
+}
+
+export interface HeldContract {
+	key: string
+	chain: string
+	contract: string
+	collection: string
+	name: string
+	count: number
+	tokenIds: string[]
+	tokens: HeldNft[]
+	image: string
+	gallery: string[]
+	url: string
+	standard?: string
+	spam: boolean
+	unverified?: boolean
+	oat: boolean
+	wallets: string[]
+	history: NftTx[]
 	minted?: string
 	acquired?: string
 }
@@ -69,23 +104,67 @@ export function parseWallets(text: string): Wallet[] {
 		let kind: WalletKind | null = null
 		if (/^0x[0-9a-fA-F]{40}$/.test(address)) kind = 'evm'
 		else if (/^(EQ|UQ|kQ|0Q)[\w-]{46}$/.test(address) || /^-?\d:[0-9a-fA-F]{64}$/.test(address)) kind = 'ton'
+		else if (/^tz[1-4][1-9A-HJ-NP-Za-km-z]{33}$/.test(address)) kind = 'tezos'
 		else if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) kind = 'solana'
-		if (kind && !out.some(w => w.address === address)) out.push({ kind, address })
+		else if (/^[a-z0-9_.-]+\.(near|tg)$/i.test(address) || /^[0-9a-fA-F]{64}$/.test(address)) kind = 'near'
+		if (kind && !out.some(w => w.address.toLowerCase() === address.toLowerCase())) out.push({ kind, address })
 	}
 	return out
 }
 
+export const IPFS_GATEWAYS = [
+	'https://ipfs2.seadn.io/ipfs/',
+	'https://ipfs.filebase.io/ipfs/',
+	'https://gateway.pinata.cloud/ipfs/',
+	'https://cloudflare-ipfs.com/ipfs/',
+	'https://ipfs.io/ipfs/',
+	'https://dweb.link/ipfs/',
+]
+
 // ipfs:// and ar:// through public gateways; anything else must be public https.
-// ipfs.io and dweb.link time out on most files, so links to them move to Filebase too.
+// ipfs.io and dweb.link time out on most files, so links to them move to Filebase/SeaDN too.
+export function isInvalidNftMedia(url: string): boolean {
+	if (!url) return true
+	const lower = url.toLowerCase()
+	if (lower.indexOf('aa39f9c14ff6244ac5c46382132dff64') >= 0) return true
+	if (lower.indexOf('81f4057a5bc31febc57dbff2e0c8967c') >= 0) return true
+	if (lower.indexOf('463b14bfcbb174be589d50b226dabf9d') >= 0) return true
+	if (lower.indexOf('5ca21603cb9c204b8bc1d9d4ab9c8cb2') >= 0) return true
+	if (lower.indexOf('invalidated') >= 0) return true
+	if (lower.indexOf('storage.nfte.ai') >= 0) return true
+	if (lower.indexOf('nft-placeholder') >= 0) return true
+	if (lower.indexOf('1a09c26b1c30427b26944c47fc7bb9') >= 0) return true
+	if (lower.indexOf('d81a09c26b1c30427b26944c47fc7bb9') >= 0) return true
+	if (lower.indexOf('nft-ccce32a1baf127c5') >= 0) return true
+	return false
+}
+
 export function mediaUrl(value: unknown): string {
 	const raw = typeof value === 'string' ? value.trim() : ''
+	if (!raw || isInvalidNftMedia(raw)) return ''
+	// on-chain raw SVG: wrap as data URI
+	if (/^<svg[\s>]/i.test(raw)) return `data:image/svg+xml;utf8,${encodeURIComponent(raw)}`
 	// a picture the contract draws itself: kept as data, the import saves it to a file
-	if (/^data:image\/(png|jpeg|gif|webp|svg\+xml)[;,]/i.test(raw) && raw.length < 2000000) return raw
-	const ipfs = /^(?:ipfs:\/\/|https:\/\/(?:ipfs\.io|dweb\.link)\/ipfs\/)(?:ipfs\/)?(.+)$/i.exec(raw)?.[1]
-	if (ipfs) return publicHttpsUrl(`https://ipfs.filebase.io/ipfs/${ipfs.replace(/^\/+/, '')}`) ?? ''
-	const ar = /^ar:\/\/(.+)$/i.exec(raw)?.[1]
-	if (ar) return publicHttpsUrl(`https://arweave.net/${ar.replace(/^\/+/, '')}`) ?? ''
-	return publicHttpsUrl(raw) ?? ''
+	if (/^data:(image\/(png|jpeg|gif|webp|svg\+xml)|application\/json)[;,]/i.test(raw) && raw.length < 2000000) return raw
+	const ipfsSub = /^https?:\/\/([a-zA-Z0-9]+)\.ipfs\.(?:nftstorage\.link|dweb\.link|w3s\.link|cf-ipfs\.com)\/?(.*)$/i.exec(raw)
+	if (ipfsSub) {
+		const cid = ipfsSub[1]
+		const subpath = ipfsSub[2] ? `/${ipfsSub[2].replace(/^\/+/, '')}` : ''
+		const res = publicHttpsUrl(`https://ipfs.filebase.io/ipfs/${cid}${subpath}`) ?? ''
+		return isInvalidNftMedia(res) ? '' : res
+	}
+	const ipfs = /^(?:ipfs:\/\/|https?:\/\/(?:[^/]+\/)?ipfs\/)(?:ipfs\/)?(.+)$/i.exec(raw)?.[1]
+	if (ipfs) {
+		const res = publicHttpsUrl(`https://ipfs.filebase.io/ipfs/${ipfs.replace(/^\/+/, '')}`) ?? ''
+		return isInvalidNftMedia(res) ? '' : res
+	}
+	const ar = /^(?:ar:\/\/|https?:\/\/(?:arweave\.net|arweave\.dev)\/)(.+)$/i.exec(raw)?.[1]
+	if (ar) {
+		const res = publicHttpsUrl(`https://arweave.net/${ar.replace(/^\/+/, '')}`) ?? ''
+		return isInvalidNftMedia(res) ? '' : res
+	}
+	const res = publicHttpsUrl(raw) ?? ''
+	return isInvalidNftMedia(res) ? '' : res
 }
 
 // Tokens of one collection with the same name and picture are one entry, counted.
@@ -102,21 +181,83 @@ export function groupHeld(tokens: HeldNft[]): HeldNft[] {
 }
 
 // Unsolicited drops lure with money and a site to visit; the explorers flag only some of them.
-const SPAM = /\$\s?\d|\d\s?k?\s?\$|\d\s?(usdt|usdc|eth|ton|sol)\b|reward|claim|airdrop|voucher|giveaway|\bgift\b|bonus|eligible|visit|free mint|https?:|www\.|t\.me\/|\.(com|io|xyz|net|org|app|site|top|vip|pro|gift|fun|lol|cc|ly|me|gg|to|link|click|live|info)\b/i
+const SPAM = /phish|phishing|scam|fake|fraud|drainer|honeypot|malicious|\b\d[\d,.]*\s*(?:k\b|m\b|\$|usdt|usdc|eth|weth|steth|ton|sol|uni|ldo|shib|btc|wbtc|bnb|busd|matic|pol|polygon|arb|op|pepe|doge|trx|dai|avax)\b|(?:\$|€|£)\s*\d[\d,.]*|\b\d[\d,.]*\s*(?:\$|usd|eur)|reward|claim|airdrop|voucher|giveaway|\bgift\b|(?:gift|mystery|loot|blind|lucky|treasure|reward|bonus)\s*box\b|giftbox|bonus|eligible|eligibility|winner|selected|visit|scratch\s*cards?|scratchcard|lottery|casino|lucky\s*spin|spin\s*to\s*win|raffle|promo\b|whitelist\s*raffle|free\s*mint|instant\s*mint|https?:|www\.|\bt\.me\/|\bdiscord\.gg\/|\.(com|io|xyz|net|org|app|site|top|vip|pro|gift|fun|lol|cc|ly|me|gg|to|link|click|live|info|space|online|tech|pw|win|work|claims?|claims?-?\w+)\b/i
 
-export function looksLikeSpam(name: string, collection: string): boolean {
-	return SPAM.test(name) || SPAM.test(collection)
-}
-
-const OAT = /\b(oat|poap)\b|galxe|galaxy oat|layer3 cube/i
+const OAT = /\b(oat|poap)\b|galxe|galaxy oat|layer3 cube|quest3|questn|taskon/i
 
 export function isOat(name: string, collection: string): boolean {
 	return OAT.test(collection) || OAT.test(name)
 }
 
+export function looksLikeSpam(name: string, collection: string, contract = ''): boolean {
+	const raw = `${name} ${collection} ${contract}`
+	// eslint-disable-next-line no-control-regex -- strip invisible control characters used in spam token names
+	const text = raw.replace(/[\x00-\x1f\x7f-\x9f\u200b-\u200f\ufeff]/g, ' ').trim()
+	if (/phish|phishing|scam|fraud|fake|drainer|honeypot|malicious/i.test(text)) return true
+	if (isOat(name, collection) && !/claim|airdrop|voucher|giveaway|\$|\d\s*(?:usdt|usdc|eth|steth|uni|ldo)/i.test(text)) return false
+	return SPAM.test(text)
+}
+
 // chain:contract:token id; a token with an address of its own (TON, Solana) is chain:address
 export function nftKey(chain: string, contract: string, id = ''): string {
 	return id ? `${chain}:${contract.toLowerCase()}:${id.trim().toLowerCase()}` : `${chain}:${contract.toLowerCase()}`
+}
+
+// A deleted note's keys. A contract counts as hidden by its own key or address, or when every token
+// held from it was deleted; a token id alone means nothing, ids repeat across contracts and chains.
+export function nftIsHidden(deleted: Set<string>, key: string, contract: string, tokenIds: string[]): boolean {
+	const own = key.toLowerCase()
+	const address = contract.trim().toLowerCase()
+	if (deleted.has(own) || (address && deleted.has(address))) return true
+	const ids = tokenIds.map(id => id.trim().toLowerCase().replace(/^#/, '')).filter(Boolean)
+	return ids.length > 0 && ids.every(id => deleted.has(`${own}:${id}`) || (address && deleted.has(`${address}:${id}`)))
+}
+
+const ZERO_ADDRESS = /^0x0+(?:\.+0+)?$/i
+
+// Minted is the earliest transfer from the zero address, Acquired the latest transfer: none is left
+// empty rather than guessed. Rows come from a note's History or from the explorer.
+export function historyDates(rows: { from?: unknown; timeStamp?: unknown; timestamp?: unknown; date?: unknown }[]): { minted: string; acquired: string } {
+	let minted = 0
+	let acquired = 0
+	let mintedText = ''
+	let acquiredText = ''
+	for (const row of rows) {
+		const raw = row.timeStamp ?? row.timestamp ?? row.date
+		const time = raw && raw !== '-' ? parseDate(raw) : 0
+		if (time <= 0) continue
+		const text = dmyOf(raw) || (typeof raw === 'string' ? raw : '')
+		if (time > acquired) { acquired = time; acquiredText = text }
+		if (ZERO_ADDRESS.test(typeof row.from === 'string' ? row.from : '') && (minted === 0 || time < minted)) { minted = time; mintedText = text }
+	}
+	return { minted: mintedText, acquired: acquiredText }
+}
+
+// A row's hash may be a bare hash or a whole explorer link.
+export function txHashOf(value: unknown): string {
+	return typeof value === 'string' ? /0x[0-9a-fA-F]{64}/.exec(value)?.[0] ?? '' : ''
+}
+
+// The block of an EVM transaction: the explorer's API, else the chain's public RPC.
+export async function txBlock(chain: string, hash: string): Promise<string> {
+	const host = BLOCKSCOUT[chain]
+	try {
+		if (host) {
+			const json = await explorerJson(`https://${host}/api/v2/transactions/${hash}`) as { block_number?: unknown; block?: unknown } | null
+			const block = json?.block_number ?? json?.block
+			if (typeof block === 'number' || (typeof block === 'string' && /^\d+$/.test(block))) return String(block)
+		}
+		const rpc = PUBLIC_RPC[chain] || ETHERSCAN_CHAINS[chain]?.rpc || ROUTESCAN_CHAINS[chain]?.rpc
+		if (!rpc) return ''
+		const resp = await requestUrl({
+			url: rpc, method: 'POST', contentType: 'application/json', throw: false,
+			body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionByHash', params: [hash] })
+		})
+		const block = resp.status === 200 ? (resp.json as { result?: { blockNumber?: unknown } | null }).result?.blockNumber : ''
+		return typeof block === 'string' && /^0x[0-9a-f]+$/i.test(block) ? String(parseInt(block, 16)) : ''
+	} catch {
+		return ''
+	}
 }
 
 // Blockscout hosts for the EVM chains it indexes.
@@ -125,7 +266,6 @@ export const BLOCKSCOUT: Record<string, string> = {
 	Optimism: 'optimism.blockscout.com',
 	Base: 'base.blockscout.com',
 	Arbitrum: 'arbitrum.blockscout.com',
-	Polygon: 'polygon.blockscout.com',
 	Gnosis: 'gnosis.blockscout.com',
 	Celo: 'celo.blockscout.com',
 	zkSync: 'zksync.blockscout.com',
@@ -137,6 +277,11 @@ export const BLOCKSCOUT: Record<string, string> = {
 	'Arbitrum Nova': 'arbitrum-nova.blockscout.com',
 	Shape: 'shapescan.xyz',
 	Robinhood: 'robinhoodchain.blockscout.com',
+	Lisk: 'blockscout.lisk.com',
+	'World Chain': 'worldchain-mainnet.explorer.alchemy.com',
+	Metis: 'andromeda-explorer.metis.io',
+	Rootstock: 'rootstock.blockscout.com',
+	ApeChain: 'apechain.blockscout.com',
 }
 
 interface BlockscoutItem {
@@ -145,7 +290,7 @@ interface BlockscoutItem {
 	value?: unknown
 	image_url?: unknown
 	metadata?: { name?: unknown; image?: unknown } | null
-	token?: { address_hash?: unknown; name?: unknown; symbol?: unknown; reputation?: unknown } | null
+	token?: { address_hash?: unknown; name?: unknown; symbol?: unknown; reputation?: unknown; icon_url?: unknown; is_scam?: unknown; is_phishing?: unknown } | null
 	thumbnails?: Record<string, unknown> | null
 	media_url?: unknown
 }
@@ -155,8 +300,9 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 	for (const item of items) {
 		const contract = typeof item.token?.address_hash === 'string' ? item.token.address_hash : ''
 		const id = typeof item.id === 'string' ? item.id : ''
-		// the explorer's own flag: scam contracts stay out
-		if (!contract || item.token?.reputation === 'scam') continue
+		const rep = typeof item.token?.reputation === 'string' ? item.token.reputation.toLowerCase() : ''
+		// the explorer's own flags: scam and phishing contracts stay out
+		if (!contract || rep === 'scam' || rep === 'phishing' || rep === 'spam' || rep === 'suspicious' || item.token?.is_scam === true || item.token?.is_phishing === true) continue
 		// an unnamed contract shows its symbol, where airdrop spam writes "Visit website to claim USDT"
 		const symbol = typeof item.token?.symbol === 'string' ? item.token.symbol.trim() : ''
 		const collection = typeof item.token?.name === 'string' && item.token.name.trim() ? item.token.name.trim() : symbol || contract
@@ -173,7 +319,8 @@ export function blockscoutTokens(chain: string, host: string, items: BlockscoutI
 			image: mediaUrl(item.thumbnails?.['500x500']) || mediaUrl(item.media_url) || mediaUrl(item.image_url) || mediaUrl(item.metadata?.image),
 			url: `https://${host}/token/${contract}/instance/${id}`,
 			count: Math.max(1, Number(item.value) || 1),
-			spam: looksLikeSpam(name, collection) || looksLikeSpam(symbol, ''), oat: isOat(name, collection),
+			spam: looksLikeSpam(name, collection, contract) || looksLikeSpam(symbol, '', contract),
+			oat: isOat(name, collection),
 		})
 	}
 	return out
@@ -203,17 +350,18 @@ const PUBLIC_RPC: Record<string, string> = {
 	Polygon: 'https://polygon-bor-rpc.publicnode.com',
 	Gnosis: 'https://rpc.gnosischain.com',
 	Robinhood: 'https://rpc.mainnet.chain.robinhood.com',
+	BNB: 'https://bsc-dataseed.binance.org',
 }
 
 // What the wallet asked for: the hashes of its own transactions, and everyone it sent one to.
-// ponytail: the newest 500 of each; an older purchase from a quiet seller may still read as a stranger's
-async function walletTrust(host: string, address: string, withOwn: boolean): Promise<{ own: Set<string>; peers: Set<string>; incoming: Map<string, { tx: string; from: string; time: string }> }> {
+// ponytail: the newest 1500 of each; an older purchase from a quiet seller may still read as a stranger's
+async function walletTrust(host: string, address: string, withOwn: boolean): Promise<{ own: Set<string>; peers: Set<string>; incoming: Map<string, { tx: string; from: string; time: string; block: string }> }> {
 	const own = new Set<string>()
 	const peers = new Set<string>()
-	const incoming = new Map<string, { tx: string; from: string; time: string }>()
+	const incoming = new Map<string, { tx: string; from: string; time: string; block: string }>()
 	const walk = async (path: string, take: (item: Record<string, unknown>) => void): Promise<void> => {
 		let next = ''
-		for (let page = 0; page < 10; page++) {
+		for (let page = 0; page < 30; page++) {
 			const data = await explorerJson(`https://${host}/api/v2/addresses/${address}/${path}${next}`) as { items?: Record<string, unknown>[]; next_page_params?: Record<string, unknown> | null } | null
 			if (!data || !Array.isArray(data.items)) return
 			data.items.forEach(take)
@@ -228,7 +376,8 @@ async function walletTrust(host: string, address: string, withOwn: boolean): Pro
 		const id = (item.total as { token_id?: unknown } | null)?.token_id
 		const tx = typeof item.transaction_hash === 'string' ? item.transaction_hash : typeof item.tx_hash === 'string' ? item.tx_hash : ''
 		const time = typeof item.timestamp === 'string' ? item.timestamp : ''
-		if (contract && typeof id === 'string' && !incoming.has(`${contract}:${id}`)) incoming.set(`${contract}:${id}`, { tx: tx.toLowerCase(), from: hashOf(item.from), time })
+		const block = typeof item.block_number === 'number' || typeof item.block_number === 'string' ? String(item.block_number) : ''
+		if (contract && typeof id === 'string' && !incoming.has(`${contract}:${id}`)) incoming.set(`${contract}:${id}`, { tx: tx.toLowerCase(), from: hashOf(item.from), time, block })
 	})
 	if (withOwn) {
 		await walk('transactions?filter=from', item => {
@@ -249,8 +398,9 @@ function hashOf(value: unknown): string {
 async function mintedAt(host: string, contract: string, id: string): Promise<string> {
 	const data = await explorerJson(`https://${host}/api/v2/tokens/${contract}/instances/${id}/transfers`) as { items?: Record<string, unknown>[]; next_page_params?: unknown } | null
 	const items = data?.items ?? []
-	const mint = items.find(item => /^0x0{40}$/i.test(hashOf(item.from))) ?? (data?.next_page_params ? undefined : items[items.length - 1])
-	return typeof mint?.timestamp === 'string' ? mint.timestamp : ''
+	const mint = items.find(item => !item.from || /^0x0{40}$/i.test(hashOf(item.from)) || item.type === 'token_minting' || item.type === 'token_spawning') ?? items[items.length - 1]
+	const ts = mint?.timestamp ?? mint?.block_timestamp ?? mint?.created_at
+	return typeof ts === 'string' || typeof ts === 'number' ? String(ts) : ''
 }
 
 async function blockscoutHeld(chain: string, host: string, address: string, known: (key: string) => KnownToken | undefined): Promise<NftRead> {
@@ -261,16 +411,26 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 		if (!data || !Array.isArray(data.items)) return { held, chains: [] }
 		held.push(...blockscoutTokens(chain, host, data.items))
 		if (!data.next_page_params) {
+			if (held.length === 0) return { held, chains: [chain] }
 			// a contract nobody verified is how airdrop spam ships: it goes with the spam
-			const verified = new Map<string, boolean>()
+			const verified = new Map<string, { unverified: boolean; spam: boolean }>()
 			for (const token of held) {
 				const contract = /\/token\/(0x[0-9a-fA-F]{40})\//.exec(token.url)?.[1] ?? ''
 				if (!contract || token.spam) continue
 				if (!verified.has(contract)) {
-					const info = await explorerJson(`https://${host}/api/v2/addresses/${contract}`) as { is_verified?: unknown } | null
-					verified.set(contract, info?.is_verified !== false)
+					const info = await explorerJson(`https://${host}/api/v2/addresses/${contract}`) as { is_verified?: unknown; is_scam?: unknown; is_phishing?: unknown; reputation?: unknown } | null
+					if (info) {
+						const rep = typeof info.reputation === 'string' ? info.reputation.toLowerCase() : ''
+						const isPhish = info.is_scam === true || info.is_phishing === true || rep === 'scam' || rep === 'phishing' || rep === 'spam'
+						const unverified = info.is_verified === false
+						verified.set(contract, { unverified, spam: isPhish || unverified })
+					} else {
+						verified.set(contract, { unverified: false, spam: false })
+					}
 				}
-				if (verified.get(contract) === false) token.spam = true
+				const v = verified.get(contract)
+				if (v?.spam) token.spam = true
+				if (v?.unverified) token.unverified = true
 			}
 			// a token the wallet asked for is not spam, whatever its name or contract says; the wallet's
 			// history is read only on a network where something looks like spam
@@ -279,7 +439,11 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 				const contract = (token.contract ?? '').toLowerCase()
 				const came = trust.incoming.get(`${contract}:${token.tokenId ?? ''}`)
 				if (came?.time) token.acquired = came.time
+				if (came) {
+					token.tx = { hash: came.tx, from: came.from, timeStamp: came.time, tokenId: token.tokenId, ...(came.block ? { blockNumber: came.block } : {}) }
+				}
 				if (!token.spam) continue
+				if (token.unverified) continue
 				token.trusted = trust.peers.has(contract) || (!!came && (trust.own.has(came.tx) || trust.peers.has(came.from)))
 				if (token.trusted) token.spam = false
 			}
@@ -288,6 +452,8 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 				if (token.spam || !token.contract || !token.tokenId) continue
 				const minted = known(token.key)?.minted
 				token.minted = minted || await mintedAt(host, token.contract, token.tokenId)
+				if (!token.acquired && token.minted) token.acquired = token.minted
+				if (!minted) await sleep(40)
 			}
 			// the token's own metadata from its tokenURI on the chain: the explorer's copy can predate a reveal.
 			// A URI the note already knows is not fetched again; spam is not worth the requests.
@@ -303,6 +469,7 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 				if (meta.image) token.image = meta.image
 				if (meta.name) token.name = meta.name
 				token.fresh = !!(meta.image || meta.name)
+				await sleep(40)
 			}
 			return { held, chains: [chain] }
 		}
@@ -311,10 +478,21 @@ async function blockscoutHeld(chain: string, host: string, address: string, know
 	return { held, chains: [] }
 }
 
-// BNB and Taiko: the transfers Etherscan lists, replayed into what the wallet holds now.
+// BNB, Taiko and Polygon: the transfers Etherscan lists, replayed into what the wallet holds now.
 const ETHERSCAN_CHAINS: Record<string, { id: number; rpc: string; site: string; nftscan?: string }> = {
 	BNB: { id: 56, rpc: 'https://bsc-dataseed.binance.org', site: 'bscscan.com', nftscan: 'bnb.nftscan.com' },
 	Taiko: { id: 167000, rpc: 'https://rpc.mainnet.taiko.xyz', site: 'taikoscan.io' },
+	Polygon: { id: 137, rpc: 'https://polygon-bor-rpc.publicnode.com', site: 'polygonscan.com', nftscan: 'polygon.nftscan.com' },
+}
+
+// Routescan answers Etherscan's calls for these networks, keyless.
+const ROUTESCAN_CHAINS: Record<string, { id: number; rpc: string; site: string }> = {
+	Avalanche: { id: 43114, rpc: 'https://api.avax.network/ext/bc/C/rpc', site: 'snowtrace.io' },
+	Blast: { id: 81457, rpc: 'https://rpc.blast.io', site: 'blastexplorer.io' },
+	Mantle: { id: 5000, rpc: 'https://rpc.mantle.xyz', site: 'mantlescan.xyz' },
+	Boba: { id: 288, rpc: 'https://mainnet.boba.network', site: 'bobascan.com' },
+	Hemi: { id: 43111, rpc: 'https://rpc.hemi.network/rpc', site: 'explorer.hemi.xyz' },
+	Chiliz: { id: 88888, rpc: 'https://rpc.chiliz.com', site: 'chiliscan.com' },
 }
 
 interface EtherscanTransfer {
@@ -324,19 +502,34 @@ interface EtherscanTransfer {
 	tokenID?: string
 	tokenName?: string
 	tokenValue?: string
+	hash?: string
+	blockNumber?: string
+	timeStamp?: string
 }
 
-export function replayTransfers(address: string, transfers: EtherscanTransfer[]): Array<{ contract: string; id: string; collection: string; count: number }> {
+export interface ReplayedTransfer {
+	contract: string
+	id: string
+	collection: string
+	count: number
+	tx?: NftTx
+}
+
+export function replayTransfers(address: string, transfers: EtherscanTransfer[]): ReplayedTransfer[] {
 	const me = address.toLowerCase()
-	const held = new Map<string, { contract: string; id: string; collection: string; count: number }>()
+	const held = new Map<string, ReplayedTransfer>()
 	for (const t of transfers) {
 		const contract = (t.contractAddress ?? '').toLowerCase()
 		const id = t.tokenID ?? ''
 		if (!contract || !id) continue
 		const key = `${contract}:${id}`
 		const amount = Math.max(1, Number(t.tokenValue) || 1)
-		const entry = held.get(key) ?? { contract, id, collection: t.tokenName || contract, count: 0 }
-		if ((t.to ?? '').toLowerCase() === me) entry.count += amount
+		const tx: NftTx | undefined = t.hash ? { hash: t.hash, from: t.from, to: t.to, blockNumber: t.blockNumber, timeStamp: t.timeStamp, tokenId: id } : undefined
+		const entry = held.get(key) ?? { contract, id, collection: t.tokenName || contract, count: 0, tx }
+		if ((t.to ?? '').toLowerCase() === me) {
+			entry.count += amount
+			if (tx) entry.tx = tx
+		}
 		if ((t.from ?? '').toLowerCase() === me) entry.count -= amount
 		held.set(key, entry)
 	}
@@ -399,21 +592,83 @@ async function tokenUri(rpc: string, contract: string, id: string): Promise<stri
 // The token's own name and picture from its metadata: an explorer's copy can be from before a reveal.
 async function tokenMeta(uri: string): Promise<{ name: string; image: string }> {
 	const metadata = uri ? await tokenMetadata(uri) : null
-	return { name: typeof metadata?.name === 'string' ? metadata.name.trim() : '', image: mediaUrl(metadata?.image) }
+	const img = metadata?.image || metadata?.image_data || metadata?.animation_url || metadata?.artifactUri || metadata?.displayUri || metadata?.thumbnail_url
+	let resolved = mediaUrl(img)
+	if (resolved && (/\.json(\?|$)/i.test(resolved) || resolved.startsWith('data:application/json'))) {
+		const sub = await tokenMetadata(resolved)
+		const subImg = sub?.image || sub?.image_data || sub?.animation_url || sub?.artifactUri || sub?.displayUri || sub?.thumbnail_url
+		if (subImg) resolved = mediaUrl(subImg)
+	}
+	return { name: typeof metadata?.name === 'string' ? metadata.name.trim() : '', image: resolved }
 }
 
 async function tokenImage(rpc: string, contract: string, id: string): Promise<string> {
 	return (await tokenMeta(await tokenUri(rpc, contract, id))).image
 }
 
-async function tokenMetadata(uri: string): Promise<{ image?: unknown; name?: unknown } | null> {
+export async function resolveMetadataImage(uri: string): Promise<string> {
+	if (!uri) return ''
+	if (/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(uri) || uri.startsWith('data:image/')) return mediaUrl(uri)
+	const meta = await tokenMetadata(uri)
+	if (meta) {
+		const img = meta.image || meta.image_data || meta.animation_url || meta.artifactUri || meta.displayUri || meta.thumbnail_url
+		if (img) {
+			let res = mediaUrl(img)
+			if (res && (/\.json(\?|$)/i.test(res) || res.startsWith('data:application/json'))) {
+				const sub = await tokenMetadata(res)
+				const subImg = sub?.image || sub?.image_data || sub?.animation_url || sub?.artifactUri || sub?.displayUri || sub?.thumbnail_url
+				if (subImg) res = mediaUrl(subImg)
+			}
+			return res
+		}
+	}
+	return mediaUrl(uri)
+}
+
+async function tokenMetadata(uri: string): Promise<{ image?: unknown; name?: unknown; image_data?: unknown; animation_url?: unknown; artifactUri?: unknown; displayUri?: unknown; thumbnail_url?: unknown } | null> {
 	const inline = /^data:application\/json(;base64)?,(.*)$/i.exec(uri)
 	try {
-		if (inline) return JSON.parse(inline[1] ? atob(inline[2] ?? '') : decodeURIComponent(inline[2] ?? '')) as { image?: unknown; name?: unknown }
+		if (inline) return JSON.parse(inline[1] ? atob(inline[2] ?? '') : decodeURIComponent(inline[2] ?? '')) as { image?: unknown; name?: unknown; image_data?: unknown; animation_url?: unknown; artifactUri?: unknown; displayUri?: unknown; thumbnail_url?: unknown }
+		const ipfsMatch = /^(?:ipfs:\/\/|https?:\/\/(?:[^/]+\/)?ipfs\/)(?:ipfs\/)?(.+)$/i.exec(uri)?.[1]
+		if (ipfsMatch) {
+			const path = ipfsMatch.replace(/^\/+/, '')
+			for (const gw of IPFS_GATEWAYS) {
+				const gwUrl = publicHttpsUrl(`${gw}${path}`)
+				if (!gwUrl) continue
+				try {
+					const answer = await requestUrl({ url: gwUrl, throw: false })
+					if (answer.status === 200) {
+						let parsed: Record<string, unknown> | null = (answer.json && typeof answer.json === 'object') ? (answer.json as Record<string, unknown>) : null
+						if (!parsed && answer.text) {
+							try {
+								parsed = JSON.parse(answer.text) as Record<string, unknown>
+							} catch {
+								// not json
+							}
+						}
+						if (parsed) return parsed
+					}
+				} catch {
+					// next gateway
+				}
+			}
+			return null
+		}
 		const url = mediaUrl(uri)
 		if (!url) return null
 		const answer = await requestUrl({ url, throw: false })
-		return answer.status === 200 ? answer.json as { image?: unknown; name?: unknown } : null
+		if (answer.status === 200) {
+			let parsed: Record<string, unknown> | null = (answer.json && typeof answer.json === 'object') ? (answer.json as Record<string, unknown>) : null
+			if (!parsed && answer.text) {
+				try {
+					parsed = JSON.parse(answer.text) as Record<string, unknown>
+				} catch {
+					// not json
+				}
+			}
+			return parsed
+		}
+		return null
 	} catch {
 		return null
 	}
@@ -422,10 +677,41 @@ async function tokenMetadata(uri: string): Promise<{ image?: unknown; name?: unk
 async function etherscanHeld(chain: string, address: string, key: string): Promise<NftRead> {
 	const info = ETHERSCAN_CHAINS[chain]
 	if (!info) return { held: [], chains: [] }
+	return transfersHeld(chain, info, address, action => `https://api.etherscan.io/v2/api?chainid=${String(info.id)}&module=account&action=${action}&address=${address}&startblock=0&endblock=999999999&sort=asc&apikey=${encodeURIComponent(key)}`)
+}
+
+// Networks where Routescan sees a wallet's NFTs; null when it could not say, and every network is read.
+async function routescanActive(address: string): Promise<Set<string> | null> {
+	const chains = new Set<string>()
+	try {
+		for (const kind of ['erc721-holdings', 'erc1155-holdings']) {
+			let path = `/v2/network/mainnet/evm/all/address/${address}/${kind}?limit=100`
+			for (let page = 0; page < 20 && path; page++) {
+				const resp = await requestUrl({ url: `https://api.routescan.io${path}`, throw: false })
+				if (resp.status !== 200) return null
+				const data = resp.json as { items?: { chainId?: unknown }[]; link?: { next?: unknown } }
+				for (const item of data.items ?? []) if (typeof item.chainId === 'string') chains.add(item.chainId)
+				path = typeof data.link?.next === 'string' ? data.link.next : ''
+			}
+		}
+		return chains
+	} catch {
+		return null
+	}
+}
+
+function routescanHeld(chain: string, address: string): Promise<NftRead> {
+	const info = ROUTESCAN_CHAINS[chain]
+	if (!info) return Promise.resolve({ held: [], chains: [] })
+	return transfersHeld(chain, info, address, action =>
+		`https://api.routescan.io/v2/network/mainnet/evm/${String(info.id)}/etherscan/api?module=account&action=${action}&address=${address}&page=1&offset=10000&sort=asc`)
+}
+
+async function transfersHeld(chain: string, info: { rpc: string; site: string }, address: string, url: (action: string) => string): Promise<NftRead> {
 	const transfers: EtherscanTransfer[] = []
 	for (const action of ['tokennfttx', 'token1155tx']) {
 		try {
-			const answer = await requestUrl({ url: `https://api.etherscan.io/v2/api?chainid=${String(info.id)}&module=account&action=${action}&address=${address}&startblock=0&endblock=999999999&sort=asc&apikey=${encodeURIComponent(key)}`, throw: false })
+			const answer = await requestUrl({ url: url(action), throw: false })
 			const data = answer.json as { message?: string; result?: unknown }
 			if (Array.isArray(data.result)) transfers.push(...data.result as EtherscanTransfer[])
 			else if (data.message !== 'No transactions found') return { held: [], chains: [] }
@@ -444,6 +730,8 @@ async function etherscanHeld(chain: string, address: string, key: string): Promi
 			image: await tokenImage(info.rpc, token.contract, token.id),
 			url: `https://${info.site}/nft/${token.contract}/${token.id}`,
 			count: token.count,
+			contract: token.contract,
+			tx: token.tx,
 			spam: looksLikeSpam(token.collection, token.collection), oat: isOat(token.collection, token.collection),
 		})
 	}
@@ -451,7 +739,7 @@ async function etherscanHeld(chain: string, address: string, key: string): Promi
 }
 
 // Runs inside the explorer's NFT transfers page: its table, 100 rows a page, every page.
-const TRANSFERS_PAGE = "(async () => {\n\tconst sleep = (ms) => new Promise((r) => setTimeout(r, ms))\n\tconst ready = () => window.jQuery && jQuery.fn.dataTable && jQuery.fn.dataTable.isDataTable('#datatable') && document.querySelector('#datatable tbody tr a[href*=\"/nft/\"]')\n\tfor (let i = 0; i < 60 && !ready(); i++) await sleep(500)\n\tif (!ready()) return ''\n\tconst dt = jQuery('#datatable').DataTable()\n\tconst rows = []\n\tconst grab = () => {\n\t\tfor (const tr of document.querySelectorAll('#datatable tbody tr')) {\n\t\t\tconst link = [...tr.querySelectorAll('a[href*=\"/nft/\"]')].pop()\n\t\t\tconst m = link && /\\/nft\\/(0x[0-9a-fA-F]{40})\\/(\\d+)/.exec(link.getAttribute('href') || '')\n\t\t\tif (!m) continue\n\t\t\tconst cells = [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim())\n\t\t\trows.push({ contract: m[1].toLowerCase(), id: m[2], dir: cells.find((t) => /^(IN|OUT|SELF)$/.test(t)) || '', link: link.innerText.trim(), type: cells.find((t) => /-(721|1155)$/.test(t)) || '' })\n\t\t}\n\t}\n\tconst page = (fn) => new Promise((resolve) => { dt.one('draw', () => resolve()); fn(); setTimeout(resolve, 20000) })\n\tawait page(() => dt.page.len(100).draw('page'))\n\tconst pages = dt.page.info().pages\n\tfor (let p = 0; p < pages && p < 40; p++) {\n\t\tif (p > 0) await page(() => dt.page(p).draw('page'))\n\t\tgrab()\n\t}\n\treturn JSON.stringify(pages <= 40 ? rows : null)\n})()"
+const TRANSFERS_PAGE = "(async () => {\n\tconst sleep = (ms) => new Promise((r) => setTimeout(r, ms))\n\tconst ready = () => window.jQuery && jQuery.fn.dataTable && jQuery.fn.dataTable.isDataTable('#datatable') && document.querySelector('#datatable tbody tr a[href*=\"/nft/\"]')\n\tfor (let i = 0; i < 60 && !ready(); i++) await sleep(500)\n\tif (!ready()) return ''\n\tconst dt = jQuery('#datatable').DataTable()\n\tconst rows = []\n\tconst grab = () => {\n\t\tfor (const tr of document.querySelectorAll('#datatable tbody tr')) {\n\t\t\tconst link = [...tr.querySelectorAll('a[href*=\"/nft/\"]')].pop()\n\t\t\tconst m = link && /\\/nft\\/(0x[0-9a-fA-F]{40})\\/(\\d+)/.exec(link.getAttribute('href') || '')\n\t\t\tif (!m) continue\n\t\t\tconst cells = [...tr.cells].map((c) => c.innerText.replace(/\\s+/g, ' ').trim())\n\t\t\tconst isScam = /phish|phishing|scam|fake|drainer/i.test(tr.innerText) || /phish|scam/i.test(link.getAttribute('href') || '')\n\t\t\tconst timeEl = tr.querySelector('.showDate span, .showDate, .showLocalDateNFT span, .showLocalDateNFT, [data-bs-title], [title]')\n\t\t\tconst time = timeEl ? ((timeEl.textContent || '').trim() || timeEl.getAttribute('data-bs-title') || timeEl.getAttribute('title') || '') : ''\n\t\t\tconst txEl = tr.querySelector('a[href*=\"tx/0x\"], a[href*=\"/tx/\"]')\n\t\t\tconst hash = txEl ? (txEl.getAttribute('href') || '').replace(/^.*tx\\//, '').split('?')[0].split('#')[0] : ''\n\t\t\tconst fromEl = tr.querySelector('a[href*=\"address/0x\"], a[href*=\"/address/\"]')\n\t\t\tconst from = fromEl ? (fromEl.getAttribute('href') || '').replace(/^.*address\\//, '').split('?')[0].split('#')[0] : ''\n\t\t\tconst blockEl = tr.querySelector('a[href*=\"block/\"], a[href*=\"/block/\"]')\n\t\t\tconst block = blockEl ? blockEl.innerText.trim() : ''\n\t\t\tconst imgEl = tr.querySelector('img[src*=\"assetquay.com\"], img[src*=\"nftimagebucket\"], img[src*=\"seadn.io/matic/\"], img[src*=\"seadn.io/files/\"], img[src*=\"/ipfs/\"], img[src*=\"arweave\"]')\n\t\t\tconst rawSrc = imgEl ? (imgEl.getAttribute('src') || '') : ''\n\t\t\tconst image = /boredapeyachtclub|1a09c26b1c30427b26944c47fc7bb9/i.test(rawSrc) ? '' : rawSrc\n\t\t\trows.push({ contract: m[1].toLowerCase(), id: m[2], dir: cells.find((t) => /^(IN|OUT|SELF)$/.test(t)) || '', link: link.innerText.trim(), type: cells.find((t) => /-(721|1155)$/.test(t)) || '', time, hash, from, block, image, isScam })\n\t\t}\n\t}\n\tconst page = (fn) => new Promise((resolve) => { dt.one('draw', () => resolve()); fn(); setTimeout(resolve, 20000) })\n\tawait page(() => dt.page.len(100).draw('page'))\n\tconst pages = dt.page.info().pages\n\tfor (let p = 0; p < pages && p < 40; p++) {\n\t\tif (p > 0) await page(() => dt.page(p).draw('page'))\n\t\tgrab()\n\t}\n\treturn JSON.stringify(pages <= 40 ? rows : null)\n})()"
 
 interface PageTransfer {
 	contract?: string
@@ -459,28 +747,74 @@ interface PageTransfer {
 	dir?: string
 	link?: string
 	type?: string
+	time?: string
+	hash?: string
+	from?: string
+	block?: string
+	image?: string
+	isScam?: boolean
+}
+
+export function decodeHtmlEntities(str: string): string {
+	return str
+		.replace(/&amp;#?39;|&quot;|&#39;|&apos;/g, "'")
+		.replace(/&amp;quot;/g, '"')
+		.replace(/&amp;amp;/g, '&')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&#(\d+);?/g, (_, code: string) => String.fromCharCode(Number(code)))
 }
 
 // The transfers page's rows replayed: what came in and did not go out again.
 export function pageHeld(chain: string, site: string, rows: PageTransfer[]): Array<HeldNft & { contract: string; id: string }> {
-	const net = new Map<string, { contract: string; id: string; count: number; link: string }>()
+	const net = new Map<string, { contract: string; id: string; count: number; link: string; time?: string; tx?: NftTx; image?: string; isScam?: boolean }>()
 	const types = new Map<string, string>()
 	for (const row of rows) {
 		if (!row.contract || !row.id || (row.dir !== 'IN' && row.dir !== 'OUT')) continue
 		const key = `${row.contract}:${row.id}`
 		if (row.type) types.set(key, row.type)
-		const entry = net.get(key) ?? { contract: row.contract, id: row.id, count: 0, link: row.link ?? '' }
+		const entry = net.get(key) ?? { contract: row.contract, id: row.id, count: 0, link: row.link ?? '', time: row.time, isScam: row.isScam }
 		entry.count += row.dir === 'IN' ? 1 : -1
+		if (row.isScam) entry.isScam = true
+		if (row.dir === 'IN' && row.hash) {
+			entry.tx = {
+				hash: row.hash.startsWith('http') ? row.hash : `https://${site}/tx/${row.hash}`,
+				from: row.from ? row.from.replace(/#.*$/, '') : '',
+				blockNumber: row.block || '',
+				timeStamp: row.time || '',
+				tokenId: row.id || ''
+			}
+		}
+		if (row.image && !entry.image) entry.image = row.image
+		if (row.time && (!entry.time || parseDate(row.time) > parseDate(entry.time))) entry.time = row.time
 		net.set(key, entry)
 	}
 	const out: Array<HeldNft & { contract: string; id: string }> = []
-	for (const { contract, id, count, link } of net.values()) {
+	for (const { contract, id, count, link, time, tx, image, isScam } of net.values()) {
 		if (count <= 0) continue
 		// the explorer's "NFT:" label is not part of the name
-		const [first = '', second = ''] = link.replace(/&#(\d+);/g, (_, code: string) => String.fromCharCode(Number(code))).split('\n').map(line => line.trim().replace(/^NFT:\s*/, ''))
+		const [first = '', second = ''] = decodeHtmlEntities(link).split('\n').map(line => line.trim().replace(/^NFT:\s*/, ''))
 		const collection = second || first || contract
 		const name = first && first.indexOf(id) >= 0 ? first : `${first || collection} #${id}`
-		out.push({ key: nftKey(chain, contract, id), chain, collection, name, image: '', url: `https://${site}/nft/${contract}/${id}`, count, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), contract, id, tokenId: id, standard: types.get(`${contract}:${id}`) ?? '' })
+		out.push({
+			key: nftKey(chain, contract, id),
+			chain,
+			collection,
+			name,
+			image: image || '',
+			url: `https://${site}/nft/${contract}/${id}`,
+			count,
+			spam: isScam === true || looksLikeSpam(name, collection, contract),
+			oat: isOat(name, collection),
+			contract,
+			id,
+			tokenId: id,
+			standard: types.get(`${contract}:${id}`) ?? '',
+			acquired: time,
+			minted: time,
+			tx
+		})
 	}
 	return out
 }
@@ -556,7 +890,7 @@ export function tonTokens(items: TonItem[]): HeldNft[] {
 		const collection = typeof item.collection?.name === 'string' && item.collection.name.trim() ? item.collection.name.trim() : 'TON'
 		const name = typeof item.metadata?.name === 'string' && item.metadata.name.trim() ? item.metadata.name.trim() : collection
 		const preview = (item.previews ?? []).find(p => p.resolution === '500x500')?.url
-		out.push({ key: nftKey('TON', address), chain: 'TON', collection, name, contract: typeof item.collection?.address === 'string' ? item.collection.address : '', image: mediaUrl(preview) || mediaUrl(item.metadata?.image), url: `https://tonviewer.com/${address}`, count: 1, spam: looksLikeSpam(name, collection), oat: isOat(name, collection), standard: 'TEP-62', tokenId: address })
+		out.push({ key: nftKey('TON', address), chain: 'TON', collection, name, contract: typeof item.collection?.address === 'string' ? item.collection.address : '', image: mediaUrl(preview) || mediaUrl(item.metadata?.image), url: `https://tonviewer.com/${address}`, count: 1, spam: looksLikeSpam(name, collection) || item.trust === 'graylist', oat: isOat(name, collection), standard: 'TEP-62', tokenId: address })
 	}
 	return out
 }
@@ -648,49 +982,801 @@ async function solanaHeld(address: string): Promise<NftRead> {
 }
 
 // The networks a wallet list can name; "EVM" stands for every EVM network at once.
-export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko', 'Gnosis', 'Celo', 'zkSync', 'Scroll', 'Ink', 'Soneium', 'Unichain', 'Mode', 'Arbitrum Nova', 'Shape', 'Robinhood']
-export const WALLET_FIELDS = ['EVM', 'TON', 'Solana']
+export const EVM_NETWORKS = ['Ethereum', 'Optimism', 'Base', 'Arbitrum', 'Polygon', 'BNB', 'Taiko', 'Gnosis', 'Celo', 'zkSync', 'Scroll', 'Ink', 'Soneium', 'Unichain', 'Mode', 'Arbitrum Nova', 'Shape', 'Robinhood', 'Lisk', 'World Chain', 'Metis', 'Rootstock', 'ApeChain', 'Avalanche', 'Blast', 'Mantle', 'Boba', 'Hemi', 'Chiliz']
+export const WALLET_FIELD = 'Wallets'
 
 export interface WalletPair {
 	chain: string
 	address: string
 }
 
-// The "EVM" field's addresses on every EVM network, TON and Solana on their own.
+// One list of addresses: each kind is read on its networks, an EVM address on every EVM network.
 export function walletPairs(fields: Record<string, string>): WalletPair[] {
 	const out: WalletPair[] = []
-	const add = (chain: string, text: string | undefined, kind: WalletKind): void => {
-		for (const wallet of parseWallets(text ?? '')) {
-			if (wallet.kind === kind && !out.some(p => p.chain === chain && p.address.toLowerCase() === wallet.address.toLowerCase())) out.push({ chain, address: wallet.address })
+	const single: Partial<Record<WalletKind, string>> = { ton: 'TON', solana: 'Solana', near: 'NEAR', tezos: 'Tezos' }
+	for (const wallet of parseWallets(Object.keys(fields).map(key => fields[key]).join('\n'))) {
+		const chains = wallet.kind === 'evm' ? EVM_NETWORKS : [single[wallet.kind] ?? '']
+		for (const chain of chains) {
+			if (chain && !out.some(p => p.chain === chain && p.address.toLowerCase() === wallet.address.toLowerCase())) out.push({ chain, address: wallet.address })
 		}
 	}
-	for (const chain of EVM_NETWORKS) {
-		add(chain, fields.EVM, 'evm')
-	}
-	add('TON', fields.TON, 'ton')
-	add('Solana', fields.Solana, 'solana')
 	return out
+}
+
+export function explorerSite(chain: string): string {
+	if (chain === 'Ethereum') return 'etherscan.io'
+	if (chain === 'Optimism') return 'optimistic.etherscan.io'
+	if (chain === 'Base') return 'basescan.org'
+	if (chain === 'Arbitrum') return 'arbiscan.io'
+	if (chain === 'Polygon') return 'polygonscan.com'
+	if (chain === 'BNB') return 'bscscan.com'
+	if (chain === 'Taiko') return 'taikoscan.io'
+	if (chain === 'zkSync') return 'era.zksync.network'
+	if (chain === 'Scroll') return 'scrollscan.com'
+	if (chain === 'Solana') return 'solscan.io'
+	if (chain === 'TON') return 'tonviewer.com'
+	if (chain === 'NEAR') return 'nearblocks.io'
+	if (chain === 'Tezos') return 'tzkt.io'
+	return ROUTESCAN_CHAINS[chain]?.site || BLOCKSCOUT[chain] || 'etherscan.io'
+}
+
+export function explorerContractUrl(chain: string, contract: string): string {
+	const host = explorerSite(chain)
+	if (chain === 'TON' || chain === 'Tezos') return `https://${host}/${contract}`
+	if (chain === 'Solana') return `https://${host}/account/${contract}`
+	if (chain === 'NEAR') return `https://${host}/nft-tokens/${contract}`
+	return `https://${host}/token/${contract}`
+}
+
+export function explorerTokenUrl(chain: string, contract: string, tokenId: string): string {
+	const host = explorerSite(chain)
+	if (chain === 'TON') return `https://${host}/${tokenId || contract}`
+	if (chain === 'Solana') return `https://${host}/token/${tokenId || contract}`
+	if (chain === 'NEAR') return `https://${host}/nft-tokens/${contract}/tokens/${tokenId}`
+	if (chain === 'Tezos') return `https://${host}/${contract}/tokens/${tokenId}`
+	if (BLOCKSCOUT[chain] === host) {
+		return `https://${host}/token/${contract}/instance/${tokenId}`
+	}
+	return `https://${host}/nft/${contract}/${tokenId}`
+}
+
+export function explorerAddressUrl(chain: string, address: string): string {
+	return `https://${explorerSite(chain)}/address/${address}`
+}
+
+export function explorerTxUrl(chain: string, hash: string): string {
+	if (/^https?:\/\//i.test(hash)) return hash
+	const host = explorerSite(chain)
+	if (chain === 'TON') return `https://${host}/transaction/${hash}`
+	if (chain === 'NEAR') return `https://${host}/txns/${hash}`
+	if (chain === 'Tezos') return `https://${host}/${hash}`
+	return `https://${host}/tx/${hash}`
+}
+
+export function explorerBlockUrl(chain: string, block: string): string {
+	const host = explorerSite(chain)
+	const clean = block.replace(/^.*\/block(?:s)?\//i, '').trim()
+	if (!clean || clean === '-') return ''
+	if (chain === 'NEAR') return `https://${host}/blocks/${clean}`
+	return `https://${host}/block/${clean}`
+}
+
+export interface OpenSeaContractInfo {
+	name?: string
+	description?: string
+	imageUrl?: string
+	bannerImageUrl?: string
+}
+
+export const OPENSEA_CHAINS: Record<string, string> = {
+	Ethereum: 'ethereum',
+	Polygon: 'matic',
+	Arbitrum: 'arbitrum',
+	Optimism: 'optimism',
+	Base: 'base',
+	BNB: 'bsc',
+	zkSync: 'zksync',
+	Avalanche: 'avalanche',
+	Solana: 'solana',
+	Blast: 'blast',
+	ApeChain: 'ape_chain',
+	Shape: 'shape',
+	Unichain: 'unichain',
+	Soneium: 'soneium',
+	Robinhood: 'robinhood',
+}
+
+const creatorOnPage = (html: string): string => /Contract Creator[\s\S]{0,800}?href=['"]\/address\/(0x[0-9a-fA-F]{40})/i.exec(html)?.[1] ?? ''
+
+// Who deployed a contract: the explorer's own answer.
+export async function contractCreator(chain: string, contract: string, etherscanKey = ''): Promise<string> {
+	const clean = (value: unknown): string => typeof value === 'string' && /^0x[0-9a-fA-F]{40}$/.test(value) ? value : ''
+	try {
+		const host = BLOCKSCOUT[chain]
+		if (host) {
+			return clean((await explorerJson(`https://${host}/api/v2/addresses/${contract}`) as { creator_address_hash?: unknown } | null)?.creator_address_hash)
+		}
+		const routescan = ROUTESCAN_CHAINS[chain]
+		const etherscan = ETHERSCAN_CHAINS[chain]
+		// without a key the explorer's own page says it; a page behind a challenge opens in the hidden browser
+		if (etherscan && !etherscanKey) {
+			const page = `https://${etherscan.site}/address/${contract}`
+			const plain = await requestUrl({ url: page, throw: false })
+			return creatorOnPage(plain.status === 200 ? plain.text : await readPage(page, 'new XMLSerializer().serializeToString(document)', 30000, "!!document.querySelector('h4')"))
+		}
+		const url = routescan ? `https://api.routescan.io/v2/network/mainnet/evm/${String(routescan.id)}/etherscan/api?module=contract&action=getcontractcreation&contractaddresses=${contract}`
+			: etherscan && etherscanKey ? `https://api.etherscan.io/v2/api?chainid=${String(etherscan.id)}&module=contract&action=getcontractcreation&contractaddresses=${contract}&apikey=${encodeURIComponent(etherscanKey)}` : ''
+		if (!url) return ''
+		const resp = await requestUrl({ url, throw: false })
+		const rows = resp.status === 200 ? (resp.json as { result?: unknown }).result : null
+		return Array.isArray(rows) ? clean((rows[0] as { contractCreator?: unknown } | undefined)?.contractCreator) : ''
+	} catch {
+		return ''
+	}
+}
+
+interface OpenSeaCollection {
+	opensea_url?: unknown
+	project_url?: unknown
+	wiki_url?: unknown
+	discord_url?: unknown
+	telegram_url?: unknown
+	twitter_username?: unknown
+	instagram_username?: unknown
+	owner?: unknown
+}
+
+interface OpenSeaAccount {
+	website?: unknown
+	social_media_accounts?: { platform?: unknown; username?: unknown }[]
+}
+
+const handleUrl = (site: string, handle: unknown): string => typeof handle === 'string' && handle.trim() ? `https://${site}/${handle.trim().replace(/^@/, '')}` : ''
+
+export function projectLinks(collection: OpenSeaCollection, account: OpenSeaAccount | null = null): string[] {
+	const social = (platform: string): unknown => account?.social_media_accounts?.find(item => item.platform === platform)?.username
+	const raw = [
+		collection.project_url, account?.website, handleUrl('x.com', collection.twitter_username) || handleUrl('x.com', social('twitter')),
+		collection.discord_url, collection.telegram_url, handleUrl('instagram.com', collection.instagram_username) || handleUrl('instagram.com', social('instagram')),
+		collection.wiki_url, collection.opensea_url,
+	]
+	const out: string[] = []
+	for (const value of raw) {
+		const url = typeof value === 'string' ? publicHttpsUrl(value.replace(/^http:/i, 'https:')) ?? '' : ''
+		if (url && out.indexOf(url) < 0) out.push(url)
+	}
+	return out
+}
+
+// A collection's site and socials from OpenSea, keyless; with a key the creator's own profile adds to them.
+export async function openseaLinks(chain: string, contract: string, apiKey = ''): Promise<string[]> {
+	const osChain = OPENSEA_CHAINS[chain]
+	if (!osChain) return []
+	const headers: Record<string, string> = { accept: 'application/json', ...(apiKey ? { 'x-api-key': apiKey } : {}) }
+	const read = async <T>(path: string): Promise<T | null> => {
+		const resp = await requestUrl({ url: `https://api.opensea.io/api/v2/${path}`, headers, throw: false })
+		return resp.status === 200 ? resp.json as T : null
+	}
+	try {
+		const slug = (await read<{ collection?: unknown }>(`chain/${osChain}/contract/${contract.toLowerCase()}`))?.collection
+		if (typeof slug !== 'string' || !slug) return []
+		const collection = await read<OpenSeaCollection>(`collections/${encodeURIComponent(slug)}`)
+		if (!collection) return []
+		const owner = typeof collection.owner === 'string' ? collection.owner : ''
+		return projectLinks(collection, apiKey && owner ? await read<OpenSeaAccount>(`accounts/${owner}`) : null)
+	} catch {
+		return []
+	}
+}
+
+export async function openseaContract(chain: string, contract: string, apiKey?: string): Promise<OpenSeaContractInfo | null> {
+	if (!apiKey || !contract) return null
+	const osChain = OPENSEA_CHAINS[chain]
+	if (!osChain) return null
+	try {
+		const res = await requestUrl({
+			url: `https://api.opensea.io/api/v2/chain/${osChain}/contract/${contract.toLowerCase()}`,
+			headers: { 'x-api-key': apiKey, 'accept': 'application/json' },
+			throw: false,
+		})
+		if (res.status !== 200 || !res.json) return null
+		const data = res.json as { name?: string; description?: string; image_url?: string; banner_image_url?: string; collection?: string }
+		let name = typeof data.name === 'string' ? data.name : undefined
+		let imageUrl = mediaUrl(data.image_url)
+		let bannerImageUrl = mediaUrl(data.banner_image_url)
+		let description = typeof data.description === 'string' ? data.description : undefined
+
+		if ((!imageUrl || !name) && typeof data.collection === 'string' && data.collection) {
+			try {
+				const colRes = await requestUrl({
+					url: `https://api.opensea.io/api/v2/collections/${data.collection}`,
+					headers: { 'x-api-key': apiKey, 'accept': 'application/json' },
+					throw: false,
+				})
+				if (colRes.status === 200 && colRes.json) {
+					const col = colRes.json as { name?: string; description?: string; image_url?: string; banner_image_url?: string }
+					if (!name && typeof col.name === 'string') name = col.name
+					if (!imageUrl && col.image_url) imageUrl = mediaUrl(col.image_url)
+					if (!bannerImageUrl && col.banner_image_url) bannerImageUrl = mediaUrl(col.banner_image_url)
+					if (!description && typeof col.description === 'string') description = col.description
+				}
+			} catch {
+				// ignore
+			}
+		}
+
+		return {
+			name,
+			description,
+			imageUrl,
+			bannerImageUrl,
+		}
+	} catch {
+		return null
+	}
+}
+
+export async function openseaNftImage(chain: string, contract: string, tokenId: string, apiKey?: string): Promise<string> {
+	if (!apiKey || !contract || !tokenId) return ''
+	const osChain = OPENSEA_CHAINS[chain]
+	if (!osChain) return ''
+	try {
+		const res = await requestUrl({
+			url: `https://api.opensea.io/api/v2/chain/${osChain}/contract/${contract.toLowerCase()}/nfts/${tokenId}`,
+			headers: { 'x-api-key': apiKey, 'accept': 'application/json' },
+			throw: false,
+		})
+		if (res.status !== 200 || !res.json) return ''
+		const nft = (res.json as { nft?: { image_url?: string; display_image_url?: string; display_animation_url?: string; animation_url?: string; original_image_url?: string } }).nft
+		return mediaUrl(nft?.display_image_url) || mediaUrl(nft?.image_url) || mediaUrl(nft?.display_animation_url) || mediaUrl(nft?.animation_url) || mediaUrl(nft?.original_image_url) || ''
+	} catch {
+		return ''
+	}
+}
+
+export async function openseaAccountHeld(chain: string, address: string, apiKey: string): Promise<HeldNft[]> {
+	const osChain = OPENSEA_CHAINS[chain]
+	if (!osChain || !apiKey || !address) return []
+	const out: HeldNft[] = []
+	try {
+		const res = await requestUrl({
+			url: `https://api.opensea.io/api/v2/chain/${osChain}/account/${address.toLowerCase()}/nfts?limit=50&include_auto_hidden=true`,
+			headers: { 'x-api-key': apiKey, 'accept': 'application/json' },
+			throw: false,
+		})
+		if (res.status !== 200 || !res.json) return []
+		const nfts = (res.json as { nfts?: Array<Record<string, unknown>> }).nfts
+		if (!Array.isArray(nfts)) return []
+		for (const nft of nfts) {
+			const contract = typeof nft.contract === 'string' ? nft.contract : ''
+			const id = typeof nft.identifier === 'string' ? nft.identifier : ''
+			const name = typeof nft.name === 'string' ? nft.name : ''
+			const col = typeof nft.collection === 'string' ? nft.collection : ''
+			const img = mediaUrl(nft.display_image_url) || mediaUrl(nft.image_url) || mediaUrl(nft.original_image_url)
+			const standard = typeof nft.token_standard === 'string' ? nft.token_standard.toUpperCase() : undefined
+			let minted: string | undefined
+			const traits = Array.isArray(nft.traits) ? nft.traits : []
+			for (const tr of traits) {
+				if (typeof tr === 'object' && tr !== null) {
+					const rec = tr as Record<string, unknown>
+					if (rec.trait_type === 'birthday' || rec.trait_type === 'Minted') {
+						const ts = Number(rec.value)
+						if (!isNaN(ts) && ts > 0) minted = dmyOf(new Date(ts * 1000).toISOString())
+					}
+				}
+			}
+			out.push({
+				key: `${chain}:${contract}:${id}`,
+				chain,
+				contract,
+				tokenId: id,
+				name: name || (col ? `${col} #${id}` : id),
+				collection: col || contract,
+				image: img,
+				url: typeof nft.opensea_url === 'string' ? nft.opensea_url : `https://opensea.io/assets/${osChain}/${contract}/${id}`,
+				count: 1,
+				spam: nft.is_suspicious === true,
+				oat: isOat(name, col),
+				standard,
+				minted,
+			})
+		}
+	} catch {
+		// ignore
+	}
+	return out
+}
+
+export async function nearHeld(address: string): Promise<NftRead> {
+	const held: HeldNft[] = []
+	try {
+		const contracts: Array<{ contract: string; name?: string; icon?: string }> = []
+		try {
+			const res = await requestUrl({
+				url: `https://api.nearblocks.io/v1/account/${address}/inventory`,
+				headers: { accept: 'application/json' },
+				throw: false,
+			})
+			if (res.status === 200 && res.json) {
+				const nfts = (res.json as { inventory?: { nfts?: Array<{ contract?: string; nft_meta?: { name?: string; icon?: string } }> } }).inventory?.nfts
+				if (Array.isArray(nfts)) {
+					for (const n of nfts) {
+						if (n.contract) {
+							contracts.push({
+								contract: n.contract,
+								name: n.nft_meta?.name,
+								icon: mediaUrl(n.nft_meta?.icon),
+							})
+						}
+					}
+				}
+			}
+		} catch {
+			// ignore
+		}
+
+		if (contracts.length === 0) {
+			try {
+				const res = await requestUrl({
+					url: `https://api.fastnear.com/v1/account/${address}/nft`,
+					headers: { accept: 'application/json' },
+					throw: false,
+				})
+				if (res.status === 200 && res.json) {
+					const tokens = (res.json as { tokens?: Array<{ contract_id?: string }> }).tokens
+					if (Array.isArray(tokens)) {
+						for (const t of tokens) {
+							if (t.contract_id && !contracts.some(c => c.contract === t.contract_id)) {
+								contracts.push({ contract: t.contract_id })
+							}
+						}
+					}
+				}
+			} catch {
+				// ignore
+			}
+		}
+
+		for (const { contract, name: colName, icon: colIcon } of contracts) {
+			try {
+				const args = btoa(JSON.stringify({ account_id: address }))
+				const rpcRes = await requestUrl({
+					url: 'https://rpc.mainnet.near.org',
+					method: 'POST',
+					headers: { 'content-type': 'application/json' },
+					body: JSON.stringify({
+						jsonrpc: '2.0',
+						id: 'library-nft',
+						method: 'query',
+						params: {
+							request_type: 'call_function',
+							finality: 'final',
+							account_id: contract,
+							method_name: 'nft_tokens_for_owner',
+							args_base64: args,
+						},
+					}),
+					throw: false,
+				})
+				if (rpcRes.status === 200 && rpcRes.json) {
+					const bytes = (rpcRes.json as { result?: { result?: number[] } }).result?.result
+					if (Array.isArray(bytes)) {
+						const decoded = JSON.parse(new TextDecoder().decode(new Uint8Array(bytes))) as Array<{
+							token_id?: string
+							metadata?: {
+								title?: string
+								description?: string
+								media?: string
+								issued_at?: number | string
+							}
+						}>
+						if (Array.isArray(decoded)) {
+							for (const tok of decoded) {
+								const id = tok.token_id ?? ''
+								const title = tok.metadata?.title || (colName ? `${colName} #${id}` : id)
+								const image = mediaUrl(tok.metadata?.media) || colIcon || ''
+								let minted: string | undefined
+								if (tok.metadata?.issued_at) {
+									const ms = Number(tok.metadata.issued_at)
+									if (!isNaN(ms) && ms > 0) {
+										const timestamp = ms > 1e15 ? Math.floor(ms / 1e6) : (ms > 1e11 ? ms : ms * 1000)
+										minted = dmyOf(new Date(timestamp).toISOString())
+									}
+								}
+								held.push({
+									key: `NEAR:${contract}:${id}`,
+									chain: 'NEAR',
+									contract,
+									tokenId: id,
+									name: title,
+									collection: colName || contract,
+									image,
+									url: `https://nearblocks.io/nft-tokens/${contract}/tokens/${id}`,
+									count: 1,
+									spam: false,
+									oat: false,
+									standard: 'NEP-171',
+									minted,
+								})
+							}
+						}
+					}
+				}
+			} catch {
+				// ignore
+			}
+		}
+	} catch {
+		// ignore
+	}
+	return { held, chains: ['NEAR'] }
+}
+
+export function cleanCollectionName(raw: string, creator = '', tokenId = ''): string {
+	if (creator) {
+		let clean = creator.replace(/[[\]]/g, '').trim()
+		if (clean.indexOf('|') >= 0) clean = clean.split('|').pop()?.trim() || clean
+		clean = clean.replace(/\.canvas$/, '').trim()
+		clean = decodeHtmlEntities(clean)
+		clean = clean.replace(/[\s\-_.:#]+$/, '').trim()
+		if (clean && !clean.startsWith('0x')) {
+			if (/^quest3(?:nft)?$/i.test(clean)) return 'Quest3NFT'
+			return clean
+		}
+	}
+	let name = raw.replace(/\.md$/, '').replace(/\s*\(\d+\)$/, '').trim()
+	if (name.indexOf('|') >= 0) name = name.split('|').pop()?.trim() || name
+	name = decodeHtmlEntities(name)
+	if (tokenId) {
+		name = name.replace(new RegExp('#?' + tokenId + '$'), '').trim()
+	}
+	name = name.replace(/#\d+$/, '').trim()
+	const digitTail = name.match(/^(.*?[a-zA-Z\s\-_])(\d{4,})$/)
+	if (digitTail && digitTail[1]) {
+		name = digitTail[1].trim()
+	}
+	name = name.replace(/[\s\-_.:#]+$/, '').trim()
+	if (/^quest3(?:nft)?$/i.test(name)) {
+		name = 'Quest3NFT'
+	}
+	return name.trim() || raw
+}
+
+export async function fetchNftTokenImage(chain: string, contract: string, tokenId: string, openseaKey = ''): Promise<string> {
+	if (!contract || !tokenId) return ''
+	if (openseaKey) {
+		try {
+			const osImg = await openseaNftImage(chain, contract, tokenId, openseaKey)
+			if (osImg) return osImg
+		} catch {
+			// fallback
+		}
+	}
+	const host = BLOCKSCOUT[chain]
+	if (host) {
+		try {
+			const res = await requestUrl({ url: `https://${host}/api/v2/tokens/${contract}/instances/${tokenId}`, headers: { accept: 'application/json' }, throw: false })
+			if (res.status === 200 && res.json) {
+				const data = res.json as BlockscoutItem
+				const img = mediaUrl(data.thumbnails?.['500x500']) || mediaUrl(data.media_url) || mediaUrl(data.image_url) || mediaUrl(data.metadata?.image)
+				if (img) return img
+			}
+		} catch {
+			// fallback
+		}
+	}
+	const rpc = PUBLIC_RPC[chain] || ETHERSCAN_CHAINS[chain]?.rpc || ROUTESCAN_CHAINS[chain]?.rpc
+	if (rpc) {
+		try {
+			const img = await tokenImage(rpc, contract, tokenId)
+			if (img) return img
+		} catch {
+			// fallback
+		}
+	}
+	if (chain === 'BNB') {
+		try {
+			const img = await nftscanImage('bnb.nftscan.com', contract, tokenId)
+			if (img && !isInvalidNftMedia(img)) return img
+		} catch {
+			// fallback
+		}
+	}
+	return ''
+}
+
+export function groupHeldByContract(tokens: HeldNft[]): HeldContract[] {
+	const map = new Map<string, HeldContract>()
+	for (const token of tokens) {
+		const contractAddr = (token.contract || '').trim().toLowerCase()
+		const key = contractAddr ? `${token.chain}:${contractAddr}` : `${token.chain}:${token.collection.toLowerCase()}`
+		const existing = map.get(key)
+		const tokenId = token.tokenId?.trim()
+		const rawImage = token.image?.trim()
+		const image = rawImage && !isInvalidNftMedia(rawImage) ? rawImage : ''
+		const cleanName = cleanCollectionName(token.collection || token.name, '', tokenId)
+
+		const rawTxTime = token.tx?.timeStamp
+		const txTimeStr = rawTxTime ? (dmyOf(rawTxTime) || String(rawTxTime)) : ''
+		const fromZero = ZERO_ADDRESS.test(token.tx?.from ?? '')
+		const initialMinted = token.minted || (fromZero ? txTimeStr : '')
+		const initialAcquired = token.acquired || txTimeStr || token.minted || ''
+
+		if (!existing) {
+			map.set(key, {
+				key,
+				chain: token.chain,
+				contract: token.contract || '',
+				collection: cleanName,
+				name: cleanName,
+				count: token.count,
+				tokenIds: tokenId ? [tokenId] : [],
+				tokens: [{ ...token }],
+				image: image || '',
+				gallery: image ? [image] : [],
+				url: token.url,
+				standard: token.standard,
+				spam: token.spam,
+				unverified: token.unverified,
+				oat: token.oat,
+				wallets: token.wallets ? [...token.wallets] : [],
+				history: token.tx ? [token.tx] : [],
+				minted: initialMinted,
+				acquired: initialAcquired,
+			})
+		} else {
+			existing.count += token.count
+			if (tokenId && existing.tokenIds.indexOf(tokenId) < 0) {
+				existing.tokenIds.push(tokenId)
+			}
+			existing.tokens.push({ ...token })
+			if ((!existing.image || isInvalidNftMedia(existing.image)) && image && !isInvalidNftMedia(image)) {
+				existing.image = image
+			}
+			if (image && !isInvalidNftMedia(image) && existing.gallery.indexOf(image) < 0) {
+				existing.gallery.push(image)
+			}
+			if (!existing.standard && token.standard) {
+				existing.standard = token.standard
+			}
+			const tMint = initialMinted
+			if (tMint) {
+				if (!existing.minted || parseDate(tMint) < parseDate(existing.minted)) {
+					existing.minted = dmyOf(tMint) || tMint
+				}
+			}
+			const tAcq = initialAcquired
+			if (tAcq) {
+				if (!existing.acquired || parseDate(tAcq) > parseDate(existing.acquired)) {
+					existing.acquired = dmyOf(tAcq) || tAcq
+				}
+			}
+			if (token.wallets) {
+				for (const w of token.wallets) {
+					if (existing.wallets.indexOf(w) < 0) existing.wallets.push(w)
+				}
+			}
+			if (token.tx && !existing.history.some(h => h.hash && h.hash === token.tx?.hash && h.tokenId === token.tx?.tokenId)) {
+				existing.history.push(token.tx)
+			}
+			// a collection is spam only when all of it is: one odd token does not condemn the rest
+			if (token.unverified) existing.unverified = true
+			existing.spam = existing.spam && token.spam
+			if (token.oat) existing.oat = true
+		}
+	}
+	const contracts = [...map.values()]
+	// a fixed order: a list that shuffles would rewrite the note on every import
+	for (const contract of contracts) contract.tokenIds.sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
+	return contracts
 }
 
 // Every wallet's tokens, grouped. A network counts as read only when all its wallets read in full:
 // only then may a token missing from it be taken as gone. BNB and Taiko need the Etherscan key.
-export async function nftHoldings(pairs: WalletPair[], etherscanKey: string, hasCover: (key: string) => boolean = () => false, known: (key: string) => KnownToken | undefined = () => undefined): Promise<NftRead> {
+interface TezosBalance {
+	balance?: unknown
+	firstTime?: unknown
+	lastTime?: unknown
+	lastLevel?: unknown
+	token?: { tokenId?: unknown; standard?: unknown; contract?: { address?: unknown; alias?: unknown }; metadata?: { name?: unknown; decimals?: unknown; thumbnailUri?: unknown; displayUri?: unknown; artifactUri?: unknown } | null }
+}
+
+export function tezosTokens(items: TezosBalance[]): HeldNft[] {
+	const out: HeldNft[] = []
+	for (const item of items) {
+		const contract = typeof item.token?.contract?.address === 'string' ? item.token.contract.address : ''
+		const id = typeof item.token?.tokenId === 'string' ? item.token.tokenId : ''
+		const meta = item.token?.metadata
+		// a token with decimals is a currency
+		if (!contract || !id || !meta || Number(meta.decimals ?? 0) > 0) continue
+		const collection = typeof item.token?.contract?.alias === 'string' && item.token.contract.alias ? item.token.contract.alias : contract
+		const name = typeof meta.name === 'string' && meta.name ? meta.name : `${collection} #${id}`
+		out.push({
+			key: nftKey('Tezos', contract, id), chain: 'Tezos', collection, name, contract, tokenId: id, standard: 'FA2',
+			image: mediaUrl(meta.displayUri) || mediaUrl(meta.thumbnailUri) || mediaUrl(meta.artifactUri),
+			url: `https://tzkt.io/${contract}/tokens/${id}`, count: Number(item.balance) || 1,
+			spam: looksLikeSpam(name, collection), oat: false,
+			acquired: typeof item.lastTime === 'string' ? item.lastTime : undefined,
+		})
+	}
+	return out
+}
+
+async function tezosHeld(address: string): Promise<NftRead> {
 	const held: HeldNft[] = []
+	for (let offset = 0; offset < 10000; offset += 1000) {
+		try {
+			const answer = await requestUrl({ url: `https://api.tzkt.io/v1/tokens/balances?account=${address}&balance.gt=0&token.standard=fa2&limit=1000&offset=${String(offset)}`, throw: false })
+			if (answer.status !== 200 || !Array.isArray(answer.json)) return { held, chains: [] }
+			const items = answer.json as TezosBalance[]
+			held.push(...tezosTokens(items))
+			if (items.length < 1000) break
+		} catch {
+			return { held, chains: [] }
+		}
+	}
+	return { held, chains: ['Tezos'] }
+}
+
+interface TonTx {
+	hash?: unknown
+	utime?: unknown
+	block?: unknown
+}
+
+async function tonTx(item: string, order: 'asc' | 'desc'): Promise<TonTx | null> {
+	const resp = await requestUrl({ url: `https://tonapi.io/v2/blockchain/accounts/${item}/transactions?limit=1&sort_order=${order}`, throw: false })
+	return resp.status === 200 ? (resp.json as { transactions?: TonTx[] }).transactions?.[0] ?? null : null
+}
+
+// A TON token is an account of its own: its first transaction is the mint, its last the latest transfer.
+// ponytail: the first 40 tokens per wallet, tonapi allows about a request a second without a key
+async function withTonHistory(read: NftRead): Promise<NftRead> {
+	for (const token of read.held.slice(0, 40)) {
+		const item = token.key.slice('TON:'.length)
+		try {
+			const first = await tonTx(item, 'asc')
+			await sleep(1100)
+			const last = await tonTx(item, 'desc')
+			await sleep(1100)
+			const when = (tx: TonTx | null): string => typeof tx?.utime === 'number' ? new Date(tx.utime * 1000).toISOString() : ''
+			if (first) token.minted = when(first)
+			if (last) token.acquired = when(last)
+			const hash = typeof last?.hash === 'string' ? last.hash : ''
+			const block = typeof last?.block === 'string' ? last.block : ''
+			if (hash) token.tx = {
+				hash, timeStamp: when(last), tokenId: token.tokenId,
+				...(block ? { blockNumber: /(\d+)\)$/.exec(block)?.[1] ?? '', blockUrl: `https://tonviewer.com/block/${block}` } : {})
+			}
+		} catch {
+			// a token without its dates is read again next time
+		}
+	}
+	return read
+}
+
+interface NearTx {
+	cause?: unknown
+	transaction_hash?: unknown
+	included_in_block_hash?: unknown
+	block_timestamp?: unknown
+	block?: { block_height?: unknown } | null
+}
+
+async function withNearHistory(read: NftRead): Promise<NftRead> {
+	for (const token of read.held.slice(0, 40)) {
+		try {
+			const resp = await requestUrl({ url: `https://api.nearblocks.io/v1/nfts/${token.contract ?? ''}/tokens/${token.tokenId ?? ''}/txns?per_page=25`, headers: { accept: 'application/json' }, throw: false })
+			const txns = resp.status === 200 ? (resp.json as { txns?: NearTx[] }).txns ?? [] : []
+			const when = (tx: NearTx | undefined): string => typeof tx?.block_timestamp === 'string' ? new Date(Number(tx.block_timestamp) / 1e6).toISOString() : ''
+			const last = txns[0]
+			const mint = txns.find(tx => tx.cause === 'MINT')
+			if (mint) token.minted = when(mint)
+			if (last) token.acquired = when(last)
+			const hash = typeof last?.transaction_hash === 'string' ? last.transaction_hash : ''
+			const blockHash = typeof last?.included_in_block_hash === 'string' ? last.included_in_block_hash : ''
+			const height = last?.block?.block_height
+			if (hash) token.tx = {
+				hash, timeStamp: when(last), tokenId: token.tokenId,
+				...(typeof height === 'number' ? { blockNumber: String(height) } : {}),
+				...(blockHash ? { blockUrl: `https://nearblocks.io/blocks/${blockHash}` } : {})
+			}
+			await sleep(400)
+		} catch {
+			// a token without its dates is read again next time
+		}
+	}
+	return read
+}
+
+export async function nftHoldings(
+	pairs: WalletPair[],
+	etherscanKey: string,
+	hasCover: (key: string) => boolean = () => false,
+	known: (key: string) => KnownToken | undefined = () => undefined,
+	openseaKey = ''
+): Promise<NftRead> {
 	const done = new Map<string, number>()
 	const wanted = new Map<string, number>()
+	// one call tells which Routescan networks a wallet has anything on: the rest are not asked
+	const routescanWallets = new Map<string, Set<string> | null>()
 	for (const { chain, address } of pairs) {
+		if (ROUTESCAN_CHAINS[chain] && !routescanWallets.has(address)) routescanWallets.set(address, await routescanActive(address))
+	}
+	const readPair = async (chain: string, address: string): Promise<HeldNft[]> => {
 		const host = BLOCKSCOUT[chain]
+		const routescan = ROUTESCAN_CHAINS[chain]
+		const active = routescanWallets.get(address)
 		let read: NftRead | null = null
 		if (host) read = await blockscoutHeld(chain, host, address, known)
+		else if (routescan) read = active && !active.has(String(routescan.id)) ? { held: [], chains: [chain] } : await routescanHeld(chain, address)
+		else if (chain === 'Tezos') read = await tezosHeld(address)
 		else if (ETHERSCAN_CHAINS[chain]) read = etherscanKey ? await etherscanHeld(chain, address, etherscanKey) : await pageScanHeld(chain, address, hasCover)
-		else if (chain === 'TON') read = await tonAllHeld(address)
+		else if (chain === 'TON') read = await withTonHistory(await tonAllHeld(address))
 		else if (chain === 'Solana') read = await solanaHeld(address)
-		if (!read) continue
+		else if (chain === 'NEAR') read = await withNearHistory(await nearHeld(address))
+		if (!read) return []
 		wanted.set(chain, (wanted.get(chain) ?? 0) + 1)
-		for (const token of read.held) token.wallets = [address]
-		held.push(...read.held)
+		const found = [...read.held]
+		for (const token of found) token.wallets = [address]
+		if (openseaKey && OPENSEA_CHAINS[chain]) {
+			try {
+				const osNfts = await openseaAccountHeld(chain, address, openseaKey)
+				for (const osToken of osNfts) {
+					osToken.wallets = [address]
+					const match = found.find(t => t.contract?.toLowerCase() === osToken.contract?.toLowerCase() && t.tokenId === osToken.tokenId)
+					if (match) {
+						if (!match.image && osToken.image) match.image = osToken.image
+						if (!match.minted && osToken.minted) match.minted = osToken.minted
+					} else {
+						found.push(osToken)
+					}
+				}
+			} catch {
+				// ignore
+			}
+		}
 		for (const c of read.chains) done.set(c, (done.get(c) ?? 0) + 1)
+		await sleep(80)
+		return found
 	}
+	// networks read side by side, wallets of one network in turn; the explorer pages share one hidden browser,
+	// so they form a single lane. Results keep the wallets' order, or notes would change with who answered first.
+	const results: HeldNft[][] = pairs.map(() => [])
+	const lanes = new Map<string, number[]>()
+	pairs.forEach(({ chain }, at) => {
+		const lane = !etherscanKey && ETHERSCAN_CHAINS[chain] ? 'pages' : chain
+		lanes.set(lane, [...(lanes.get(lane) ?? []), at])
+	})
+	const queue = [...lanes.values()]
+	await Promise.all(Array.from({ length: 6 }, async () => {
+		for (let lane = queue.shift(); lane; lane = queue.shift()) {
+			for (const at of lane) {
+				const pair = pairs[at]
+				if (pair) results[at] = await readPair(pair.chain, pair.address)
+			}
+		}
+	}))
+	const held = results.reduce((all, part) => all.concat(part), [] as HeldNft[])
 	const chains = [...wanted.keys()].filter(chain => done.get(chain) === wanted.get(chain))
+	if (openseaKey) {
+		let osLookups = 0
+		for (const token of held) {
+			if (osLookups >= 15) break
+			if (!token.image && token.contract) {
+				if (token.tokenId) {
+					token.image = await openseaNftImage(token.chain, token.contract, token.tokenId, openseaKey)
+					osLookups++
+					await sleep(150)
+				}
+				if (!token.image) {
+					const info = await openseaContract(token.chain, token.contract, openseaKey)
+					if (info?.imageUrl && !isInvalidNftMedia(info.imageUrl)) token.image = info.imageUrl
+					osLookups++
+					await sleep(150)
+				}
+			}
+		}
+	}
 	return { held: groupHeld(held), chains }
 }
