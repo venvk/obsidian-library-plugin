@@ -1362,7 +1362,7 @@ export async function tokenTransfers(chain: string, contract: string, id: string
 	const page = `https://${site}/nft/${contract}/${id}`
 	try {
 		const plain = await requestUrl({ url: page, throw: false })
-		const html = plain.status === 200 ? plain.text : await readPage(page, 'new XMLSerializer().serializeToString(document)', 30000, "!!document.querySelector('h2, h1')")
+		const html = plain.status === 200 ? plain.text : await readPage(page, 'new XMLSerializer().serializeToString(document)', 30000, "!!document.querySelector('#mytable')")
 		const data = /var dt_Data = (\[[\s\S]*?\]);/.exec(html)?.[1]
 		if (!data) return null
 		return (JSON.parse(data) as ExplorerActivity[]).map(row => ({
