@@ -1161,9 +1161,10 @@ export class LibraryView extends ItemView {
 			text: countText,
 			attr: { 'aria-label': titleAttr, title: titleAttr }
 		})
-		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game' && kind !== 'manual') return
+		if (kind !== 'movie' && kind !== 'series' && kind !== 'anime' && kind !== 'music' && kind !== 'game' && kind !== 'manual' && kind !== 'book') return
 		let minutes = 0
-		for (const card of cards) minutes += spentMinutes(card.fm, card.kind)
+		// of books only the audiobooks have a time: what was listened to
+		for (const card of cards) if (kind !== 'book' || isAudiobook(card.fm)) minutes += spentMinutes(card.fm, card.kind)
 		if (minutes <= 0) return
 		const time = row.createSpan({ cls: 'library-section-time' })
 		setTooltip(time, exactHours(minutes), { placement: 'top' })
