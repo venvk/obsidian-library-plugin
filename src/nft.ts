@@ -783,15 +783,11 @@ interface PageTransfer {
 	isScam?: boolean
 }
 
+// One pass, so a decoded "&" never starts a second entity; "&amp;" repeated in front is double encoding.
 export function decodeHtmlEntities(str: string): string {
-	return str
-		.replace(/&amp;#?39;|&quot;|&#39;|&apos;/g, "'")
-		.replace(/&amp;quot;/g, '"')
-		.replace(/&amp;amp;/g, '&')
-		.replace(/&amp;/g, '&')
-		.replace(/&lt;/g, '<')
-		.replace(/&gt;/g, '>')
-		.replace(/&#(\d+);?/g, (_, code: string) => String.fromCharCode(Number(code)))
+	const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
+	return str.replace(/&(?:amp;)*(?:(amp|lt|gt|quot|apos);|#(\d+);?)/g, (_, name: string | undefined, code: string | undefined) =>
+		name ? named[name] ?? '' : String.fromCharCode(Number(code)))
 }
 
 // The transfers page's rows replayed: what came in and did not go out again.
