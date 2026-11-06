@@ -91,6 +91,61 @@
 	height: 18px;
 }
 
+.note-header-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 8px;
+}
+
+.note-header-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 28px;
+	height: 28px;
+	border-radius: var(--radius-s);
+	color: #ffffff;
+	text-decoration: none;
+}
+
+.note-header-link:hover,
+.note-header-link:focus-visible {
+	color: #ffffff;
+	filter: brightness(1.15);
+}
+
+.note-header-link.is-site {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.note-header-link.is-x {
+	background: #000000;
+	box-shadow: inset 0 0 0 1px var(--background-modifier-border);
+}
+
+.note-header-link.is-discord {
+	background: #5865f2;
+}
+
+.note-header-link.is-opensea {
+	background: #2081e2;
+}
+
+.note-header-link.is-telegram {
+	background: #26a5e4;
+}
+
+.note-header-link.is-instagram {
+	background: linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888);
+}
+
+.note-header-link svg {
+	width: 16px;
+	height: 16px;
+}
+
 .note-header-pill {
 	display: inline-flex;
 	align-items: center;
@@ -113,16 +168,6 @@
 	height: 14px;
 }
 
-.note-header-formats .note-header-pill {
-	margin-left: 0;
-	margin-right: 6px;
-}
-
-.note-header-formats .note-header-pill.is-on {
-	background: var(--interactive-accent);
-	color: var(--text-on-accent);
-}
-
 .note-header-pill.is-subscribe {
 	background: #ff0000;
 	color: #ffffff;
@@ -131,6 +176,55 @@
 .note-header-pill.is-subscribe.is-on {
 	background: var(--background-modifier-hover);
 	color: var(--text-normal);
+}
+
+.note-header-format-pill {
+	transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.note-header-format-pill.is-paper.is-on {
+	background-color: #e0a96d;
+	color: #1e2026;
+	font-weight: 600;
+}
+
+.note-header-format-pill.is-ebook.is-on {
+	background-color: #00b4d8;
+	color: #ffffff;
+	font-weight: 600;
+}
+
+.note-header-format-pill.is-audiobook.is-on {
+	background-color: #9d4edd;
+	color: #ffffff;
+	font-weight: 600;
+}
+
+.note-header-formats-toggle {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	margin-left: 6px;
+	padding: 2px 6px;
+	height: 22px;
+	min-width: 22px;
+	border-radius: 999px;
+	font-size: var(--font-ui-smaller);
+	vertical-align: middle;
+	background: var(--background-modifier-border);
+	color: var(--text-muted);
+	cursor: pointer;
+	box-shadow: none;
+}
+
+.note-header-formats-toggle:hover {
+	background: var(--background-modifier-border-hover);
+	color: var(--text-normal);
+}
+
+.note-header-formats-toggle svg {
+	width: 12px;
+	height: 12px;
 }
 
 .note-header-youtube {
@@ -149,7 +243,8 @@
 	height: 16px;
 }
 
-.library-card .card-image img {
+.library-card .card-image img,
+.library-card .card-image video {
 	width: 100%;
 	height: 100%;
 	object-fit: cover;
@@ -174,6 +269,62 @@
 	height: 14px;
 }
 
+.library-card .card-format-badges {
+	position: absolute;
+	top: 6px;
+	left: 6px;
+	display: flex;
+	gap: 4px;
+	z-index: 2;
+}
+
+.library-card .card-format-badge {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	backdrop-filter: blur(4px);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+}
+
+.library-card .card-format-badge svg {
+	width: 12px;
+	height: 12px;
+}
+
+.library-card .card-format-badge.is-audiobook {
+	background: rgba(157, 78, 221, 0.9);
+	color: #fff;
+}
+
+.library-card .card-format-badge.is-ebook {
+	background: rgba(0, 180, 216, 0.9);
+	color: #fff;
+}
+
+.library-card .card-format-badge.is-paper {
+	background: rgba(224, 169, 109, 0.95);
+	color: #2b1803;
+}
+
+.library-card .card-count-badge {
+	position: absolute;
+	bottom: 8px;
+	right: 8px;
+	padding: 2px 6px;
+	border-radius: 10px;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: #fff;
+	background: rgba(0, 0, 0, 0.75);
+	backdrop-filter: blur(4px);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+	z-index: 2;
+}
+
 .library-card .card-info {
 	padding: 5px 10px 10px;
 	display: flex;
@@ -188,6 +339,12 @@
 	font-weight: bold;
 	font-size: 0.95em;
 	line-height: 1.2;
+	/* token names like "Pandra: PixelProwler#123144" have no space to break at */
+	overflow-wrap: anywhere;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
 }
 
 .library-card .card-title a {
@@ -213,6 +370,31 @@
 	font-weight: bold;
 	color: var(--interactive-accent);
 	margin-top: 1%;
+}
+
+.library-card .card-poster-progress {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	height: 3px;
+	background: rgba(0, 0, 0, 0.45);
+	overflow: hidden;
+	z-index: 2;
+	cursor: pointer;
+	transition: height 0.15s ease;
+}
+
+.library-card:hover .card-poster-progress,
+.library-card .card-poster-progress:hover {
+	height: 5px;
+}
+
+.library-card .card-poster-progress-fill {
+	width: var(--library-progress);
+	height: 100%;
+	background: var(--interactive-accent);
+	transition: width 0.3s ease;
 }
 
 .library-card .card-progress {
@@ -334,6 +516,31 @@ sort trigger, the chosen one in the accent colour. */
 	background: var(--background-modifier-hover);
 }
 
+.library-category-map-btn {
+	background: none;
+	border: none;
+	cursor: pointer;
+	color: var(--text-muted);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 4px 6px;
+	border-radius: var(--radius-s);
+	opacity: 0.7;
+	transition: opacity 0.2s, background-color 0.2s, color 0.2s;
+}
+
+.library-category-map-btn:hover {
+	opacity: 1;
+	color: var(--text-normal);
+	background-color: var(--background-modifier-hover);
+}
+
+.library-category-map-btn svg {
+	width: 16px;
+	height: 16px;
+}
+
 .library-sort-dropdown {
 	position: relative;
 }
@@ -439,12 +646,52 @@ sort trigger, the chosen one in the accent colour. */
 .note-header-wrap .note-header-cover {
 	flex: 0 0 40%;
 	max-width: 40%;
+	position: relative;
 }
 
-.note-header-wrap .note-header-cover img {
+.card-badge-spam,
+.note-header-spam-badge,
+.nft-token-spam-badge {
+	position: absolute;
+	top: 8px;
+	left: 8px;
+	background: #e11d48;
+	color: #ffffff;
+	font-size: 10px;
+	font-weight: 800;
+	letter-spacing: 0.08em;
+	line-height: 1;
+	padding: 3px 6px;
+	border-radius: 4px;
+	text-transform: uppercase;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+	z-index: 10;
+	pointer-events: none;
+}
+
+.note-header-wrap .note-header-cover img,
+.note-header-wrap .note-header-cover video {
 	width: 100%;
 	border-radius: 10px;
 	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.note-header-wrap .note-header-cover-placeholder {
+	width: 100%;
+	aspect-ratio: 1;
+	border-radius: 10px;
+	background: var(--background-secondary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-faint);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.note-header-wrap .note-header-cover-placeholder svg {
+	width: 48px;
+	height: 48px;
+	opacity: 0.5;
 }
 
 .note-header-wrap .note-header-info {
@@ -515,6 +762,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .note-header-wrap .note-header-progress-fill {
+	width: var(--library-progress);
 	height: 100%;
 	background: var(--interactive-accent);
 	border-radius: 3px;
@@ -976,6 +1224,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-time-chart {
+	background: var(--library-time-chart);
 	position: relative;
 	width: 100%;
 	max-width: 190px;
@@ -1032,6 +1281,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-time-dot {
+	background-color: var(--library-time-dot);
 	flex-shrink: 0;
 	width: 10px;
 	height: 10px;
@@ -1336,11 +1586,78 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-lightbox img {
-	/* The image box fills the viewport and `contain` fits the picture inside
-	   it, so a small still is enlarged instead of sitting tiny in the middle. */
-	width: 94vw;
-	height: 88vh;
+	/* Fits the picture inside the viewport without creating false letterbox click targets. */
+	max-width: 94vw;
+	max-height: 88vh;
+	width: auto;
+	height: auto;
 	object-fit: contain;
+	cursor: zoom-out;
+}
+
+.library-lightbox video {
+	max-width: 94vw;
+	max-height: 88vh;
+	width: auto;
+	height: auto;
+	cursor: default;
+}
+
+.library-lightbox-close {
+	position: absolute;
+	top: 20px;
+	right: 24px;
+	width: 36px;
+	height: 36px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.15);
+	color: #ffffff;
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+	z-index: 10;
+	transition: background 0.15s ease, transform 0.15s ease;
+	user-select: none;
+}
+
+.library-lightbox-close:hover {
+	background: rgba(255, 255, 255, 0.3);
+	transform: scale(1.08);
+}
+
+.library-lightbox-nav {
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 44px;
+	height: 44px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.15);
+	color: #ffffff;
+	font-size: 28px;
+	line-height: 1;
+	cursor: pointer;
+	z-index: 10;
+	transition: background 0.15s ease, transform 0.15s ease;
+	user-select: none;
+}
+
+.library-lightbox-nav:hover {
+	background: rgba(255, 255, 255, 0.3);
+}
+
+.library-lightbox-prev {
+	left: 24px;
+}
+
+.library-lightbox-next {
+	right: 24px;
 }
 
 /* Recommendations: a scrolling row of small covers under the note header. */
@@ -1564,6 +1881,12 @@ sort trigger, the chosen one in the accent colour. */
 	background: color-mix(in srgb, var(--background-primary) 80%, transparent);
 }
 
+.library-platform-initial {
+	font-size: 11px;
+	font-weight: 700;
+	line-height: 1;
+}
+
 .library-platform svg {
 	width: 13px;
 	height: 13px;
@@ -1578,6 +1901,9 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-platform-label {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
 	padding: 1px 7px;
 	border-radius: 4px;
 	font-size: var(--font-ui-smaller);
@@ -1585,6 +1911,92 @@ sort trigger, the chosen one in the accent colour. */
 	letter-spacing: 0.02em;
 	color: #ffffff;
 	background-color: #3a3a3a;
+}
+
+.library-platform-label svg {
+	width: 1em;
+	height: 1em;
+	fill: currentColor;
+}
+
+.library-platform-label.is-ethereum {
+	background-color: #627eea;
+}
+
+.library-platform-label.is-optimism {
+	background-color: #ff0420;
+}
+
+.library-platform-label.is-base {
+	background-color: #0052ff;
+}
+
+.library-platform-label.is-arbitrum {
+	background-color: #28a0f0;
+}
+
+.library-platform-label.is-polygon {
+	background-color: #7b3fe4;
+}
+
+.library-platform-label.is-bnb {
+	background-color: #f0b90b;
+	color: #1e2026;
+}
+
+.library-platform-label.is-taiko {
+	background-color: #e81899;
+}
+
+.library-platform-label.is-gnosis {
+	background-color: #04795b;
+}
+
+.library-platform-label.is-celo {
+	background-color: #fcff52;
+	color: #000000;
+}
+
+.library-platform-label.is-zksync {
+	background-color: #1e69ff;
+}
+
+.library-platform-label.is-scroll {
+	background-color: #ffeeda;
+	color: #190f05;
+}
+
+.library-platform-label.is-ink {
+	background-color: #7132f5;
+}
+
+.library-platform-label.is-soneium {
+	background-color: #000000;
+}
+
+.library-platform-label.is-unichain {
+	background-color: #f50db4;
+}
+
+.library-platform-label.is-mode {
+	background-color: #dffe00;
+	color: #000000;
+}
+
+.library-platform-label.is-arbitrum-nova {
+	background-color: #ef8220;
+}
+
+.library-platform-label.is-shape {
+	background-color: #000000;
+}
+
+.library-platform-label.is-ton {
+	background-color: #0098ea;
+}
+
+.library-platform-label.is-solana {
+	background-color: #9945ff;
 }
 
 .library-platform-label.is-playstation {
@@ -1686,13 +2098,18 @@ sort trigger, the chosen one in the accent colour. */
 	color: #ffffff;
 }
 
-.library-platform-row-icon.is-epic {
-	background-color: #2a2a2a;
+.library-platform-row-icon.is-itunes {
+	background-color: #fa233b;
 	color: #ffffff;
 }
 
-.library-platform-row-icon.is-ea {
-	background-color: #ff4747;
+.library-platform-row-icon.is-librivox {
+	background-color: #5b3e2b;
+	color: #ffffff;
+}
+
+.library-platform-row-icon.is-openlibrary {
+	background-color: #02598b;
 	color: #ffffff;
 }
 
@@ -1997,6 +2414,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-taste-fill {
+	height: var(--library-taste);
 	width: 100%;
 	border-radius: 4px;
 	background: color-mix(in srgb, var(--interactive-accent) 38%, transparent);
@@ -2085,6 +2503,63 @@ sort trigger, the chosen one in the accent colour. */
 	color: var(--text-on-accent);
 }
 
+/* An NFT's favorite star: an outline, filled when on */
+.card-favorite-row {
+	display: flex;
+	justify-content: center;
+}
+
+.card-favorite {
+	display: inline-flex;
+	color: var(--text-muted);
+}
+
+.card-favorite svg {
+	width: 16px;
+	height: 16px;
+}
+
+.card-favorite.is-on svg,
+.note-header-favorite.is-on svg {
+	color: #e3b341;
+	fill: currentColor;
+}
+
+.note-header-favorite {
+	display: inline-flex;
+	vertical-align: middle;
+	margin-left: 6px;
+	padding: 4px;
+	background: transparent;
+	box-shadow: none;
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.note-header-favorite svg {
+	width: 18px;
+	height: 18px;
+}
+
+.library-wallet-list {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: var(--size-4-2);
+}
+
+.library-wallet-line {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-1);
+}
+
+.library-wallet-line input {
+	width: 26em;
+	max-width: 100%;
+	font-family: var(--font-monospace);
+}
+
 /* My Rating: five stars, each half a point out of 10 */
 .note-header-wrap .note-header-stars {
 	display: flex;
@@ -2162,4 +2637,327 @@ sort trigger, the chosen one in the accent colour. */
 .note-header-wrap .note-header-star-half:focus-visible {
 	outline: 2px solid var(--interactive-accent);
 	outline-offset: -2px;
+}
+
+.library-platform-label.is-robinhood {
+	background-color: #ccff00;
+	color: #000000;
+}
+
+.library-platform-label.is-near {
+	background-color: #000000;
+	color: #ffffff;
+}
+
+.library-platform-label.is-mantle {
+	background-color: #65b3ae;
+	color: #000000;
+}
+
+.library-platform-label.is-avalanche {
+	background-color: #e84142;
+	color: #ffffff;
+}
+
+.library-platform-label.is-blast {
+	background-color: #fcfc03;
+	color: #000000;
+}
+
+.library-platform-label.is-boba {
+	background-color: #ccff00;
+	color: #000000;
+}
+
+.library-platform-label.is-hemi {
+	background-color: #ff6c15;
+	color: #ffffff;
+}
+
+.library-platform-label.is-chiliz {
+	background-color: #cd0124;
+	color: #ffffff;
+}
+
+.library-platform-label.is-lisk {
+	background-color: #4070f4;
+	color: #ffffff;
+}
+
+.library-platform-label.is-world-chain {
+	background-color: #000000;
+	color: #ffffff;
+}
+
+.library-platform-label.is-metis {
+	background-color: #00dacc;
+	color: #000000;
+}
+
+.library-platform-label.is-rootstock {
+	background-color: #ff9100;
+	color: #000000;
+}
+
+.library-platform-label.is-apechain {
+	background-color: #0054fa;
+	color: #ffffff;
+}
+
+.library-platform-label.is-tezos {
+	background-color: #2c7df7;
+	color: #ffffff;
+}
+
+.note-header-nft-tokens {
+	margin-top: 16px;
+	padding-top: 14px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.note-header-nft-tokens-title {
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-normal);
+}
+
+.note-header-nft-tokens-count {
+	font-size: 12px;
+	font-weight: 400;
+	color: var(--text-muted);
+}
+
+.note-header-nft-tokens-sort-btn {
+	margin-left: auto;
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 4px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	color: var(--text-muted);
+	cursor: pointer;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+
+.note-header-nft-tokens-sort-btn:hover {
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
+}
+
+.note-header-nft-tokens-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 12px;
+	max-height: 520px;
+	overflow-y: auto;
+	padding: 4px;
+}
+
+.note-header-nft-token-card {
+	display: flex;
+	flex-direction: column;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 8px;
+	overflow: hidden;
+	transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+	cursor: pointer;
+}
+
+.note-header-nft-token-card:hover {
+	transform: translateY(-2px);
+	border-color: var(--interactive-accent);
+	box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.nft-token-img-wrap {
+	width: 100%;
+	aspect-ratio: 1;
+	background: var(--background-primary);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	position: relative;
+}
+
+.nft-token-img-wrap img,
+.nft-token-img-wrap video {
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	display: block;
+	transition: transform 0.2s ease;
+}
+
+.note-header-nft-token-card:hover .nft-token-img-wrap img,
+.note-header-nft-token-card:hover .nft-token-img-wrap video {
+	transform: scale(1.03);
+}
+
+.nft-token-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	color: var(--text-faint);
+}
+
+.nft-token-info {
+	padding: 8px 10px 10px;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	width: 100%;
+	box-sizing: border-box;
+	border-top: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.nft-token-id-row {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+}
+
+.nft-token-id-link {
+	font-size: 13px;
+	font-weight: 600;
+	font-family: var(--font-monospace);
+	color: var(--text-normal);
+	text-decoration: none;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+}
+
+.nft-token-id-link:hover {
+	color: var(--interactive-accent);
+	text-decoration: underline;
+}
+
+.nft-token-date-row {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.nft-token-date-icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 12px;
+	height: 12px;
+	opacity: 0.7;
+}
+
+.nft-token-date-icon svg {
+	width: 12px;
+	height: 12px;
+}
+
+.nft-token-date-text {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.note-header-nft-history {
+	margin-top: 16px;
+	padding-top: 14px;
+	border-top: 1px solid var(--background-modifier-border);
+}
+
+.note-header-nft-history-wrap {
+	overflow-x: auto;
+}
+
+.note-header-nft-history-title {
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 10px;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-normal);
+}
+
+.note-header-nft-history-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12px;
+	background: var(--background-secondary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 6px;
+	overflow: hidden;
+}
+
+.note-header-nft-history-table th {
+	text-align: left;
+	padding: 8px 12px;
+	background: var(--background-secondary-alt);
+	color: var(--text-muted);
+	font-weight: 500;
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.note-header-nft-history-table th.is-sortable {
+	cursor: pointer;
+	user-select: none;
+	transition: color 0.15s ease;
+}
+
+.note-header-nft-history-table th.is-sortable:hover {
+	color: var(--text-normal);
+}
+
+.nft-sort-arrow {
+	font-size: 10px;
+	margin-left: 4px;
+	color: var(--text-accent);
+}
+
+.note-header-nft-history-table td {
+	padding: 8px 12px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	color: var(--text-normal);
+}
+
+.note-header-nft-history-table tr:last-child td {
+	border-bottom: none;
+}
+
+.nft-tx-link {
+	font-family: var(--font-monospace);
+	color: var(--text-accent);
+	text-decoration: none;
+}
+
+.nft-tx-link:hover {
+	text-decoration: underline;
+}
+
+.nft-address-mono {
+	font-family: var(--font-monospace);
+	font-size: 11px;
+	color: var(--text-muted);
+}
+
+.canvas-node.library-measure {
+	position: absolute;
+	left: -100000px;
+	top: 0;
+	width: var(--library-measure-width);
+	visibility: hidden;
+}
+
+.canvas-node.library-measure .library-measure-grow {
+	height: auto;
+	contain: none;
 }

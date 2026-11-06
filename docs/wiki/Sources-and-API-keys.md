@@ -71,6 +71,18 @@ Without them, a game's trailer comes from Wikidata when it lists one, or from St
 
 Sign in at [comicvine.gamespot.com/api](https://comicvine.gamespot.com/api/) to see your key. Paste it into Comic Vine API key.
 
+## Audiobooks
+
+Searching a book also finds its audiobooks on Audible, Apple Books, LibriVox and the Internet Archive, with no key. A card says **Book** or **Audiobook** and how long it runs.
+
+## IMDb search
+
+With IMDb connected, movie and series searches start with IMDb's own results. See [[IMDb and Netflix|IMDb-and-Netflix]].
+
+## Etherscan and OpenSea
+
+Both are optional and only matter for [[NFT]]: Etherscan reads BNB Chain, Polygon and Taiko faster, and OpenSea adds the creator's profile links and more pictures.
+
 ## Search limits
 
 Each source gets 4 seconds to answer, and Open Library 16. One that hasn't answered by then is left out of that search, so try again if a title you expect is missing.

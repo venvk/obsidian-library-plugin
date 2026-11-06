@@ -134,6 +134,32 @@ Settings > Library > General > Skip properties keeps any of these out of notes; 
 
 These can't be skipped. See [[Connected accounts|Connected-accounts]] for what each service changes.
 
+## Book properties
+
+| Property | Meaning |
+|---|---|
+| `Format` | `Paper`, `eBook`, `Audiobook`, or several. The buttons in the note's header set it. |
+| `Narrator` | Who reads an audiobook. A link, like `Creator`. |
+| `Runtime` | An audiobook's whole length, in minutes. |
+| `Runtime Estimated` | Set when `Runtime` is an estimate from the page count. Type your own `Runtime` and it stops counting. |
+
+## NFT properties
+
+| Property | Meaning |
+|---|---|
+| `Contract` | The contract's address. |
+| `Contract Creator` | The address that deployed it. In OpenSea's shared contract, the token's creator. |
+| `Project Links` | The project's site and social pages. |
+| `Wallet` | Your wallets that hold it. Links, like `Creator`. |
+| `Tokens` | The ids of the tokens you hold. |
+| `Count` | How many you hold. |
+| `Standard` | ERC-721, ERC-1155 and the like. |
+| `Kind` | `NFT` or `OAT`. |
+| `Minted`, `Acquired` | The first mint and the latest transfer to you. |
+| `History` | The transfers: hash, block, sender, date, token. |
+| `Spam` | `true` hides the note, `false` keeps it however it looks. |
+| `Favorite` | The star on the card. |
+
 ## Source and Source ID
 
 | Category | `Source` | `Source ID` |

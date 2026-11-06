@@ -21,6 +21,15 @@ interface OmdbSearchItem {
 	Poster?: string
 }
 
+interface ImdbSuggestion {
+	id?: string
+	l?: string
+	y?: number
+	s?: string
+	qid?: string
+	i?: { imageUrl?: string }
+}
+
 interface OmdbSearchResponse {
 	Search?: OmdbSearchItem[]
 	Response?: string
@@ -142,10 +151,12 @@ export class OmdbProvider implements ContentProvider {
 
 	private getKey: () => string
 	private enrichers: MetadataEnricher[]
+	private imdbConnected: () => boolean
 
-	constructor(getKey: () => string, enrichers: MetadataEnricher[] = []) {
+	constructor(getKey: () => string, enrichers: MetadataEnricher[] = [], imdbConnected: () => boolean = () => false) {
 		this.getKey = getKey
 		this.enrichers = enrichers
+		this.imdbConnected = imdbConnected
 	}
 
 	private url(params: Record<string, string>): string {
@@ -203,8 +214,31 @@ export class OmdbProvider implements ContentProvider {
 		const kind = type === 'series' ? 'series' : 'movie'
 		const { title, year } = splitYear(query)
 		const open = this.searchOpen(query, title, kind)
+		const imdb = this.imdbConnected() ? within(this.searchImdb(title, kind), SEARCH_BUDGET_MS, []) : Promise.resolve([])
 		const keyed = this.getKey() && !this.resting() ? await within(this.searchOmdb(title, kind, year), SEARCH_BUDGET_MS, []) : []
-		return arrange([...keyed, ...(await open)], year)
+		return arrange([...(await imdb), ...keyed, ...(await open)], year)
+	}
+
+	// IMDb's own search box: with IMDb connected its titles lead the results.
+	private async searchImdb(title: string, kind: 'movie' | 'series'): Promise<SearchResult[]> {
+		try {
+			const resp = await requestUrl({ url: `https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(title.toLowerCase())}.json`, throw: false })
+			const items = (jsonOf(resp) as { d?: ImdbSuggestion[] } | null)?.d
+			if (resp.status !== 200 || !Array.isArray(items)) return []
+			const kinds = kind === 'series' ? ['tvSeries', 'tvMiniSeries'] : ['movie', 'tvMovie', 'short', 'video']
+			return items.filter(item => /^tt\d+$/.test(item.id ?? '') && kinds.indexOf(item.qid ?? '') >= 0).map(item => ({
+				provider: this.id,
+				sourceId: item.id ?? '',
+				title: item.l ?? '',
+				year: typeof item.y === 'number' ? item.y : null,
+				cover: this.cover(item.i?.imageUrl),
+				subtitle: item.s ?? null,
+				raw: item
+			}))
+		} catch (e) {
+			console.error('Library: IMDb search error', e)
+			return []
+		}
 	}
 
 	private async searchOmdb(title: string, kind: 'movie' | 'series', year: number | null): Promise<SearchResult[]> {
@@ -344,9 +378,9 @@ export class OmdbProvider implements ContentProvider {
 				const resp = await requestUrl({ url: this.url({ i: sourceId }), throw: false })
 				const json = jsonOf(resp) as OmdbDetails | null
 				if (!this.unavailable(resp.status, json)) {
-					if (resp.status !== 200) return null
-					if (!json || typeof json !== 'object' || json.Response === 'False') return null
-					details = json
+					if (resp.status === 200 && json && typeof json === 'object' && json.Response !== 'False') {
+						details = json
+					}
 				}
 			}
 			if (!details) {

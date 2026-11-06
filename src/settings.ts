@@ -12,6 +12,7 @@ import {
 	type SettingDefinitionItem,
 } from "obsidian";
 import type LibraryPlugin from "./main";
+import { WALLET_FIELD } from "./nft";
 import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constants";
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
@@ -40,7 +41,9 @@ type TextKey =
 	| "coverProperty"
 	| "skipFields"
 	| "twitchClientId"
-	| "twitchClientSecret";
+	| "twitchClientSecret"
+	| "etherscanApiKey"
+	| "openseaApiKey";
 
 // One row; getSettingDefinitions() (1.13+) and display() render the same rows.
 interface Row {
@@ -52,9 +55,9 @@ interface Row {
 }
 
 // The tabs of the settings, each with its sections under the strip.
-type Page = "general" | "categories" | "connectors" | "keys" | "stats";
-const PAGES: Page[] = ["general", "categories", "connectors", "keys", "stats"];
-const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", keys: "key-round", stats: "bar-chart-3" };
+type Page = "general" | "categories" | "connectors" | "wallets" | "keys" | "stats";
+const PAGES: Page[] = ["general", "categories", "connectors", "wallets", "keys", "stats"];
+const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", wallets: "wallet", keys: "key-round", stats: "bar-chart-3" };
 
 // A group of rows; a group scopes row names — each category is its own (each has "Type value").
 interface Section {
@@ -135,6 +138,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 		if (page === "categories") return tr("settings.section.categories");
 		if (page === "keys") return tr("settings.section.keys");
 		if (page === "stats") return tr("stats.title");
+		if (page === "wallets") return "NFT";
 		return tr(`settings.page.${page}`);
 	}
 
@@ -388,6 +392,8 @@ export class LibrarySettingTab extends PluginSettingTab {
 					this.keyRow("settings.twitchId", "twitchClientId", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.twitchSecret", "twitchClientSecret", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.comicvine", "comicVineApiKey", tr("settings.comicvine.placeholder")),
+					this.keyRow("settings.etherscan", "etherscanApiKey", tr("settings.rawg.placeholder")),
+					this.keyRow("settings.opensea", "openseaApiKey", tr("settings.rawg.placeholder")),
 				],
 			},
 			{
@@ -400,9 +406,59 @@ export class LibrarySettingTab extends PluginSettingTab {
 				],
 			},
 			{
+				page: "wallets",
+				heading: "NFT",
+				rows: [
+					note(tr("settings.nft.desc")),
+					{
+						name: tr("settings.wallets.name"),
+						desc: tr("settings.nftWallets.desc"),
+						render: (row) => this.walletList(row, WALLET_FIELD),
+					},
+					{
+						name: tr("settings.nftOat.name"),
+						desc: tr("settings.nftOat.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(settings.showNftOat).onChange(async (value) => {
+									settings.showNftOat = value;
+									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+					{
+						name: tr("settings.nftSpam.name"),
+						desc: tr("settings.nftSpam.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(settings.showNftSpam).onChange(async (value) => {
+									settings.showNftSpam = value;
+									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+				],
+			},
+			{
 				page: "connectors",
-				heading: "YouTube",
-				rows: [{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") }],
+				heading: tr("settings.default.video"),
+				rows: [
+					{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") },
+					{
+						name: tr("settings.youtubeShorts.name"),
+						desc: tr("settings.youtubeShorts.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(settings.youtubeIncludeShorts).onChange(async (value) => {
+									settings.youtubeIncludeShorts = value;
+									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+				],
 			},
 			{
 				page: "connectors",
@@ -497,6 +553,49 @@ export class LibrarySettingTab extends PluginSettingTab {
 	}
 
 	// A key field, and from 1.11.4 a pick from Obsidian's Keychain: a picked secret is read from there, the field stays off.
+	// One line per address, a cross to drop it, and a button for the next one.
+	private walletList(row: Setting, field: string): void {
+		const settings = this.plugin.settings;
+		const lines = (settings.nftWallets[field] ?? "").split("\n").map((line) => line.trim()).filter(Boolean);
+		const list = row.controlEl.createDiv({ cls: "library-wallet-list" });
+		const save = async (): Promise<void> => {
+			const value = lines.map((line) => line.trim()).filter(Boolean).join("\n");
+			const prev = settings.nftWallets[field] ?? "";
+			if (value) settings.nftWallets[field] = value;
+			else delete settings.nftWallets[field];
+			await this.plugin.saveSettings();
+			if (value !== prev) {
+				this.plugin.scheduleLazyNftImport(2500);
+			}
+		};
+		const draw = (focus = false): void => {
+			list.empty();
+			if (lines.length === 0) lines.push("");
+			lines.forEach((value, i) => {
+				const line = list.createDiv({ cls: "library-wallet-line" });
+				const input = line.createEl("input", { type: "text", value, attr: { spellcheck: "false" } });
+				input.addEventListener("input", () => {
+					lines[i] = input.value;
+					void save();
+				});
+				if (focus && i === lines.length - 1) window.setTimeout(() => input.focus(), 0);
+				const drop = line.createEl("button", { cls: "clickable-icon", attr: { "aria-label": tr("dup.remove") } });
+				setIcon(drop, "x");
+				drop.addEventListener("click", () => {
+					lines.splice(i, 1);
+					void save();
+					draw();
+				});
+			});
+			const add = list.createEl("button", { text: tr("settings.wallets.add") });
+			add.addEventListener("click", () => {
+				lines.push("");
+				draw(true);
+			});
+		};
+		draw();
+	}
+
 	private keyRow(prefix: string, key: ApiKeyName, placeholder: string): Row {
 		return {
 			name: tr(`${prefix}.name`),
@@ -780,6 +879,13 @@ export class LibrarySettingTab extends PluginSettingTab {
 		row.nameEl.prepend(icon);
 		const status = row.nameEl.createSpan({ cls: `library-platform-status${state.connected ? " is-connected" : ""}` });
 		status.setText(tr(state.connected ? "settings.connected" : "settings.notConnected"));
+		if (state.connected) {
+			row.addButton((button) => {
+				button.setIcon("refresh-cw");
+				button.setTooltip(tr("cmd.updateAll"));
+				button.onClick(() => void this.plugin.watchImport(site, true));
+			});
+		}
 		row.addButton((button) => {
 			button.setButtonText(tr(state.connected ? "settings.disconnect" : "settings.connect"));
 			if (!state.connected) button.setCta();

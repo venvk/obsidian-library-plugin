@@ -37,3 +37,9 @@ Click a card to open its note.
 The canvas is `Library map.canvas` in your library folder. Each run builds it again from scratch, so changes you make to it by hand are lost; copy it first to keep a version.
 
 The map reads `Creator` and `Cast`, so it grows with your movies, series, and games that have them.
+
+## A category's canvas
+
+The button at the right of a section's heading draws that category as a canvas, as wide as a screen, in groups that say what they are: creator, actor, genre. NFTs group by network.
+
+A person's or a genre's canvas is split the same way: what they created, what they acted in.

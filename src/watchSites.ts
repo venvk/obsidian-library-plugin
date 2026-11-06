@@ -49,16 +49,25 @@ export async function readPage(url: string, code: string, timeout = 30000, ready
 	const guest = view as unknown as { executeJavaScript: (code: string) => Promise<unknown> }
 	try {
 		await new Promise<void>((resolve, reject) => {
-			const timer = window.setTimeout(() => reject(new Error('timeout')), timeout)
+			let pollTimer = 0
+			const timer = window.setTimeout(() => {
+				window.clearInterval(pollTimer)
+				view.removeEventListener('dom-ready', check)
+				reject(new Error('timeout'))
+			}, timeout)
+			const done = (): void => {
+				window.clearTimeout(timer)
+				window.clearInterval(pollTimer)
+				view.removeEventListener('dom-ready', check)
+				resolve()
+			}
 			const check = (): void => {
 				void guest.executeJavaScript(ready).catch(() => false).then(ok => {
-					if (!ok) return
-					window.clearTimeout(timer)
-					view.removeEventListener('dom-ready', check)
-					resolve()
+					if (ok) done()
 				})
 			}
 			view.addEventListener('dom-ready', check)
+			pollTimer = window.setInterval(check, 500)
 		})
 		let timer = 0
 		const answer = await Promise.race([
@@ -118,6 +127,8 @@ export interface EpisodeRating {
 	season: number
 	episode: number
 	rating: number
+	title?: string
+	episodeId?: string
 }
 
 export function imdbEpisodes(rated: ImdbNode[]): EpisodeRating[] {
@@ -125,15 +136,19 @@ export function imdbEpisodes(rated: ImdbNode[]): EpisodeRating[] {
 	for (const node of rated) {
 		if (node.titleType?.id !== 'tvEpisode') continue
 		const series = node.series?.series
-		const season = node.series?.episodeNumber?.seasonNumber
-		const episode = node.series?.episodeNumber?.episodeNumber
+		const season = node.series?.episodeNumber?.seasonNumber ?? 0
+		const episode = node.series?.episodeNumber?.episodeNumber ?? 0
 		const rating = node.userRating?.value
-		if (!series?.id || !/^tt\d+$/.test(series.id) || !season || !episode || typeof rating !== 'number') continue
+		if (!series?.id || !/^tt\d+$/.test(series.id) || typeof rating !== 'number') continue
+		// Standalone specials with no season and no episode number go to imdbTitles as a movie/special
+		if (season === 0 && episode === 0) continue
 		out.push({
 			series: { id: series.id, name: series.titleText?.text ?? series.id, kind: 'series', year: series.releaseYear?.year ?? null, rating: null, when: node.userRating?.date ?? '', watched: true },
 			season,
 			episode,
 			rating,
+			title: node.titleText?.text ?? '',
+			episodeId: node.id,
 		})
 	}
 	return out
@@ -152,7 +167,8 @@ export function imdbTitles(rated: ImdbNode[], listed: { title: ImdbNode; added: 
 	const add = (node: ImdbNode, when: string, watched: boolean): void => {
 		const id = node.id ?? ''
 		const type = node.titleType?.id ?? ''
-		const kind = IMDB_MOVIE.indexOf(type) >= 0 ? 'movie' : IMDB_SERIES.indexOf(type) >= 0 ? 'series' : null
+		let kind: 'movie' | 'series' | null = IMDB_MOVIE.indexOf(type) >= 0 ? 'movie' : IMDB_SERIES.indexOf(type) >= 0 ? 'series' : null
+		if (!kind && type === 'tvEpisode' && node.series && node.series.episodeNumber === null) kind = 'movie'
 		const known = out.get(id)
 		if (known && !watched) known.listed = true
 		if (!/^tt\d+$/.test(id) || !kind || known) return

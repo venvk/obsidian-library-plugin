@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  Your movies, series, anime and manga, books, games, comics, music and YouTube videos as plain Markdown notes,<br>
+  Your movies, series, anime and manga, books and audiobooks, games, comics, music, YouTube videos and NFTs as plain Markdown notes,<br>
   shown as a gallery of covers. Search a title, pick it, and the note fills itself in.
   <br><br>
   <a href="https://community.obsidian.md/plugins/library">Install</a> · <a href="https://github.com/venvk/obsidian-library-plugin/wiki">Wiki</a> · <a href="https://github.com/venvk/obsidian-library-plugin/issues/new/choose">Report a bug</a>
@@ -25,13 +25,15 @@
 
 - One note per title. The cover, year, genres, creators, cast, ratings and trailer sit in its properties (frontmatter), where Bases, Dataview and other plugins can read them. Set your own rating with five stars: each half star is one point out of 10, written to `My Rating`; click the same rating again to clear it.
 - Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs. A book's chapter list can be edited with the pencil, and each chapter's notes button opens a section with its name in the note body for quotes and thoughts.
-- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order. A book note marks its format (paper, ebook, audiobook) with buttons under the title, saved to `Format`, and the Books filter can show one format.
+- The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order. Searching a book also finds its audiobooks from Audible, Apple Books, LibriVox and the Internet Archive, no key needed, and their listening time counts in the statistics. A book note marks its format (paper, ebook, audiobook) with buttons under the title, saved to `Format`, and the Books filter can show one format.
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
 - Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
-- One command draws your library as a canvas, with posters grouped around the actors and creators they share.
+- One command draws your library as a canvas, with posters grouped around the actors and creators they share, and each category has its own, grouped by creator, actor and genre.
 - Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
 - Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
+- Searching a book also finds its audiobooks, with their length. Listening time counts in the statistics.
+- Paste a wallet address and its NFTs arrive as notes, from 33 networks, with no key: pictures, dates, transactions and the project's links. Details in the [wiki](https://github.com/venvk/obsidian-library-plugin/wiki/NFT).
 - Works on desktop and mobile, in every Obsidian language.
 
 ## Getting started
@@ -121,9 +123,11 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | --- | --- | --- |
 | `www.omdbapi.com`, `m.media-amazon.com` | Movie search with a key, posters | Title or IMDb id, key |
 | `v3-cinemeta.strem.io`, `images.metahub.space`, `episodes.metahub.space` | Movies, series, stills, air dates | Title or IMDb id, genre |
+| `v3.sg.media-imdb.com`, `m.media-amazon.com` | Movie and series search and posters, with IMDb connected | Title |
 | `api.themoviedb.org`, `image.tmdb.org` | Movie and series details, with a key | IMDb id, key |
 | `www.wikidata.org`, `en.wikipedia.org`, `commons.wikimedia.org`, `upload.wikimedia.org` | Search, Rotten Tomatoes, trailers, covers, matching Netflix titles, awards of albums, titles and people, photos on a person's canvas | Search text, ids, Netflix ids, album title and artist |
 | `openlibrary.org`, `covers.openlibrary.org` | Books, chapters, covers | Title, author, ISBN, genres |
+| `api.audible.com`, `itunes.apple.com`, `books.apple.com`, `is1-ssl.mzstatic.com` to `is5-ssl.mzstatic.com`, `librivox.org`, `archive.org` | Audiobook search, length, covers, chapters | Title and author |
 | `www.googleapis.com`, `books.google.com` | Book search with a key, covers | Title, key |
 | `api.rawg.io`, `media.rawg.io` | Games, with a key | Title or id, genre, key |
 | `store.steampowered.com`, `steamcommunity.com`, `api.steampowered.com`, `cdn.cloudflare.steamstatic.com`, `video.akamai.steamstatic.com`, `shared.akamai.steamstatic.com`, `shared.fastly.steamstatic.com` | Games, trailers, Steam import, achievements | Title or app id; sign-in, library and achievements on import |
@@ -131,6 +135,16 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `www.netflix.com` | Netflix connector | Sign-in; viewing activity and thumbs are read, scores are sent as thumbs; unticked or deleted titles are hidden from the history, unstarted series go to My List |
 | `accounts.google.com`, `www.youtube.com` | YouTube connector | Sign-in; the watch history is read (the last 7 days, then one older month a day) with each video's length and watched share; per video, its description, publish date, your like and whether you're subscribed; the like and subscribe buttons in a note send them back |
 | `returnyoutubedislikeapi.com` | YouTube connector: like and estimated dislike counts, as YouTube shows no dislikes | Video id |
+| `eth.blockscout.com`, `optimism.blockscout.com`, `base.blockscout.com`, `arbitrum.blockscout.com`, `polygon.blockscout.com`, `gnosis.blockscout.com`, `celo.blockscout.com`, `zksync.blockscout.com`, `scroll.blockscout.com`, `explorer.inkonchain.com`, `soneium.blockscout.com`, `unichain.blockscout.com`, `explorer.mode.network`, `arbitrum-nova.blockscout.com`, `shapescan.xyz`, `robinhoodchain.blockscout.com`, `tonapi.io`, `api-mainnet.magiceden.dev`, `api.nearblocks.io`, `api.fastnear.com`, `rpc.mainnet.near.org` | NFT connector | Your wallet addresses |
+| `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain, Polygon and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
+| `api.opensea.io` | NFT collection links (site, socials); with an API key also the creator's profile, covers and token pictures | Contract address and token id; key if set |
+| `ethereum-rpc.publicnode.com`, `mainnet.optimism.io`, `mainnet.base.org`, `arb1.arbitrum.io`, `polygon-bor-rpc.publicnode.com`, `rpc.gnosischain.com`, `rpc.mainnet.chain.robinhood.com` | NFT pictures the explorer lacks | Token contract and id |
+| `bscscan.com`, `polygonscan.com`, `taikoscan.io` token and address pages, `cdn*.assetquay.com` | Explorer's cached NFT picture, who created a contract | Token contract and id |
+| `bnb.nftscan.com` token pages and the image hosts they show (`i.seadn.io`, `cdn-2.galxe.com`) | BNB NFT pictures whose own servers are gone | Token contract and id |
+| `api.routescan.io`, `api.avax.network`, `rpc.blast.io`, `rpc.mantle.xyz`, `mainnet.boba.network`, `rpc.hemi.network`, `rpc.chiliz.com` | NFT connector on Avalanche, Blast, Mantle, Boba, Hemi and Chiliz | Wallet address; token contract and id |
+| `api.tzkt.io` | NFT connector on Tezos | Wallet address |
+| `ipfs2.seadn.io`, `ipfs.filebase.io`, `cloudflare-ipfs.com`, `gateway.pinata.cloud`, `ipfs.io`, `dweb.link`, `arweave.net`, and the hosts a token's metadata names | NFT images and metadata | Token id or file path |
+| `tonviewer.com`, `solscan.io`, `bscscan.com`, `taikoscan.io`, `nearblocks.io`, `tzkt.io`, `www.audible.com`, `snowtrace.io`, `blastexplorer.io`, `mantlescan.xyz`, `bobascan.com`, `explorer.hemi.xyz`, `chiliscan.com` | Links in NFT notes, opened only when you click them | Nothing until you click |
 | `api.trakt.tv`, `auth.trakt.tv` | Trakt connector | Sign-in code; history, ratings and watchlist are read, scores, watched and unwatched episodes, watchlist titles and removals of deleted notes are sent |
 | `id.twitch.tv`, `api.igdb.com` | Game trailers, with Twitch keys | Twitch id and secret, game |
 | `api.deezer.com`, `cdn-images.dzcdn.net` | Music search, covers, tracks, similar albums | Album or artist |

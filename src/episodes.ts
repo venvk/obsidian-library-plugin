@@ -136,7 +136,7 @@ export function seasonsOf(fm: Record<string, unknown>, kind: TrackKind = 'series
 
 // Writes ticks + ratings back, Progress from ticks, My Rating from seasons; Complete is dropped.
 // Seasons and episodes the plugin does not know keep their other keys.
-function writeBack(fm: Record<string, unknown>, states: SeasonState[], kind: TrackKind = 'series'): void {
+export function writeBack(fm: Record<string, unknown>, states: SeasonState[], kind: TrackKind = 'series'): void {
 	const raw = rawSeasons(fm, kind)
 	const seasons = states.map((state, index) => {
 		const season: Record<string, unknown> = { ...(raw[index] ?? { name: state.name, episodes: state.episodes.length }) }
@@ -171,7 +171,7 @@ function writeBack(fm: Record<string, unknown>, states: SeasonState[], kind: Tra
 	if (seasonRatings.length > 0) fm['My Rating'] = average(seasonRatings)
 }
 
-function recompute(state: SeasonState): void {
+export function recompute(state: SeasonState): void {
 	const rated = state.episodes.map((e) => e.rating).filter((r): r is number => r !== null)
 	state.ratedByEpisodes = rated.length > 0
 	state.rating = rated.length > 0 ? average(rated) : state.manualRating
@@ -268,18 +268,26 @@ export function mergeSeasons(existing: unknown, fetched: unknown): unknown[] {
 			out.push(mine ?? theirs ?? old[i] ?? fresh[i])
 			continue
 		}
-		const merged: Record<string, unknown> = { ...theirs, ...mine }
+		const merged: Record<string, unknown> = { ...mine }
 		for (const key of ['name', 'rating', 'trailer']) {
-			if (text(mine[key]) === '' && theirs[key] !== undefined) merged[key] = theirs[key]
+			if (text(mine[key]) === '' && theirs[key] !== undefined && text(theirs[key]) !== '') {
+				merged[key] = theirs[key]
+			}
 		}
-		merged.episodes = Math.max(countOf(mine), countOf(theirs))
+		if (countOf(theirs) > countOf(mine)) {
+			merged.episodes = countOf(theirs)
+		}
 		const myEpisodes = rawEpisodes(mine)
 		const theirEpisodes = rawEpisodes(theirs)
 		if (myEpisodes.length > 0 || theirEpisodes.length > 0) {
 			const list: Record<string, unknown>[] = []
 			for (let e = 0; e < Math.max(myEpisodes.length, theirEpisodes.length); e++) {
-				const entry: Record<string, unknown> = { ...(theirEpisodes[e] ?? {}), ...(myEpisodes[e] ?? {}) }
-				if (text(myEpisodes[e]?.title) === '' && text(theirEpisodes[e]?.title) !== '') entry.title = theirEpisodes[e]?.title
+				const myEp = myEpisodes[e] ?? {}
+				const theirEp = theirEpisodes[e] ?? {}
+				const entry: Record<string, unknown> = { ...myEp }
+				if (text(myEp.title) === '' && text(theirEp.title) !== '') {
+					entry.title = theirEp.title
+				}
 				list.push(entry)
 			}
 			merged.episode_list = list
@@ -287,6 +295,32 @@ export function mergeSeasons(existing: unknown, fetched: unknown): unknown[] {
 		out.push(merged)
 	}
 	return out
+}
+
+export function areSeasonsChanged(existing: unknown, merged: unknown[]): boolean {
+	const old = Array.isArray(existing) ? (existing as unknown[]) : []
+	if (old.length !== merged.length) return true
+	for (let i = 0; i < old.length; i++) {
+		const mine = record(old[i])
+		const next = record(merged[i])
+		if (!mine || !next) {
+			if (mine !== next) return true
+			continue
+		}
+		if (text(mine.name) !== text(next.name)) return true
+		if (text(mine.rating) !== text(next.rating)) return true
+		if (text(mine.trailer) !== text(next.trailer)) return true
+		if (countOf(mine) !== countOf(next)) return true
+		const myEps = rawEpisodes(mine)
+		const nextEps = rawEpisodes(next)
+		if (myEps.length !== nextEps.length) return true
+		for (let e = 0; e < myEps.length; e++) {
+			if (text(myEps[e]?.title) !== text(nextEps[e]?.title)) return true
+			if (Boolean(myEps[e]?.watched) !== Boolean(nextEps[e]?.watched)) return true
+			if (myEps[e]?.my_rating !== nextEps[e]?.my_rating) return true
+		}
+	}
+	return false
 }
 
 // A chapter's own notes live in the note body under a heading with its label ("3. Title"), up to the

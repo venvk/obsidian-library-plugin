@@ -18,12 +18,19 @@ export const MEDIA: ContentType[] = ['movie', 'series', 'book', 'comic', 'game',
 // the video connectors' category (YouTube): fixed like the built-in ones
 export const VIDEO_CATEGORY = 'Video'
 
+// the NFT connector's category, fixed the same way
+export const NFT_CATEGORY = 'NFT'
+
 function isVideo(cat: ICategory): boolean {
 	return cat.contentType === 'manual' && cat.typeValue === VIDEO_CATEGORY
 }
 
+export function isNftCategory(cat: ICategory): boolean {
+	return cat.contentType === 'manual' && cat.typeValue === NFT_CATEGORY
+}
+
 export function isBuiltInCategory(cat: ICategory): boolean {
-	return isVideo(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
+	return isVideo(cat) || isNftCategory(cat) || (cat.contentType !== 'manual' && cat.typeValue === TYPE_DEFAULTS[cat.contentType])
 }
 
 // The library's sections in order: the categories, with Soon and Up next placed among them.
@@ -61,6 +68,7 @@ export function splitOrder(entries: SectionEntry[]): { categories: ICategory[]; 
 
 export function categoryLabel(cat: ICategory): string {
 	if (isVideo(cat)) return tr('settings.default.video')
+	if (isNftCategory(cat)) return NFT_CATEGORY
 	return isBuiltInCategory(cat) ? tr(`settings.default.${cat.contentType}`) : cat.name
 }
 
@@ -118,10 +126,11 @@ export function newCategory(contentType: ContentType, settings: ILibrarySettings
 }
 
 export function addCategoryTop(settings: ILibrarySettings, typeValue: string): void {
+	const cat = settings.categories.find(c => c.typeValue === typeValue)
+	if (!cat || isNftCategory(cat) || cat.typeValue === NFT_CATEGORY) return
 	const tops = settings.stats.tops
 	if (!tops.some(top => top.kind === 'category' && top.key === typeValue)) tops.push({ kind: 'category', key: typeValue })
-	const cat = settings.categories.find(c => c.typeValue === typeValue)
-	if (cat) addCreatorTop(tops, cat)
+	addCreatorTop(tops, cat)
 }
 
 // Games' and videos' creators are developers and channels: kept out of the shared creator top.

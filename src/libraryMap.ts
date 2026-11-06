@@ -1,3 +1,6 @@
+import { tr } from './i18n'
+import { linkLabel, toStrArray } from './util'
+
 // The library as an Obsidian canvas. Each busy person is a star with the
 // titles that best belong to them in a ring around it, and the stars are
 // packed in rows, so the map reads like a set of constellations. A title also
@@ -164,10 +167,6 @@ export function personCardText(card: PersonCard): string {
 
 
 export function linkCanvas(name: string, sections: { label: string; titles: Omit<MapTitle, 'people'>[] }[], card?: PersonCard): Canvas {
-	// as many columns as keep the whole grid about as wide as a 16:9 screen
-	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
-	const cols = Math.max(1, Math.round(Math.sqrt((total * 16 * (POSTER.height + GAP)) / (9 * (POSTER.width + GAP)))))
-	// a person: one card, the photo on top at its own height, then the text as tall as its lines
 	const nodes: CanvasNode[] = []
 	let head = 80
 	if (card) {
@@ -176,23 +175,184 @@ export function linkCanvas(name: string, sections: { label: string; titles: Omit
 	} else {
 		nodes.push({ id: 'lib-h', type: 'text', text: `# ${name}`, x: 0, y: 0, width: 600, height: head })
 	}
-	let y = head + 60
+
+	// laid out for a desktop screen: as wide as a 16:9 picture of all the posters, sections side by side
+	const cellWidth = POSTER.width + GAP
+	const cellHeight = POSTER.height + GAP
+	const total = sections.reduce((sum, section) => sum + section.titles.length, 0)
+	const targetWidth = Math.max(cellWidth * 6, Math.sqrt((total * cellWidth * cellHeight * 16) / 9) * 1.4)
+	const maxCols = Math.max(1, Math.floor(targetWidth / cellWidth))
+	let curX = 0
+	let curY = head + 60
+	let rowMaxHeight = 0
+
 	sections.forEach((section, i) => {
-		const rows = Math.ceil(section.titles.length / cols)
-		const width = Math.min(section.titles.length, cols) * (POSTER.width + GAP) + GAP
-		const height = rows * (POSTER.height + GAP) + GAP
-		nodes.push({ id: `lib-g${String(i)}`, type: 'group', label: section.label, x: 0, y, width, height })
+		const n = section.titles.length
+		const sectionCols = Math.max(1, Math.min(n, maxCols))
+		const rows = Math.ceil(n / sectionCols)
+		const secWidth = sectionCols * cellWidth + GAP
+		const secHeight = rows * cellHeight + GAP
+
+		if (curX > 0 && curX + secWidth > targetWidth) {
+			curX = 0
+			curY += rowMaxHeight + 80
+			rowMaxHeight = 0
+		}
+
+		const cleanLabel = section.label.replace(/\.canvas$/i, '').trim()
+		nodes.push({ id: `lib-g${String(i)}`, type: 'group', label: cleanLabel, x: curX, y: curY, width: secWidth, height: secHeight })
 		section.titles.forEach((title, j) => {
 			nodes.push({
 				id: `lib-t${String(nodes.length)}`,
 				type: 'text',
 				text: `${title.cover}${title.cover ? '\n\n' : ''}**${link(title.path, title.name)}**`,
-				x: GAP + (j % cols) * (POSTER.width + GAP),
-				y: y + GAP + Math.floor(j / cols) * (POSTER.height + GAP),
+				x: curX + GAP + (j % sectionCols) * (POSTER.width + GAP),
+				y: curY + GAP + Math.floor(j / sectionCols) * (POSTER.height + GAP),
 				...POSTER,
 			})
 		})
-		y += height + 100
+
+		curX += secWidth + 60
+		rowMaxHeight = Math.max(rowMaxHeight, secHeight)
 	})
+
 	return { nodes, edges: [] }
+}
+
+export function categoryCanvas(
+	categoryName: string,
+	titles: MapTitle[],
+	getFileFm?: (path: string) => Record<string, unknown> | undefined
+): Canvas {
+	const groups = new Map<string, Omit<MapTitle, 'people'>[]>()
+	// every group says what kind it is: creator, actor, genre
+	const typed = (key: string, name: string): string => `${tr(key)}: ${name}`
+	const rank = (label: string): number => {
+		const at = ['header.creator', 'header.cast', 'header.genre'].findIndex(key => label.startsWith(`${tr(key)}: `))
+		return at < 0 ? 3 : at
+	}
+	const isNft = categoryName.toLowerCase().includes('nft') || titles.some(t => getFileFm?.(t.path)?.Source === 'nft')
+	const isVideo = categoryName.toLowerCase().includes('video') || titles.some(t => getFileFm?.(t.path)?.Source === 'youtube')
+
+	if (isNft) {
+		for (const title of titles) {
+			const fm = getFileFm?.(title.path)
+			const chain = fm ? toStrArray(fm.Platforms)[0] : ''
+			const groupKey = chain ? typed('header.chain', chain) : 'NFT'
+			if (!groups.has(groupKey)) groups.set(groupKey, [])
+			groups.get(groupKey)?.push(title)
+		}
+	} else if (isVideo) {
+		for (const title of titles) {
+			const fm = getFileFm?.(title.path)
+			const creators = fm ? toStrArray(fm.Creator).map(linkLabel).filter(Boolean) : []
+			const groupKey = creators[0] ? typed('header.creator', creators[0]) : 'YouTube'
+			if (!groups.has(groupKey)) groups.set(groupKey, [])
+			groups.get(groupKey)?.push(title)
+		}
+	} else {
+		const directorCounts = new Map<string, number>()
+		const actorCounts = new Map<string, number>()
+		const metaMap = new Map<string, { directors: string[]; actors: string[]; genres: string[] }>()
+
+		for (const title of titles) {
+			const fm = getFileFm?.(title.path)
+			const directors = fm
+				? [...toStrArray(fm.Director), ...toStrArray(fm.Creator), ...toStrArray(fm.Author), ...toStrArray(fm.Artist)]
+					.map(linkLabel)
+					.filter(Boolean)
+				: []
+			const actors = fm ? toStrArray(fm.Cast).map(linkLabel).filter(Boolean) : []
+			const genres = fm ? toStrArray(fm.Genre).map(linkLabel).filter(Boolean) : []
+
+			for (const d of new Set(directors)) directorCounts.set(d, (directorCounts.get(d) ?? 0) + 1)
+			for (const a of new Set(actors)) actorCounts.set(a, (actorCounts.get(a) ?? 0) + 1)
+			metaMap.set(title.path, { directors, actors, genres })
+		}
+
+		const topDirectors = new Set(
+			[...directorCounts.entries()]
+				.filter(([, count]) => count >= 2)
+				.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+				.map(([name]) => name)
+		)
+
+		const topActors = new Set(
+			[...actorCounts.entries()]
+				.filter(([, count]) => count >= 2)
+				.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+				.map(([name]) => name)
+		)
+
+		for (const title of titles) {
+			const meta = metaMap.get(title.path)
+			let groupKey = ''
+
+			if (meta) {
+				const matchDirector = meta.directors.find(d => topDirectors.has(d))
+				if (matchDirector) {
+					groupKey = typed('header.creator', matchDirector)
+				} else {
+					const matchActor = meta.actors.find(a => topActors.has(a))
+					if (matchActor) {
+						groupKey = typed('header.cast', matchActor)
+					} else if (meta.genres[0]) {
+						groupKey = typed('header.genre', meta.genres[0])
+					}
+				}
+			}
+
+			if (!groupKey) {
+				groupKey = title.people[0] ? typed('header.creator', linkLabel(title.people[0])) : tr('filter.other')
+			}
+
+			if (!groups.has(groupKey)) groups.set(groupKey, [])
+			groups.get(groupKey)?.push(title)
+		}
+	}
+
+	const sortedSections = [...groups.entries()]
+		.sort((a, b) => rank(a[0]) - rank(b[0]) || b[1].length - a[1].length || a[0].localeCompare(b[0]))
+		.map(([label, groupTitles]) => {
+			const clean = label.replace(/\.canvas$/i, '').replace(/^[|·\s-]+|[|·\s-]+$/g, '').trim()
+			return {
+				label: `${clean} (${String(groupTitles.length)})`,
+				titles: groupTitles
+			}
+		})
+
+	const canvas = linkCanvas(categoryName, sortedSections)
+
+	const titleNodeMap = new Map<string, string>()
+	for (const node of canvas.nodes) {
+		if (node.id.startsWith('lib-t')) {
+			for (const title of titles) {
+				const base = title.path.replace(/\.md$/, '')
+				if (node.text && (node.text.includes(`[[${base}|`) || node.text.includes(`[[${title.path}|`))) {
+					titleNodeMap.set(title.path, node.id)
+					break
+				}
+			}
+		}
+	}
+
+	const edges: CanvasEdge[] = []
+	for (let i = 0; i < titles.length; i++) {
+		const t1 = titles[i]
+		if (!t1) continue
+		for (let j = i + 1; j < titles.length; j++) {
+			const t2 = titles[j]
+			if (!t2) continue
+			const common = t1.people.filter(p => t2.people.includes(p))
+			if (common.length > 0) {
+				const n1 = titleNodeMap.get(t1.path)
+				const n2 = titleNodeMap.get(t2.path)
+				if (n1 && n2 && n1 !== n2) {
+					edges.push({ id: `e${String(edges.length)}`, fromNode: n1, toNode: n2, toEnd: 'none' })
+				}
+			}
+		}
+	}
+	canvas.edges = edges.slice(0, 150)
+	return canvas
 }

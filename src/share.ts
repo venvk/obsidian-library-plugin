@@ -1,15 +1,12 @@
 import { App, requestUrl, TFile } from 'obsidian'
 import { RATING_RT_ICON } from './constants'
 import { tr } from './i18n'
-import { coverValue, linkLabel, publicHttpsUrl, sanitizeFilename, toStr, toStrArray } from './util'
+import { coverValue, isCollectible, isWalletAddress, latestNftMintDate, linkLabel, publicHttpsUrl, sanitizeFilename, toStr, toStrArray } from './util'
+import { INITIALS, MARKS, PLATFORM_COLORS, platformFamily } from './ui/platformIcons'
 
 const W = 1200
 const H = 630
 const PAD = 48
-const POSTER_W = 340
-const POSTER_H = 510
-// a video thumbnail: room left for the title beside it
-const WIDE_W = 560
 const PLUGIN_URL = 'https://community.obsidian.md/plugins/library'
 
 type Frontmatter = Record<string, unknown>
@@ -171,41 +168,68 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 	ctx.fillStyle = accent
 	ctx.fillRect(0, 0, 8, H)
 
-	const posterX = PAD
-	const posterY = (H - POSTER_H) / 2
-	// album covers are square, video thumbnails wide: 16:9 across the poster's height centre
-	const wide = toStr(fm.Source) === 'youtube'
-	const posterW = toStr(fm.Type).toLowerCase() === 'music' ? POSTER_H : wide ? WIDE_W : POSTER_W
-	const imageH = wide ? Math.round((WIDE_W * 9) / 16) : POSTER_H
-	const imageY = posterY + (POSTER_H - imageH) / 2
 	const coverBytes = await loadCoverBytes(app, coverValue(fm, coverProperty))
 	const img = coverBytes ? await loadImage(coverBytes) : null
-	roundRect(ctx, posterX, imageY, posterW, imageH, 16)
+
+	// Preserve natural aspect ratio without cropping (square is square, rectangle is rectangle)
+	const maxImageW = 540
+	const maxImageH = 510
+	let imageW: number
+	let imageH: number
+
+	if (img && img.width > 0 && img.height > 0) {
+		const aspect = img.width / img.height
+		if (aspect >= maxImageW / maxImageH) {
+			imageW = maxImageW
+			imageH = Math.round(maxImageW / aspect)
+			if (imageH > maxImageH) {
+				imageH = maxImageH
+				imageW = Math.round(maxImageH * aspect)
+			}
+		} else {
+			imageH = maxImageH
+			imageW = Math.round(maxImageH * aspect)
+			if (imageW > maxImageW) {
+				imageW = maxImageW
+				imageH = Math.round(maxImageW / aspect)
+			}
+		}
+	} else {
+		const isWide = toStr(fm.Source) === 'youtube'
+		const isSquare = toStr(fm.Type).toLowerCase() === 'music' || isCollectible(fm)
+		imageW = isSquare ? 510 : isWide ? 540 : 340
+		imageH = isWide ? 304 : 510
+	}
+
+	const imageX = PAD
+	const imageY = Math.round((H - imageH) / 2)
+
+	roundRect(ctx, imageX, imageY, imageW, imageH, 16)
 	ctx.save()
 	ctx.clip()
 	if (img && img.width > 0 && img.height > 0) {
-		const scale = Math.max(posterW / img.width, imageH / img.height)
-		const dw = img.width * scale
-		const dh = img.height * scale
-		ctx.drawImage(img, posterX + (posterW - dw) / 2, imageY + (imageH - dh) / 2, dw, dh)
+		ctx.drawImage(img, imageX, imageY, imageW, imageH)
 	} else {
 		ctx.fillStyle = '#24242e'
-		ctx.fillRect(posterX, imageY, posterW, imageH)
+		ctx.fillRect(imageX, imageY, imageW, imageH)
 		ctx.fillStyle = '#5a5a6e'
 		ctx.font = '140px sans-serif'
 		ctx.textAlign = 'center'
+		ctx.textBaseline = 'middle'
 		const type = toStr(fm.Type).toLowerCase()
-		const glyph = type === 'book' ? '📖'
+		const glyph = isCollectible(fm) ? '💎'
+			: type === 'book' ? '📖'
 			: type === 'game' ? '🎮'
 			: type === 'music' ? '🎵'
 			: type === 'anime' ? '🎌'
 			: type === 'comic' ? '📚'
 			: '🎬'
-		ctx.fillText(glyph, posterX + posterW / 2, posterY + POSTER_H / 2 + 50)
+		ctx.fillText(glyph, imageX + imageW / 2, imageY + imageH / 2)
+		ctx.textBaseline = 'alphabetic'
 	}
 	ctx.restore()
 
-	const colX = posterX + posterW + PAD
+	const colX = imageX + imageW + PAD
 	const colW = W - colX - PAD
 	ctx.textAlign = 'left'
 	ctx.textBaseline = 'alphabetic'
@@ -213,71 +237,244 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 	ctx.fillStyle = '#f2f2f5'
 	ctx.font = 'bold 58px sans-serif'
 	const titleLines = wrap(ctx, name, colW, 3)
-	let y = posterY + 70
+	let y = Math.min(imageY + 65, 130)
 	for (const line of titleLines) {
 		ctx.fillText(line, colX, y)
-		y += 70
+		y += 68
 	}
 
-	const meta: string[] = []
-	if (fm.Year) meta.push(toStr(fm.Year))
-	const genres = toStrArray(fm.Genre).map(linkLabel).slice(0, 3)
-	if (genres.length > 0) meta.push(genres.join(' · '))
-	if (meta.length > 0) {
-		ctx.fillStyle = '#a0a0b0'
-		ctx.font = '30px sans-serif'
+	const isNft = isCollectible(fm) || toStr(fm.Source) === 'nft' || fm.Type === 'NFT'
+	if (isNft) {
 		y += 14
-		wrap(ctx, meta.join('  ·  '), colW, 3).forEach((l) => {
-			ctx.fillText(l, colX, y)
-			y += 40
-		})
-	}
+		let rowX = colX
+		const rowH = 34
 
-	const creator = toStrArray(fm.Creator ?? fm.Director ?? fm.Author ?? fm.Artist).map(linkLabel).join(', ')
-	if (creator) {
-		ctx.fillStyle = '#8a8a9a'
-		ctx.font = '28px sans-serif'
-		y += 8
-		wrap(ctx, creator, colW, 2).forEach((l) => {
-			ctx.fillText(l, colX, y)
-			y += 40
-		})
-	}
+		// Blockchain badge in the info block, styled like the note header badge
+		let platforms = toStrArray(fm.Platforms)
+		if (platforms.length === 0) {
+			const fallback = toStr(fm['Source ID']).split(':')[0]
+			if (fallback) platforms = [fallback]
+		}
+		for (const platform of platforms) {
+			const family = platformFamily(platform) ?? platform.toLowerCase().replace(/\s+/g, '-')
+			const colors = PLATFORM_COLORS[family] ?? { bg: '#3a3a4c', text: '#ffffff' }
+			const mark = MARKS[family]
+			const initial = INITIALS[family]?.text ?? platform.slice(0, 1).toUpperCase()
+			const label = mark?.label ?? INITIALS[family]?.label ?? platform
 
-	// Cast only while it leaves room above the rating pill.
-	const cast = toStrArray(fm.Cast).map(linkLabel).slice(0, 3).join(', ')
-	const pillTop = posterY + POSTER_H - 96
-	if (cast && y + 48 + 48 <= pillTop) {
-		ctx.fillStyle = '#8a8a9a'
-		ctx.font = '28px sans-serif'
-		y += 8
-		wrap(ctx, `${tr('header.cast')}: ${cast}`, colW, 2).forEach((l) => {
-			ctx.fillText(l, colX, y)
-			y += 40
-		})
-	}
+			ctx.font = 'bold 19px sans-serif'
+			const textW = ctx.measureText(label).width
+			const iconSize = 18
+			const badgeW = Math.round(textW + iconSize + 26)
+			if (rowX + badgeW > W - PAD) {
+				y += rowH + 8
+				rowX = colX
+			}
 
-	const ext = shareRatings(fm)
-	if (ext.length > 0) {
-		ctx.fillStyle = '#7a7a8a'
-		ctx.font = '24px sans-serif'
-		y += 12
-		ctx.fillText(ext.join('   ·   '), colX, y + 12)
-		y += 36
-	}
+			ctx.save()
+			ctx.fillStyle = colors.bg
+			roundRect(ctx, rowX, y - 22, badgeW, rowH, 6)
+			ctx.fill()
+			ctx.restore()
 
-	const ratingRaw = fm['My Rating'] ?? fm.Rating
-	const rating = ratingRaw ? toStr(ratingRaw).trim() : ''
-	if (rating) {
-		const pillY = posterY + POSTER_H - 96
-		ctx.fillStyle = accent
-		roundRect(ctx, colX, pillY, 260, 84, 42)
-		ctx.fill()
-		ctx.fillStyle = themeColor(ctx, '--text-on-accent', '#ffffff')
-		ctx.font = 'bold 46px sans-serif'
-		ctx.textBaseline = 'middle'
-		ctx.fillText(`★ ${rating} / 10`, colX + 28, pillY + 44)
-		ctx.textBaseline = 'alphabetic'
+			const iconX = rowX + 10
+			const iconY = y - 22 + Math.round((rowH - iconSize) / 2)
+			if (mark && typeof Path2D !== 'undefined') {
+				ctx.save()
+				ctx.fillStyle = colors.text
+				ctx.translate(iconX, iconY)
+				if (family === 'taiko') {
+					const scale = iconSize / 260
+					ctx.translate(-20 * scale, -20 * scale)
+					ctx.scale(scale, scale)
+				} else {
+					const scale = iconSize / 24
+					ctx.scale(scale, scale)
+				}
+				ctx.fill(new Path2D(mark.path))
+				ctx.restore()
+			} else {
+				ctx.save()
+				ctx.fillStyle = colors.text
+				ctx.font = 'bold 14px sans-serif'
+				ctx.textAlign = 'center'
+				ctx.textBaseline = 'middle'
+				ctx.fillText(initial, iconX + iconSize / 2, y - 22 + rowH / 2)
+				ctx.restore()
+			}
+
+			ctx.save()
+			ctx.fillStyle = colors.text
+			ctx.font = 'bold 19px sans-serif'
+			ctx.textAlign = 'left'
+			ctx.textBaseline = 'middle'
+			ctx.fillText(label, iconX + iconSize + 6, y - 22 + rowH / 2)
+			ctx.restore()
+
+			rowX += badgeW + 8
+		}
+
+		const chips: string[] = []
+		chips.push(fm.OAT === true ? 'OAT' : 'NFT')
+		const standard = toStr(fm.Standard).trim()
+		if (standard) chips.push(standard)
+		const count = Number(fm.Count)
+		const tokens = toStrArray(fm.Tokens)
+		if (count > 1) {
+			chips.push(`×${count}`)
+		} else if (tokens.length > 1) {
+			chips.push(`×${tokens.length}`)
+		} else {
+			const tokenId = toStr(fm['Token ID']).trim()
+			if (tokenId && tokenId.length <= 14) chips.push(`#${tokenId}`)
+		}
+
+		if (chips.length > 0) {
+			ctx.font = 'bold 19px sans-serif'
+			for (const text of chips) {
+				const tw = ctx.measureText(text).width
+				const chipW = Math.round(tw + 24)
+				if (rowX + chipW > W - PAD) {
+					y += rowH + 8
+					rowX = colX
+				}
+				ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'
+				roundRect(ctx, rowX, y - 22, chipW, rowH, 6)
+				ctx.fill()
+				ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)'
+				ctx.lineWidth = 1
+				ctx.stroke()
+				ctx.fillStyle = '#e2e2ec'
+				ctx.textBaseline = 'middle'
+				ctx.fillText(text, rowX + 12, y - 22 + rowH / 2)
+				ctx.textBaseline = 'alphabetic'
+				rowX += chipW + 8
+			}
+		}
+		y += rowH + 16
+
+		let collection = toStr(fm.Collection).trim()
+		if (!collection) {
+			const creators = toStrArray(fm.Creator).map(linkLabel).filter(c => !isWalletAddress(c))
+			if (creators.length > 0 && creators[0]) collection = creators[0]
+		}
+		if (collection && collection.toLowerCase() !== name.toLowerCase()) {
+			ctx.fillStyle = '#b4b4c6'
+			ctx.font = '28px sans-serif'
+			const collLabel = tr('header.collection') || 'Collection'
+			wrap(ctx, `${collLabel}: ${collection}`, colW, 2).forEach((l) => {
+				ctx.fillText(l, colX, y)
+				y += 38
+			})
+			y += 6
+		}
+
+		const authorRaw = toStrArray(fm.Author ?? fm.Artist).map(linkLabel).filter(c => !isWalletAddress(c))
+		const creators = toStrArray(fm.Creator).map(linkLabel).filter(c => !isWalletAddress(c))
+		const authorList = authorRaw.length > 0 ? authorRaw : creators.filter(c => c.toLowerCase() !== collection.toLowerCase())
+		const author = authorList.join(', ')
+		if (author && author.toLowerCase() !== name.toLowerCase()) {
+			ctx.fillStyle = '#8a8a9a'
+			ctx.font = '28px sans-serif'
+			const creatorLabel = tr('header.creator') || 'Creator'
+			wrap(ctx, `${creatorLabel}: ${author}`, colW, 2).forEach((l) => {
+				ctx.fillText(l, colX, y)
+				y += 38
+			})
+			y += 6
+		}
+
+		const mintDate = latestNftMintDate(fm) || toStr(fm.Minted) || toStr(fm.Acquired) || toStr(fm.Date)
+		if (mintDate) {
+			ctx.fillStyle = '#7a7a8a'
+			ctx.font = '24px sans-serif'
+			const dateLabel = tr('header.minted') || 'Minted'
+			ctx.fillText(`${dateLabel}: ${mintDate}`, colX, y)
+			y += 34
+		}
+
+		const ratingRaw = fm['My Rating'] ?? fm.Rating
+		const rating = ratingRaw ? toStr(ratingRaw).trim() : ''
+		const pillY = 474
+		if (fm.Favorite === true) {
+			ctx.fillStyle = '#e3b341'
+			roundRect(ctx, colX, pillY, 240, 76, 38)
+			ctx.fill()
+			ctx.fillStyle = '#1e2026'
+			ctx.font = 'bold 36px sans-serif'
+			ctx.textBaseline = 'middle'
+			ctx.fillText('★ Favorite', colX + 28, pillY + 39)
+			ctx.textBaseline = 'alphabetic'
+		} else if (rating) {
+			ctx.fillStyle = accent
+			roundRect(ctx, colX, pillY, 260, 84, 42)
+			ctx.fill()
+			ctx.fillStyle = themeColor(ctx, '--text-on-accent', '#ffffff')
+			ctx.font = 'bold 46px sans-serif'
+			ctx.textBaseline = 'middle'
+			ctx.fillText(`★ ${rating} / 10`, colX + 28, pillY + 44)
+			ctx.textBaseline = 'alphabetic'
+		}
+	} else {
+		const meta: string[] = []
+		if (fm.Year) meta.push(toStr(fm.Year))
+		const genres = toStrArray(fm.Genre).map(linkLabel).slice(0, 3)
+		if (genres.length > 0) meta.push(genres.join(' · '))
+		if (meta.length > 0) {
+			ctx.fillStyle = '#a0a0b0'
+			ctx.font = '30px sans-serif'
+			y += 14
+			wrap(ctx, meta.join('  ·  '), colW, 3).forEach((l) => {
+				ctx.fillText(l, colX, y)
+				y += 40
+			})
+		}
+
+		const creator = toStrArray(fm.Creator ?? fm.Director ?? fm.Author ?? fm.Artist).map(linkLabel).join(', ')
+		if (creator) {
+			ctx.fillStyle = '#8a8a9a'
+			ctx.font = '28px sans-serif'
+			y += 8
+			wrap(ctx, creator, colW, 2).forEach((l) => {
+				ctx.fillText(l, colX, y)
+				y += 40
+			})
+		}
+
+		const cast = toStrArray(fm.Cast).map(linkLabel).slice(0, 3).join(', ')
+		const pillTop = 474
+		if (cast && y + 48 + 48 <= pillTop) {
+			ctx.fillStyle = '#8a8a9a'
+			ctx.font = '28px sans-serif'
+			y += 8
+			wrap(ctx, `${tr('header.cast')}: ${cast}`, colW, 2).forEach((l) => {
+				ctx.fillText(l, colX, y)
+				y += 40
+			})
+		}
+
+		const ext = shareRatings(fm)
+		if (ext.length > 0) {
+			ctx.fillStyle = '#7a7a8a'
+			ctx.font = '24px sans-serif'
+			y += 12
+			ctx.fillText(ext.join('   ·   '), colX, y + 12)
+			y += 36
+		}
+
+		const ratingRaw = fm['My Rating'] ?? fm.Rating
+		const rating = ratingRaw ? toStr(ratingRaw).trim() : ''
+		if (rating) {
+			const pillY = 474
+			ctx.fillStyle = accent
+			roundRect(ctx, colX, pillY, 260, 84, 42)
+			ctx.fill()
+			ctx.fillStyle = themeColor(ctx, '--text-on-accent', '#ffffff')
+			ctx.font = 'bold 46px sans-serif'
+			ctx.textBaseline = 'middle'
+			ctx.fillText(`★ ${rating} / 10`, colX + 28, pillY + 44)
+			ctx.textBaseline = 'alphabetic'
+		}
 	}
 
 	ctx.fillStyle = '#5a5a6e'
