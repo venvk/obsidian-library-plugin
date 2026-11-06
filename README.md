@@ -15,7 +15,7 @@
 </p>
 
 <p align="center">
-  Your movies, series, anime and manga, books, games, comics, music and YouTube videos as plain Markdown notes,<br>
+  Your movies, series, anime and manga, books and audiobooks, games, comics, music, YouTube videos and NFTs as plain Markdown notes,<br>
   shown as a gallery of covers. Search a title, pick it, and the note fills itself in.
   <br><br>
   <a href="https://community.obsidian.md/plugins/library">Install</a> · <a href="https://github.com/venvk/obsidian-library-plugin/wiki">Wiki</a> · <a href="https://github.com/venvk/obsidian-library-plugin/issues/new/choose">Report a bug</a>
@@ -29,9 +29,11 @@
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
 - Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
-- One command draws your library as a canvas, with posters grouped around the actors and creators they share.
+- One command draws your library as a canvas, with posters grouped around the actors and creators they share, and each category has its own, grouped by creator, actor and genre.
 - Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
 - Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
+- Searching a book also finds its audiobooks, with their length. Listening time counts in the statistics.
+- Paste a wallet address and its NFTs arrive as notes, from 33 networks, with no key: pictures, dates, transactions and the project's links. Details in the [wiki](https://github.com/venvk/obsidian-library-plugin/wiki/NFT).
 - Works on desktop and mobile, in every Obsidian language.
 
 ## Getting started
@@ -134,7 +136,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `accounts.google.com`, `www.youtube.com` | YouTube connector | Sign-in; the watch history is read (the last 7 days, then one older month a day) with each video's length and watched share; per video, its description, publish date, your like and whether you're subscribed; the like and subscribe buttons in a note send them back |
 | `returnyoutubedislikeapi.com` | YouTube connector: like and estimated dislike counts, as YouTube shows no dislikes | Video id |
 | `eth.blockscout.com`, `optimism.blockscout.com`, `base.blockscout.com`, `arbitrum.blockscout.com`, `polygon.blockscout.com`, `gnosis.blockscout.com`, `celo.blockscout.com`, `zksync.blockscout.com`, `scroll.blockscout.com`, `explorer.inkonchain.com`, `soneium.blockscout.com`, `unichain.blockscout.com`, `explorer.mode.network`, `arbitrum-nova.blockscout.com`, `shapescan.xyz`, `robinhoodchain.blockscout.com`, `tonapi.io`, `api-mainnet.magiceden.dev`, `api.nearblocks.io`, `api.fastnear.com`, `rpc.mainnet.near.org` | NFT connector | Your wallet addresses |
-| `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
+| `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain, Polygon and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
 | `api.opensea.io` | NFT collection links (site, socials); with an API key also the creator's profile, covers and token pictures | Contract address and token id; key if set |
 | `ethereum-rpc.publicnode.com`, `mainnet.optimism.io`, `mainnet.base.org`, `arb1.arbitrum.io`, `polygon-bor-rpc.publicnode.com`, `rpc.gnosischain.com`, `rpc.mainnet.chain.robinhood.com` | NFT pictures the explorer lacks | Token contract and id |
 | `bscscan.com`, `polygonscan.com`, `taikoscan.io` token and address pages, `cdn*.assetquay.com` | Explorer's cached NFT picture, who created a contract | Token contract and id |

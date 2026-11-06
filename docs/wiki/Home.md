@@ -12,6 +12,7 @@ The [README](https://github.com/venvk/obsidian-library-plugin#readme) is the sho
   - [[YouTube]]: watch history, time spent, likes, and subscriptions.
   - [[Trakt]]: watch history, ratings, and watchlist, both ways.
   - [[Game libraries|Game-libraries]]: PlayStation, Steam, Nintendo Switch, Epic Games, and EA App, with playtime, trophies, and achievements.
+- [[NFT]]: what your wallets hold, on 33 networks, with no key.
 
 ### Use
 

@@ -21,6 +21,12 @@ Without chapters, `Progress` counts pages. Change the first number by hand as yo
 
 A book is done when its progress is full, and then hides it; there is no `Complete` to switch.
 
+### Audiobooks
+
+Mark a book as an audiobook with the button in its header, or choose an audiobook in search. Library finds its length on Audible or LibriVox by title and author. If neither has it, the length is estimated from the pages and shown with `≈`, and an exact one replaces it once a catalogue has the edition. Type your own `Runtime` to set it yourself.
+
+The share you have listened to counts in the Books section's header and as Audiobooks in the statistics' time chart. A book with no pages found anywhere has no length, and the chart counts it under "without runtime".
+
 ## Movies
 
 A movie is watched or not: press Mark complete in the note's header, or turn on `Complete` in its properties, when you have seen it. Movies have no progress. A movie you rate on IMDb or watch on Netflix is marked for you; see [[IMDb and Netflix|IMDb-and-Netflix]].

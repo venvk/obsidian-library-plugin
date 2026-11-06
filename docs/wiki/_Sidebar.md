@@ -7,6 +7,7 @@
   - [[YouTube]]
   - [[Trakt]]
   - [[Game libraries|Game-libraries]]
+- [[NFT]]
 - [[The Library tab and the note header|Library-tab-and-note-header]]
 - [[Progress and statistics|Progress-and-statistics]]
 - [[Library blocks and map|Library-blocks-and-map]]
