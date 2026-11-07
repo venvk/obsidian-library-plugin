@@ -2982,3 +2982,46 @@ sort trigger, the chosen one in the accent colour. */
 .note-header-book-progress .note-header-progress-input.is-invalid {
 	border-color: var(--text-error);
 }
+
+.library-cover-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+	gap: var(--size-4-3);
+	max-height: 60vh;
+	overflow-y: auto;
+	margin-bottom: var(--size-4-3);
+}
+
+.library-cover-item {
+	display: flex;
+	flex-direction: column;
+	gap: var(--size-2-1);
+	height: auto;
+	padding: var(--size-2-2);
+	background: none;
+	box-shadow: none;
+}
+
+.library-cover-item img {
+	width: 100%;
+	aspect-ratio: 2 / 3;
+	object-fit: cover;
+	border-radius: var(--radius-s);
+}
+
+.library-cover-size,
+.library-cover-status {
+	font-size: var(--font-ui-smaller);
+	color: var(--text-muted);
+}
+
+.note-header-wrap .note-header-local-title {
+	margin-top: calc(-1 * var(--size-4-2));
+	margin-bottom: var(--size-4-2);
+	color: var(--text-muted);
+	font-size: var(--font-ui-medium);
+}
+
+.note-header-wrap .note-header-local-title:empty {
+	display: none;
+}

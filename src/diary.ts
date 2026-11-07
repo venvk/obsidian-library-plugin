@@ -1,6 +1,6 @@
 import { seasonsOf, type EpisodeChange, type TrackKind } from './episodes'
 import { seasonIndex } from './watchSites'
-import { toStrArray } from './util'
+import { clockOf, toStrArray } from './util'
 
 // A note's diary lives in its "Log" property: "2026-10-18 S2E5", or a bare date for a finished title.
 export interface LogEntry {
@@ -28,6 +28,20 @@ export function addLog(fm: Record<string, unknown>, date: string, label: string)
 	const entry = label ? `${date} ${label}` : date
 	const log = toStrArray(fm.Log)
 	if (log.indexOf(entry) < 0) fm.Log = [...log, entry]
+}
+
+// A sitting with a book without chapters: "2026-11-08 p 140–216", or "1:20–2:40" for an audiobook.
+// Later saves the same day stretch that day's range; a first save says only where the reader is.
+export function addReadRange(fm: Record<string, unknown>, date: string, from: number, to: number, audio: boolean): void {
+	if (to <= from) return
+	const show = (n: number): string => (audio ? clockOf(n) : String(n))
+	const prefix = audio ? '' : 'p '
+	const log = toStrArray(fm.Log)
+	const same = new RegExp(`^${date} ${prefix}([\\d:]+)(?:–[\\d:]+)?$`)
+	const today = log.findIndex(entry => same.test(entry))
+	const start = today >= 0 ? same.exec(log[today] ?? '')?.[1] : from > 0 ? show(from) : ''
+	const entry = `${date} ${prefix}${start ? `${start}–` : ''}${show(to)}`
+	fm.Log = today >= 0 ? log.map((old, i) => (i === today ? entry : old)) : [...log, entry]
 }
 
 // What a tick adds to the diary, read before it is applied; null when nothing new gets watched.

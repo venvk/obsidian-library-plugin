@@ -1,5 +1,5 @@
 import { requestUrl } from 'obsidian'
-import { sameTitle } from '../util'
+import { isbnOf, sameTitle } from '../util'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 
 interface OpenLibraryDoc {
@@ -19,6 +19,8 @@ interface OpenLibrarySearchResponse {
 
 interface OpenLibraryEdition {
 	title?: string
+	number_of_pages?: number
+	covers?: number[]
 	table_of_contents?: Array<{ title?: string; level?: number }>
 	works?: Array<{ key?: string }>
 }
@@ -77,6 +79,14 @@ async function editionsOf(work: string): Promise<OpenLibraryEdition[]> {
 		if ((page?.entries ?? []).length < 100) break
 	}
 	return entries
+}
+
+// Every edition's cover of a work, for picking a better one than the work's own
+export async function editionCovers(work: string): Promise<string[]> {
+	if (!/^\/works\/[\w.-]+$/.test(work)) return []
+	const ids: number[] = []
+	for (const edition of await editionsOf(work)) for (const id of edition.covers ?? []) if (id > 0 && ids.indexOf(id) < 0) ids.push(id)
+	return ids.slice(0, 40).map(id => `https://covers.openlibrary.org/b/id/${String(id)}-L.jpg`)
 }
 
 // Named chapters beat a bare count; then the title's own script; then the fullest list.
@@ -150,11 +160,25 @@ export class OpenLibraryProvider implements ContentProvider {
 
 	async search(query: string): Promise<SearchResult[]> {
 		try {
-			const params = new URLSearchParams({ q: query, fields: OpenLibraryProvider.FIELDS, limit: '20' })
+			const isbn = isbnOf(query)
+			const params = new URLSearchParams(isbn ? { isbn } : { q: query })
+			params.set('fields', OpenLibraryProvider.FIELDS)
+			params.set('limit', '20')
 			const resp = await requestUrl({ url: `${OpenLibraryProvider.SEARCH}?${params.toString()}`, throw: false })
 			if (resp.status !== 200) return []
 			const data = resp.json as OpenLibrarySearchResponse
-			const docs = Array.isArray(data?.docs) ? data.docs : []
+			let docs = Array.isArray(data?.docs) ? data.docs : []
+			// an ISBN means that edition: its own title, pages and cover over the work's
+			if (isbn && docs.length) {
+				const edition = await getJson<OpenLibraryEdition>(`https://openlibrary.org/isbn/${isbn}.json`)
+				docs = docs.map(doc => ({
+					...doc,
+					title: edition?.title ?? doc.title,
+					isbn: [isbn],
+					cover_i: edition?.covers?.find(id => id > 0) ?? doc.cover_i,
+					number_of_pages_median: edition?.number_of_pages ?? doc.number_of_pages_median
+				}))
+			}
 			return docs.map((doc) => ({
 				provider: this.id,
 				sourceId: doc.key,

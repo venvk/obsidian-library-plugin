@@ -481,6 +481,12 @@ const ROMAN_NUMERALS: Record<string, string> = {
 }
 
 // Loose match: source titles differ ("Dune (2021)" vs "Дюна", "Grand Theft Auto V" vs "Grand Theft Auto V Enhanced").
+// "978-5-17-080115-2" or "0-14-118776-1" typed in a search box: the digits, else null
+export function isbnOf(query: string): string | null {
+	const digits = query.replace(/[\s-]/g, '').toUpperCase()
+	return /^(?:\d{9}[\dX]|97[89]\d{10})$/.test(digits) ? digits : null
+}
+
 export function sameTitle(a: string, b: string): boolean {
 	const left = titleKey(a)
 	return left !== '' && left === titleKey(b)
