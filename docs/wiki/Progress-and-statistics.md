@@ -21,6 +21,12 @@ Without chapters, `Progress` counts pages. Change the first number by hand as yo
 
 A book is done when its progress is full, and then hides it; there is no `Complete` to switch.
 
+### A book without chapters
+
+Its place sits in the note's header. A paper book or an ebook shows **Page [120] / 318**: type the page you are on, and the page count if it is missing. An audiobook shows **Listened [5:20] / 11 h** instead, and takes time however you write it: `5:20`, `5h 20m`, `320m`, `5.5` (a bare number is hours) or `48%`. **Mark as read** or **Mark as listened** finishes the book and writes the day into the diary.
+
+An audiobook keeps its `Progress` in minutes, so its share and its time in the statistics are exact. A place kept in pages before turns into the same share of the time.
+
 ### Audiobooks
 
 Mark a book as an audiobook with the button in its header, or choose an audiobook in search. Library finds its length on Audible or LibriVox by title and author. If neither has it, the length is estimated from the pages and shown with `≈`, and an exact one replaces it once a catalogue has the edition. Type your own `Runtime` to set it yourself.

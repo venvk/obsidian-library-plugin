@@ -380,6 +380,27 @@ function isVideo(fm: Record<string, unknown>): boolean {
 	return fm.Source === 'youtube'
 }
 
+// What a person types for time listened, in minutes: "5:20", "5h 20m", "5ч 20м", "5,5", "320m", "48%".
+// A bare number is hours; null when the text says nothing a clock can read.
+export function parseListened(text: string, totalMinutes: number): number | null {
+	const value = text.trim().toLowerCase().replace(',', '.')
+	if (!value) return null
+	const share = /^(\d+(?:\.\d+)?)\s*%$/.exec(value)
+	if (share) return Math.round((totalMinutes * Math.min(100, Number(share[1]))) / 100)
+	const clock = /^(\d+):([0-5]?\d)(?::[0-5]\d)?$/.exec(value)
+	if (clock) return Number(clock[1]) * 60 + Number(clock[2])
+	if (/^\d+(?:\.\d+)?$/.test(value)) return Math.round(Number(value) * 60)
+	const parts = /^(?:(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h|часов|часа|час|ч)\.?)?\s*(?:(\d+)\s*(?:minutes?|mins?|m|минуты|минута|минут|мин|м)\.?)?$/.exec(value)
+	if (parts && (parts[1] || parts[2])) return Math.round(Number(parts[1] ?? 0) * 60) + Number(parts[2] ?? 0)
+	return null
+}
+
+// minutes as h:mm, the form an input shows back
+export function clockOf(minutes: number): string {
+	const whole = Math.max(0, Math.round(minutes))
+	return `${String(Math.floor(whole / 60))}:${String(whole % 60).padStart(2, '0')}`
+}
+
 // A page read aloud takes about 1.8 minutes (some 275 words at 9,000 an hour). Too few pages say nothing.
 export function listeningEstimate(pages: number): number {
 	return pages >= 20 ? Math.round(pages * 1.8) : 0

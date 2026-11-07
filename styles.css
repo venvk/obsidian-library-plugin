@@ -2961,3 +2961,24 @@ sort trigger, the chosen one in the accent colour. */
 	height: auto;
 	contain: none;
 }
+
+.note-header-book-progress {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+}
+
+.note-header-book-progress .note-header-progress-input {
+	width: 4.5em;
+	padding: 0 6px;
+	height: 26px;
+}
+
+.note-header-book-progress .note-header-progress-input.is-time {
+	width: 6em;
+}
+
+.note-header-book-progress .note-header-progress-input.is-invalid {
+	border-color: var(--text-error);
+}

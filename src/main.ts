@@ -128,6 +128,8 @@ import {
 	BOOK_FORMATS,
 	isAudiobook,
 	listeningEstimate,
+	parseListened,
+	clockOf,
 	COMIC_FORMATS
 } from './util'
 
@@ -5701,7 +5703,8 @@ export default class LibraryPlugin extends Plugin {
 			changed = true
 		}
 		// A PlayStation game's progress is PlayStation's own percentage.
-		if (meta.progressTotal && !hasChapters(current) && trackingOf(this.kindOf(current)) !== 'watched' && !current['PSN ID']) {
+		// an audiobook counts minutes, not the pages its source knows
+		if (meta.progressTotal && !hasChapters(current) && !isAudiobook(current) && trackingOf(this.kindOf(current)) !== 'watched' && !current['PSN ID']) {
 			const watched = parseWatched(current.Progress)
 			const nextProgress = `${String(watched)}/${String(meta.progressTotal)}`
 			if (current.Progress !== nextProgress) {
@@ -6103,6 +6106,8 @@ export default class LibraryPlugin extends Plugin {
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 		if (kind === 'book' || kind === 'comic') this.addFormats(infoSide, file, fm, kind)
+		// a book with chapters is ticked in its chapter list; one without keeps its place here
+		if (kind === 'book' && !hasChapters(fm) && !isTemplateFile(file.path)) this.addBookProgress(infoSide, file, fm)
 
 		const runtime = runtimeMinutes(fm.Runtime)
 		// a length typed over the estimate is no estimate
@@ -6243,6 +6248,68 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		renderPills()
+	}
+
+	// Pages for paper and ebooks, time for an audiobook, typed in the header. An audiobook's Progress is in minutes,
+	// so its share and its time in the statistics are exact; a place kept in pages before becomes the same share.
+	private addBookProgress(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
+		const match = toStr(fm.Progress).match(progressPattern)
+		const read = match ? Number(match[1]) : 0
+		const total = match ? Number(match[2]) : 0
+		const runtime = runtimeMinutes(fm.Runtime) ?? 0
+		const audio = isAudiobook(fm) && runtime > 0
+		const finished = total > 0 && read >= total
+		const save = (value: number, of: number): void => {
+			const done = Math.max(0, Math.min(of, Math.round(value)))
+			void this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+				cur.Progress = `${String(done)}/${String(of)}`
+				// the day it was finished goes in the diary, as for a ticked last chapter
+				if (done === of && !finished) addLog(cur, todayIso(), '')
+			})
+		}
+		const enter = (input: HTMLInputElement): void => {
+			input.addEventListener('keydown', (e) => {
+				if (e.key !== 'Enter') return
+				e.preventDefault()
+				input.blur()
+			})
+		}
+		const row = infoSide.createDiv({ cls: 'note-header-row note-header-book-progress' })
+		row.createEl('b', { text: `${tr(audio ? 'header.listened' : 'header.page')}: ` })
+		if (audio) {
+			const listened = total === runtime ? read : total > 0 ? Math.round((read / total) * runtime) : 0
+			const input = row.createEl('input', { cls: 'note-header-progress-input is-time', attr: { type: 'text', value: clockOf(listened), placeholder: tr('header.listenedHint'), 'aria-label': tr('header.listened') } })
+			setTooltip(input, tr('header.listenedHint'), { placement: 'top' })
+			enter(input)
+			row.appendText(` / ${formatRuntime(runtime)}`)
+			input.addEventListener('change', () => {
+				const minutes = parseListened(input.value, runtime)
+				input.toggleClass('is-invalid', minutes === null)
+				if (minutes !== null && (minutes !== listened || total !== runtime)) save(minutes, runtime)
+			})
+		} else {
+			const page = row.createEl('input', { cls: 'note-header-progress-input', attr: { type: 'number', min: '0', value: String(read), 'aria-label': tr('header.page') } })
+			row.appendText(' / ')
+			const pages = row.createEl('input', { cls: 'note-header-progress-input', attr: { type: 'number', min: '1', value: total > 0 ? String(total) : '', placeholder: '?', 'aria-label': tr('header.pages') } })
+			for (const input of [page, pages]) {
+				enter(input)
+				input.addEventListener('change', () => {
+					const at = Number(page.value)
+					const of = Number(pages.value)
+					if (!(of > 0) || !(at >= 0) || (at === read && of === total)) return
+					save(Math.min(at, of), of)
+				})
+			}
+		}
+		const end = audio ? runtime : total
+		if (end > 0 && !finished) {
+			const done = row.createEl('button', { cls: 'note-header-pill', text: tr(audio ? 'header.finishedListening' : 'header.finishedReading') })
+			done.addEventListener('click', (e) => {
+				e.preventDefault()
+				done.disabled = true
+				save(end, end)
+			})
+		}
 	}
 
 	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and
