@@ -1,4 +1,5 @@
 import { requestUrl } from 'obsidian'
+import { sameTitle } from '../util'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 
 interface OpenLibraryDoc {
@@ -17,6 +18,7 @@ interface OpenLibrarySearchResponse {
 }
 
 interface OpenLibraryEdition {
+	title?: string
 	table_of_contents?: Array<{ title?: string; level?: number }>
 	works?: Array<{ key?: string }>
 }
@@ -47,7 +49,7 @@ export function chapterTitles(edition: OpenLibraryEdition | null): string[] {
 	const titles: string[] = []
 	for (const entry of edition?.table_of_contents ?? []) {
 		if ((entry.level ?? 0) > 0) continue
-		titles.push((entry.title ?? '').trim())
+		titles.push((entry.title ?? '').replace(/\s*[-–—]+\s*$/, '').trim())
 	}
 	const named = titles.filter(Boolean)
 	// a short title is fine when it is a number, Roman or not: "I", "II", "3"
@@ -64,6 +66,17 @@ function scriptOf(text: string): string {
 	if (/\p{Script=Cyrillic}/u.test(letter)) return 'Cyrillic'
 	if (/\p{Script=Han}|\p{Script=Hiragana}|\p{Script=Katakana}/u.test(letter)) return 'CJK'
 	return letter ? 'other' : ''
+}
+
+// every edition: a well-known book has hundreds, and the one with contents is often far down the list
+async function editionsOf(work: string): Promise<OpenLibraryEdition[]> {
+	const entries: OpenLibraryEdition[] = []
+	for (let offset = 0; offset < 1000; offset += 100) {
+		const page = await getJson<{ entries?: OpenLibraryEdition[] }>(`https://openlibrary.org${work}/editions.json?limit=100&offset=${String(offset)}`)
+		entries.push(...(page?.entries ?? []))
+		if ((page?.entries ?? []).length < 100) break
+	}
+	return entries
 }
 
 // Named chapters beat a bare count; then the title's own script; then the fullest list.
@@ -109,14 +122,17 @@ export async function findChapters(book: BookLookup): Promise<string[]> {
 		work = found?.docs?.[0]?.key ?? ''
 	}
 	if (!/^\/works\/[\w.-]+$/.test(work)) return done([])
-	// every edition: a well-known book has hundreds, and the one with contents is often far down the list
-	const entries: OpenLibraryEdition[] = []
-	for (let offset = 0; offset < 1000; offset += 100) {
-		const page = await getJson<{ entries?: OpenLibraryEdition[] }>(`https://openlibrary.org${work}/editions.json?limit=100&offset=${String(offset)}`)
-		entries.push(...(page?.entries ?? []))
-		if ((page?.entries ?? []).length < 100) break
+	const found = pickContents((await editionsOf(work)).map(chapterTitles), book.title ?? '')
+	if (found.some(Boolean) || !book.title || !book.author) return done(found)
+	// Open Library often keeps one book under several works: the others of the same title and author are asked too
+	const query = new URLSearchParams({ title: book.title, author: book.author, limit: '5', fields: 'key,title' })
+	const others = (await getJson<OpenLibrarySearchResponse>(`${OpenLibraryProvider.SEARCH}?${query.toString()}`))?.docs ?? []
+	const lists = [found]
+	for (const other of others) {
+		if (other.key === work || !/^\/works\/[\w.-]+$/.test(other.key) || !sameTitle(other.title, book.title)) continue
+		lists.push(...(await editionsOf(other.key)).filter(edition => !edition.title || sameTitle(edition.title, book.title ?? '')).map(chapterTitles))
 	}
-	return done(pickContents(entries.map(chapterTitles), book.title ?? ''))
+	return done(pickContents(lists, book.title))
 }
 
 export class OpenLibraryProvider implements ContentProvider {
