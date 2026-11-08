@@ -15,7 +15,7 @@ Until you tick anything, the first episodes up to the `Progress` count show as w
 
 ## Books
 
-Chapters come from an edition's table of contents on Open Library. When none is found, Add chapters in the note header takes a chapter count or one title per line. From then on `Progress` counts chapters instead of pages, and the pages you had read carry over as the same share of chapters.
+Chapters come from an edition's table of contents on Open Library. Library looks through every Open Library edition of the book, and other Open Library records of the same title and author, so more books get their chapters automatically. When none is found, Add chapters in the note header takes a chapter count or one title per line. From then on `Progress` counts chapters instead of pages, and the pages you had read carry over as the same share of chapters.
 
 Without chapters, `Progress` counts pages. Change the first number by hand as you read.
 
@@ -24,6 +24,8 @@ A book is done when its progress is full, and then hides it; there is no `Comple
 ### A book without chapters
 
 Its place sits in the note's header. A paper book or an ebook shows **Page [120] / 318**: type the page you are on, and the page count if it is missing. An audiobook shows **Listened [5:20] / 11 h** instead, and takes time however you write it: `5:20`, `5h 20m`, `320m`, `5.5` (a bare number is hours) or `48%`. **Mark as read** or **Mark as listened** finishes the book and writes the day into the diary.
+
+Each save writes the day's range into the note's `Log` property: `2026-11-08 p 140–216` for pages, `2026-11-08 1:00–1:45` for an audiobook; saving again later that day stretches that day's entry.
 
 An audiobook keeps its `Progress` in minutes, so its share and its time in the statistics are exact. A place kept in pages before turns into the same share of the time.
 
@@ -53,7 +55,7 @@ These have nothing to tick. Edit `Progress` in the note's properties, or press M
 
 An eye on a card marks a title you haven't started: not done, no progress yet (the first number of `Progress` is 0), no playtime, and no score of yours. Up next, at the end of the Library tab, gathers these titles from every category, newest first, and folds and sorts like a category. With titles from several categories, the chips above it show one category at a time.
 
-In Settings > Library > General, turn off Up next block to hide it. With Not started in categories turned off, these titles show only in Up next. A category can also put them first with the Not started sort.
+In Settings > Library > General, turn off Up next block to hide it. Under "Up next block", the "Include categories:" checkboxes choose which categories feed Up next; all are ticked by default and the list hides when the block is off. With Not started in categories turned off, these titles show only in Up next. A category can also put them first with the Not started sort.
 
 ## Soon
 

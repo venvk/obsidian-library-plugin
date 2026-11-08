@@ -27,12 +27,12 @@
 - Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs. A book's chapter list can be edited with the pencil, and each chapter's notes button opens a section with its name in the note body for quotes and thoughts.
 - The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order. Searching a book also finds its audiobooks from Audible, Apple Books, LibriVox and the Internet Archive, no key needed, and their listening time counts in the statistics. A book note marks its format (paper, ebook, audiobook) with buttons under the title, saved to `Format`, and the Books filter can show one format.
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
-- Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
+- Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property. A book without chapters writes the pages or listening time you got through that day.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
 - One command draws your library as a canvas, with posters grouped around the actors and creators they share, and each category has its own, grouped by creator, actor and genre.
 - Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
 - Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
-- Searching a book also finds its audiobooks, with their length. Listening time counts in the statistics.
+- Searching a book also finds its audiobooks, with their length. Listening time counts in the statistics. Paste an ISBN, with or without hyphens, to find that exact edition, with its own cover and page count.
 - Paste a wallet address and its NFTs arrive as notes, from 33 networks, with no key: pictures, dates, transactions and the project's links. Details in the [wiki](https://github.com/venvk/obsidian-library-plugin/wiki/NFT).
 - Works on desktop and mobile, in every Obsidian language.
 
