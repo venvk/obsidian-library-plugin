@@ -7360,6 +7360,8 @@ export default class LibraryPlugin extends Plugin {
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}
 		if (typeof this.settings.upNextInCategories !== 'boolean') this.settings.upNextInCategories = true
+		if (!Array.isArray(this.settings.upNextHidden)) this.settings.upNextHidden = []
+		if (typeof this.settings.showCardInfo !== 'boolean') this.settings.showCardInfo = true
 		if (typeof this.settings.skipFields !== 'string') this.settings.skipFields = ''
 		if (!this.settings.psnTokens || typeof this.settings.psnTokens !== 'object') this.settings.psnTokens = null
 		if (!this.settings.enrichMarks || typeof this.settings.enrichMarks !== 'object') this.settings.enrichMarks = {}

@@ -3025,3 +3025,34 @@ sort trigger, the chosen one in the accent colour. */
 .note-header-wrap .note-header-local-title:empty {
 	display: none;
 }
+
+.library-up-next-categories {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--size-2-2) var(--size-4-4);
+	margin-top: var(--size-4-2);
+}
+
+.library-up-next-category {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--size-2-2);
+	font-size: var(--font-ui-small);
+	cursor: var(--cursor);
+}
+
+.library-up-next-caption {
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+/* covers only: the card is its cover, no strip below */
+.library-card.is-cover-only {
+	align-self: start;
+	height: auto;
+	background: none;
+}
+
+.library-up-next-categories[hidden] {
+	display: none;
+}
