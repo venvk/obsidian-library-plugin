@@ -1,4 +1,5 @@
 import { requestUrl } from 'obsidian'
+import { isbnOf, sameTitle } from '../util'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 
 interface OpenLibraryDoc {
@@ -17,6 +18,9 @@ interface OpenLibrarySearchResponse {
 }
 
 interface OpenLibraryEdition {
+	title?: string
+	number_of_pages?: number
+	covers?: number[]
 	table_of_contents?: Array<{ title?: string; level?: number }>
 	works?: Array<{ key?: string }>
 }
@@ -41,15 +45,20 @@ async function getJson<T>(url: string): Promise<T | null> {
 	}
 }
 
-// Top-level entries only: nested ones are sections inside a chapter.
-function chapterTitles(edition: OpenLibraryEdition | null): string[] {
+// Top-level entries only: nested ones are sections inside a chapter. Entries with no title still count
+// chapters ("Chapter 3" then); a list broken into stray letters is no table of contents at all.
+export function chapterTitles(edition: OpenLibraryEdition | null): string[] {
 	const titles: string[] = []
 	for (const entry of edition?.table_of_contents ?? []) {
 		if ((entry.level ?? 0) > 0) continue
-		const title = (entry.title ?? '').trim()
-		if (title) titles.push(title)
+		titles.push((entry.title ?? '').replace(/\s*[-–—]+\s*$/, '').trim())
 	}
-	return titles
+	const named = titles.filter(Boolean)
+	// a short title is fine when it is a number, Roman or not: "I", "II", "3"
+	const scraps = named.filter(title => title.length < 3 && !/^(?:\d+|[ivxlc]+)\.?$/i.test(title)).length
+	if (scraps > named.length / 2) return []
+	// blanks among named chapters are gaps in the record; only a list of blanks is a count
+	return named.length > 0 ? named : titles
 }
 
 // Writing system by first letter; matching the title's script picks the edition.
@@ -61,7 +70,43 @@ function scriptOf(text: string): string {
 	return letter ? 'other' : ''
 }
 
-// Chapter titles: the ISBNed edition first, else the fullest table of contents.
+// every edition: a well-known book has hundreds, and the one with contents is often far down the list
+async function editionsOf(work: string): Promise<OpenLibraryEdition[]> {
+	const entries: OpenLibraryEdition[] = []
+	for (let offset = 0; offset < 1000; offset += 100) {
+		const page = await getJson<{ entries?: OpenLibraryEdition[] }>(`https://openlibrary.org${work}/editions.json?limit=100&offset=${String(offset)}`)
+		entries.push(...(page?.entries ?? []))
+		if ((page?.entries ?? []).length < 100) break
+	}
+	return entries
+}
+
+// Every edition's cover of a work, for picking a better one than the work's own
+export async function editionCovers(work: string): Promise<string[]> {
+	if (!/^\/works\/[\w.-]+$/.test(work)) return []
+	const ids: number[] = []
+	for (const edition of await editionsOf(work)) for (const id of edition.covers ?? []) if (id > 0 && ids.indexOf(id) < 0) ids.push(id)
+	return ids.slice(0, 40).map(id => `https://covers.openlibrary.org/b/id/${String(id)}-L.jpg`)
+}
+
+// Named chapters beat a bare count; then the title's own script; then the fullest list.
+export function pickContents(lists: string[][], title: string): string[] {
+	const script = scriptOf(title)
+	const rank = (titles: string[]): number[] => {
+		const named = titles.filter(Boolean).join(' ')
+		return [named ? 1 : 0, script !== '' && named !== '' && scriptOf(named) === script ? 1 : 0, titles.length]
+	}
+	let best: string[] = []
+	for (const titles of lists) {
+		if (titles.length < 2) continue
+		const a = rank(titles)
+		const b = rank(best)
+		if (best.length === 0 || a[0]! > b[0]! || (a[0] === b[0] && (a[1]! > b[1]! || (a[1] === b[1] && a[2]! > b[2]!)))) best = titles
+	}
+	return best
+}
+
+// Chapter titles: the ISBNed edition first, else the best table of contents among all editions.
 export async function findChapters(book: BookLookup): Promise<string[]> {
 	const isbn = (book.isbn ?? '').replace(/[^0-9Xx]/g, '')
 	const cacheKey = isbn || book.work || `${book.title ?? ''}|${book.author ?? ''}`
@@ -76,7 +121,7 @@ export async function findChapters(book: BookLookup): Promise<string[]> {
 	if (isbn.length === 10 || isbn.length === 13) {
 		const edition = await getJson<OpenLibraryEdition>(`https://openlibrary.org/isbn/${isbn}.json`)
 		const own = chapterTitles(edition)
-		if (own.length >= 2) return done(own)
+		if (own.length >= 2 && own.some(Boolean)) return done(own)
 		work = work || edition?.works?.[0]?.key || ''
 	}
 	// A title alone matches other books of the same name: the author must agree too.
@@ -87,21 +132,17 @@ export async function findChapters(book: BookLookup): Promise<string[]> {
 		work = found?.docs?.[0]?.key ?? ''
 	}
 	if (!/^\/works\/[\w.-]+$/.test(work)) return done([])
-	const editions = await getJson<{ entries?: OpenLibraryEdition[] }>(`https://openlibrary.org${work}/editions.json?limit=100`)
-	// Fullest contents, preferring editions in the title's script.
-	const script = scriptOf(book.title ?? '')
-	let best: string[] = []
-	let bestMatches = false
-	for (const edition of editions?.entries ?? []) {
-		const titles = chapterTitles(edition)
-		if (titles.length < 2) continue
-		const matches = script !== '' && scriptOf(titles.join(' ')) === script
-		if ((matches && !bestMatches) || (matches === bestMatches && titles.length > best.length)) {
-			best = titles
-			bestMatches = matches
-		}
+	const found = pickContents((await editionsOf(work)).map(chapterTitles), book.title ?? '')
+	if (found.some(Boolean) || !book.title || !book.author) return done(found)
+	// Open Library often keeps one book under several works: the others of the same title and author are asked too
+	const query = new URLSearchParams({ title: book.title, author: book.author, limit: '5', fields: 'key,title' })
+	const others = (await getJson<OpenLibrarySearchResponse>(`${OpenLibraryProvider.SEARCH}?${query.toString()}`))?.docs ?? []
+	const lists = [found]
+	for (const other of others) {
+		if (other.key === work || !/^\/works\/[\w.-]+$/.test(other.key) || !sameTitle(other.title, book.title)) continue
+		lists.push(...(await editionsOf(other.key)).filter(edition => !edition.title || sameTitle(edition.title, book.title ?? '')).map(chapterTitles))
 	}
-	return done(best)
+	return done(pickContents(lists, book.title))
 }
 
 export class OpenLibraryProvider implements ContentProvider {
@@ -119,11 +160,25 @@ export class OpenLibraryProvider implements ContentProvider {
 
 	async search(query: string): Promise<SearchResult[]> {
 		try {
-			const params = new URLSearchParams({ q: query, fields: OpenLibraryProvider.FIELDS, limit: '20' })
+			const isbn = isbnOf(query)
+			const params = new URLSearchParams(isbn ? { isbn } : { q: query })
+			params.set('fields', OpenLibraryProvider.FIELDS)
+			params.set('limit', '20')
 			const resp = await requestUrl({ url: `${OpenLibraryProvider.SEARCH}?${params.toString()}`, throw: false })
 			if (resp.status !== 200) return []
 			const data = resp.json as OpenLibrarySearchResponse
-			const docs = Array.isArray(data?.docs) ? data.docs : []
+			let docs = Array.isArray(data?.docs) ? data.docs : []
+			// an ISBN means that edition: its own title, pages and cover over the work's
+			if (isbn && docs.length) {
+				const edition = await getJson<OpenLibraryEdition>(`https://openlibrary.org/isbn/${isbn}.json`)
+				docs = docs.map(doc => ({
+					...doc,
+					title: edition?.title ?? doc.title,
+					isbn: [isbn],
+					cover_i: edition?.covers?.find(id => id > 0) ?? doc.cover_i,
+					number_of_pages_median: edition?.number_of_pages ?? doc.number_of_pages_median
+				}))
+			}
 			return docs.map((doc) => ({
 				provider: this.id,
 				sourceId: doc.key,

@@ -1,4 +1,5 @@
 import { requestUrl } from 'obsidian'
+import { isbnOf } from '../util'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 
 interface GoogleIdentifier {
@@ -23,6 +24,12 @@ interface GoogleItem {
 
 interface GoogleResponse {
 	items?: GoogleItem[]
+}
+
+// Google finds an edition by ISBN only when asked with the isbn: prefix
+function isbnQuery(query: string): string {
+	const isbn = isbnOf(query)
+	return isbn ? `isbn:${isbn}` : query
 }
 
 export class GoogleBooksProvider implements ContentProvider {
@@ -63,7 +70,7 @@ export class GoogleBooksProvider implements ContentProvider {
 	async search(query: string): Promise<SearchResult[]> {
 		try {
 			if (!this.getKey().trim()) return []
-			const params = this.withKey(new URLSearchParams({ q: query, maxResults: '20' }))
+			const params = this.withKey(new URLSearchParams({ q: isbnQuery(query), maxResults: '20' }))
 			const resp = await requestUrl({ url: `${GoogleBooksProvider.BASE}?${params.toString()}`, throw: false })
 			if (resp.status !== 200) return []
 			const data = resp.json as GoogleResponse

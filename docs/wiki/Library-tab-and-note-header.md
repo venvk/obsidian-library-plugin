@@ -37,6 +37,8 @@ A card shows the cover (square for music, as album covers are, wide for videos),
 - a progress bar while the title is unfinished;
 - an eye on the cover for a title you haven't started; see [[Up next|Progress-and-statistics#up-next]].
 
+In Settings > Library > General, turn off "Text under covers" and a card shows only the cover, its progress bar and service icons (Netflix, PlayStation, Steam and so on); the title shows on hover.
+
 Click a card, or focus it with Tab and press Enter or Space, to open the note.
 
 ### Soon and Up next
@@ -60,6 +62,8 @@ Depending on the note it also has:
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
 - for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected;
 - for a YouTube video, the video itself, the like and dislike buttons, the channel's link and Subscribe button, the publish date, the views, and the rewatches; see [[YouTube]].
+- a "Choose a cover" button at the top right: it shows covers from every source of the category and, for a book, from its other editions, each with its size in pixels; click one, or paste an image link.
+- the title in your language under the original title, from Wikidata, when Obsidian is not in English and a translated title exists.
 
 ## Recommendations
 

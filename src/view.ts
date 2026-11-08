@@ -824,6 +824,12 @@ export class LibraryRenderer {
 
 		const video = toStr(fm.Source) === 'youtube'
 
+		// covers only: the name stays reachable on hover
+		if (!this.plugin.settings.showCardInfo) {
+			cardEl.setAttr('title', card.name)
+			cardEl.addClass('is-cover-only')
+			return
+		}
 		const info = cardEl.createDiv({ cls: 'card-info' })
 		info.createDiv({ cls: 'card-title', text: card.name })
 
@@ -979,11 +985,14 @@ export class LibraryView extends ItemView {
 		const upNextOnly = settings.showUpNext && !settings.upNextInCategories
 		let rendered = 0
 		const upNext: { category: string, card: CardData }[] = []
+		const inUpNext = (category: ICategory): boolean => settings.upNextHidden.indexOf(category.name) < 0
 		for (const { category, cards } of sections) {
+			if (!inUpNext(category)) continue
 			for (const card of cards) if (notStarted(card.fm, card.kind)) upNext.push({ category: category.name, card })
 		}
 		const renderCategory = (category: ICategory, cards: CardData[]): void => {
-			const shown = upNextOnly ? cards.filter(card => !notStarted(card.fm, card.kind)) : cards
+			// a category kept out of Up next keeps its unstarted titles
+			const shown = upNextOnly && inUpNext(category) ? cards.filter(card => !notStarted(card.fm, card.kind)) : cards
 			if (shown.length === 0) return
 			rendered++
 			const chosen = settings.filterState[category.name] ?? {}

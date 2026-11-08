@@ -19,7 +19,7 @@ import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
 import { OmdbProvider } from './providers/omdb'
-import { OpenLibraryProvider, findChapters } from './providers/openlibrary'
+import { OpenLibraryProvider, editionCovers, findChapters } from './providers/openlibrary'
 import { GoogleBooksProvider } from './providers/googlebooks'
 import { BookAggregatorProvider } from './providers/bookAggregator'
 import { CinemetaEnricher } from './providers/cinemeta'
@@ -51,6 +51,7 @@ import { LibrarySearchModal } from './ui/librarySearchModal'
 import { PromptModal } from './ui/promptModal'
 import { DuplicateRemovalModal, type DuplicateGroup } from './ui/duplicateModal'
 import { ShareModal, shareTargetFromFile } from './ui/shareModal'
+import { CoverModal } from './ui/coverModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
 import { SITE_NAME, SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
@@ -59,9 +60,9 @@ import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRed
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
-import { addLog, tickLabel, todayIso } from './diary'
+import { addLog, addReadRange, tickLabel, todayIso } from './diary'
 import { categoryCanvas, libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type MapTitle, type PersonCard } from './libraryMap'
-import { albumAwards, titleAwards, type Award } from './music'
+import { albumAwards, localTitle, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
@@ -128,6 +129,8 @@ import {
 	BOOK_FORMATS,
 	isAudiobook,
 	listeningEstimate,
+	parseListened,
+	clockOf,
 	COMIC_FORMATS
 } from './util'
 
@@ -265,6 +268,7 @@ export default class LibraryPlugin extends Plugin {
 	private refreshTimer: number | null = null
 	private bannerTimer: number | null = null
 	private bannerRetries = 0
+	private coverActions = new WeakMap<MarkdownView, HTMLElement>()
 	private isRefreshing = false
 	private settingTab: LibrarySettingTab | null = null
 	private malRefreshing: Promise<string | null> | null = null
@@ -301,6 +305,7 @@ export default class LibraryPlugin extends Plugin {
 	private recommendations = new Map<string, Promise<Recommendation[]>>()
 	// an album's awards, looked up once a session
 	private albumAwards = new Map<string, Promise<Award[]>>()
+	private localTitles = new Map<string, Promise<string | null>>()
 	// NFT notes by path, to know the token of a note once it is deleted; and the ones the import trashes itself
 	private nftPaths = new Map<string, NftTrackInfo>()
 	private nftTrashing = new Set<string>()
@@ -760,6 +765,7 @@ export default class LibraryPlugin extends Plugin {
 		this.lightbox = null
 		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
 			leaf.view.containerEl.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
+			if (leaf.view instanceof MarkdownView) this.coverActions.get(leaf.view)?.remove()
 		}
 	}
 
@@ -5701,7 +5707,8 @@ export default class LibraryPlugin extends Plugin {
 			changed = true
 		}
 		// A PlayStation game's progress is PlayStation's own percentage.
-		if (meta.progressTotal && !hasChapters(current) && trackingOf(this.kindOf(current)) !== 'watched' && !current['PSN ID']) {
+		// an audiobook counts minutes, not the pages its source knows
+		if (meta.progressTotal && !hasChapters(current) && !isAudiobook(current) && trackingOf(this.kindOf(current)) !== 'watched' && !current['PSN ID']) {
 			const watched = parseWatched(current.Progress)
 			const nextProgress = `${String(watched)}/${String(meta.progressTotal)}`
 			if (current.Progress !== nextProgress) {
@@ -5716,6 +5723,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.unloaded) return
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView)
 		if (!view || !view.file) return
+		this.coverAction(view, view.file)
 		const sizer = view.containerEl.querySelector('.markdown-preview-sizer')
 		if (!sizer?.instanceOf(HTMLElement)) return
 		sizer.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
@@ -5730,6 +5738,22 @@ export default class LibraryPlugin extends Plugin {
 			if (this.bannerTimer) window.clearTimeout(this.bannerTimer)
 			this.bannerTimer = window.setTimeout(() => this.refreshBanner(), 80)
 		}
+	}
+
+	// "Choose a cover" among the note's own buttons at the top right, for a title a source can search
+	private coverAction(view: MarkdownView, file: TFile): void {
+		this.coverActions.get(view)?.remove()
+		this.coverActions.delete(view)
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const kind = fm ? this.kindOf(fm) : undefined
+		if (!fm || !kind || isTemplateFile(file.path) || !this.registry.forType(kind)) return
+		if (toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT' || toStr(fm.Source) === YOUTUBE_SOURCE) return
+		const action = view.addAction('image', tr('cover.choose'), () => {
+			const current = this.app.metadataCache.getFileCache(file)?.frontmatter ?? fm
+			const name = toStr(current.Name) || file.basename
+			new CoverModal(this.app, () => this.coverChoices(current, name, kind), (url: string) => { void this.setCover(file, url) }).open()
+		})
+		this.coverActions.set(view, action)
 	}
 
 	// anchors in `mod-header` (survives section re-renders); false when it fell back to a sizer child
@@ -5933,6 +5957,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 		titleEl.appendChild(shareBtn)
 		infoSide.appendChild(titleEl)
+		this.addLocalTitle(titleEl, toStr(fm['Source ID']), name)
 		const badges = createDiv({ cls: 'note-header-badges' })
 		renderPlatformLabels(badges, fm)
 		renderTrophies(badges, fm, 'note-header-trophies')
@@ -6103,6 +6128,8 @@ export default class LibraryPlugin extends Plugin {
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
 		if (kind === 'book' || kind === 'comic') this.addFormats(infoSide, file, fm, kind)
+		// a book with chapters is ticked in its chapter list; one without keeps its place here
+		if (kind === 'book' && !hasChapters(fm) && !isTemplateFile(file.path)) this.addBookProgress(infoSide, file, fm)
 
 		const runtime = runtimeMinutes(fm.Runtime)
 		// a length typed over the estimate is no estimate
@@ -6245,8 +6272,115 @@ export default class LibraryPlugin extends Plugin {
 		renderPills()
 	}
 
+	// Pages for paper and ebooks, time for an audiobook, typed in the header. An audiobook's Progress is in minutes,
+	// so its share and its time in the statistics are exact; a place kept in pages before becomes the same share.
+	private addBookProgress(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
+		const match = toStr(fm.Progress).match(progressPattern)
+		const read = match ? Number(match[1]) : 0
+		const total = match ? Number(match[2]) : 0
+		const runtime = runtimeMinutes(fm.Runtime) ?? 0
+		const audio = isAudiobook(fm) && runtime > 0
+		const finished = total > 0 && read >= total
+		const save = (value: number, of: number): void => {
+			const done = Math.max(0, Math.min(of, Math.round(value)))
+			void this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+				const before = toStr(cur.Progress).match(progressPattern)
+				const was = before && Number(before[2]) === of ? Number(before[1]) : 0
+				cur.Progress = `${String(done)}/${String(of)}`
+				addReadRange(cur, todayIso(), was, done, audio)
+				// the day it was finished goes in the diary, as for a ticked last chapter
+				if (done === of && !finished) addLog(cur, todayIso(), '')
+			})
+		}
+		const enter = (input: HTMLInputElement): void => {
+			input.addEventListener('keydown', (e) => {
+				if (e.key !== 'Enter') return
+				e.preventDefault()
+				input.blur()
+			})
+		}
+		const row = infoSide.createDiv({ cls: 'note-header-row note-header-book-progress' })
+		row.createEl('b', { text: `${tr(audio ? 'header.listened' : 'header.page')}: ` })
+		if (audio) {
+			const listened = total === runtime ? read : total > 0 ? Math.round((read / total) * runtime) : 0
+			const input = row.createEl('input', { cls: 'note-header-progress-input is-time', attr: { type: 'text', value: clockOf(listened), placeholder: tr('header.listenedHint'), 'aria-label': tr('header.listened') } })
+			setTooltip(input, tr('header.listenedHint'), { placement: 'top' })
+			enter(input)
+			row.appendText(` / ${formatRuntime(runtime)}`)
+			input.addEventListener('change', () => {
+				const minutes = parseListened(input.value, runtime)
+				input.toggleClass('is-invalid', minutes === null)
+				if (minutes !== null && (minutes !== listened || total !== runtime)) save(minutes, runtime)
+			})
+		} else {
+			const page = row.createEl('input', { cls: 'note-header-progress-input', attr: { type: 'number', min: '0', value: String(read), 'aria-label': tr('header.page') } })
+			row.appendText(' / ')
+			const pages = row.createEl('input', { cls: 'note-header-progress-input', attr: { type: 'number', min: '1', value: total > 0 ? String(total) : '', placeholder: '?', 'aria-label': tr('header.pages') } })
+			for (const input of [page, pages]) {
+				enter(input)
+				input.addEventListener('change', () => {
+					const at = Number(page.value)
+					const of = Number(pages.value)
+					if (!(of > 0) || !(at >= 0) || (at === read && of === total)) return
+					save(Math.min(at, of), of)
+				})
+			}
+		}
+		const end = audio ? runtime : total
+		if (end > 0 && !finished) {
+			const done = row.createEl('button', { cls: 'note-header-pill', text: tr(audio ? 'header.finishedListening' : 'header.finishedReading') })
+			done.addEventListener('click', (e) => {
+				e.preventDefault()
+				done.disabled = true
+				save(end, end)
+			})
+		}
+	}
+
+	// the title in the reader's language under the original, once Wikidata names it differently
+	private addLocalTitle(titleEl: HTMLElement, sourceId: string, name: string): void {
+		if (!sourceId) return
+		let pending = this.localTitles.get(sourceId)
+		if (!pending) {
+			pending = localTitle(sourceId).catch(() => null)
+			this.localTitles.set(sourceId, pending)
+		}
+		const line = createDiv({ cls: 'note-header-local-title' })
+		titleEl.insertAdjacentElement('afterend', line)
+		void pending.then(local => {
+			if (!local || this.unloaded || sameTitle(local, name)) line.remove()
+			else line.setText(local)
+		})
+	}
+
 	// a title's awards from Wikidata, a row that appears once they arrive: an album by title and
 	// artist, anything else by the IMDb, Wikidata or Steam id it was made from
+	// covers to pick from: the current one, every source's results for the title, a book's other editions
+	private async coverChoices(fm: Record<string, unknown>, name: string, kind: ContentType): Promise<string[]> {
+		const urls: string[] = []
+		const add = (url: unknown): void => {
+			const safe = safeUrl(url)
+			if (safe && urls.indexOf(safe) < 0) urls.push(safe)
+		}
+		add(coverValue(fm, this.coverProperty()))
+		const sourceId = toStr(fm['Source ID'])
+		const [found, editions] = await Promise.all([
+			this.registry.forType(kind)?.search(name, kind).catch(() => [] as SearchResult[]) ?? Promise.resolve([] as SearchResult[]),
+			kind === 'book' ? editionCovers(sourceId).catch(() => [] as string[]) : Promise.resolve([] as string[])
+		])
+		for (const result of found) if (sameTitle(result.title, name)) add(result.cover)
+		for (const url of editions) add(url)
+		for (const result of found) add(result.cover)
+		return urls
+	}
+
+	private async setCover(file: TFile, url: string): Promise<void> {
+		await this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => {
+			cur[coverKey(cur, this.coverProperty()) ?? this.coverProperty()] = url
+		})
+		this.queueCover(file)
+	}
+
 	private addAwards(infoSide: HTMLElement, fm: Record<string, unknown>, name: string, kind: string | undefined): void {
 		const artist = linkLabel(toStrArray(fm.Creator)[0] ?? '')
 		const sourceId = toStr(fm['Source ID'])
@@ -7226,6 +7360,8 @@ export default class LibraryPlugin extends Plugin {
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}
 		if (typeof this.settings.upNextInCategories !== 'boolean') this.settings.upNextInCategories = true
+		if (!Array.isArray(this.settings.upNextHidden)) this.settings.upNextHidden = []
+		if (typeof this.settings.showCardInfo !== 'boolean') this.settings.showCardInfo = true
 		if (typeof this.settings.skipFields !== 'string') this.settings.skipFields = ''
 		if (!this.settings.psnTokens || typeof this.settings.psnTokens !== 'object') this.settings.psnTokens = null
 		if (!this.settings.enrichMarks || typeof this.settings.enrichMarks !== 'object') this.settings.enrichMarks = {}

@@ -169,7 +169,19 @@ export class LibrarySettingTab extends PluginSettingTab {
 	private definition(row: Row): SettingDefinition {
 		const base = { name: row.name, desc: row.desc, visible: row.visible, searchable: row.searchable };
 		const render = row.render;
-		return render ? { ...base, render: (setting: Setting) => render(setting) } : base;
+		return render ? { ...base, render: (setting: Setting) => render(LibrarySettingTab.cleared(setting)) } : base;
+	}
+
+	// 1.13+ redraws a row by calling its render again on the same element: what the last render added goes first
+	private static cleared(setting: Setting): Setting {
+		setting.controlEl.empty();
+		for (const child of Array.from(setting.infoEl.children)) {
+			if (!child.hasClass("setting-item-name") && !child.hasClass("setting-item-description")) child.remove();
+		}
+		for (const child of Array.from(setting.settingEl.children)) {
+			if (child !== setting.infoEl && child !== setting.controlEl) child.remove();
+		}
+		return setting;
 	}
 
 	private draw(): void {
@@ -305,15 +317,46 @@ export class LibrarySettingTab extends PluginSettingTab {
 						},
 					},
 					{
+						name: tr("settings.cardInfo.name"),
+						desc: tr("settings.cardInfo.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(this.plugin.settings.showCardInfo).onChange(async (value) => {
+									this.plugin.settings.showCardInfo = value;
+									await this.plugin.saveSettings();
+								}),
+							);
+						},
+					},
+					{
 						name: tr("settings.upNext.name"),
 						desc: tr("settings.upNext.desc"),
 						render: (row) => {
 							row.addToggle((toggle) =>
 								toggle.setValue(this.plugin.settings.showUpNext).onChange(async (value) => {
 									this.plugin.settings.showUpNext = value;
+									list.hidden = !value;
 									await this.plugin.saveSettings();
+									this.refresh();
 								}),
 							);
+							// which categories feed the block, under its description while it is on; all by default
+							const settings = this.plugin.settings;
+							const list = row.infoEl.createDiv({ cls: "library-up-next-categories" });
+							list.hidden = !settings.showUpNext || settings.categories.length < 2;
+							list.createSpan({ cls: "library-up-next-caption", text: tr("settings.upNextCategories.name") });
+							for (const category of settings.categories) {
+								const label = list.createEl("label", { cls: "library-up-next-category" });
+								const box = label.createEl("input", { type: "checkbox" });
+								box.checked = settings.upNextHidden.indexOf(category.name) < 0;
+								label.appendText(category.name);
+								box.addEventListener("change", () => {
+									const at = settings.upNextHidden.indexOf(category.name);
+									if (box.checked && at >= 0) settings.upNextHidden.splice(at, 1);
+									if (!box.checked && at < 0) settings.upNextHidden.push(category.name);
+									void this.plugin.saveSettings();
+								});
+							}
 						},
 					},
 					{
@@ -370,6 +413,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					{
 						name: tr("settings.upNextInCategories.name"),
 						desc: tr("settings.upNextInCategories.desc"),
+						visible: () => this.plugin.settings.showUpNext,
 						render: (row) => {
 							row.addToggle((toggle) =>
 								toggle.setValue(this.plugin.settings.upNextInCategories).onChange(async (value) => {

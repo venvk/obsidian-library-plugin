@@ -51,11 +51,30 @@ export async function albumAwards(name: string, artist: string): Promise<Award[]
 
 // The Wikidata item of a title, found by the id the note keeps: IMDb, Wikidata or Steam.
 export async function titleAwards(sourceId: string): Promise<Award[]> {
-	const id = sourceId.trim()
-	const filter = /^tt\d+$/.test(id) ? `haswbstatement:P345=${id}` : /^steam:\d+$/.test(id) ? `haswbstatement:P1733=${id.slice(6)}` : ''
-	const item = /^Q\d+$/.test(id) ? id : filter ? (await searchItems('', filter, 1))[0] : undefined
+	const item = await itemOf(sourceId)
 	if (!item) return []
 	return awardsOf((await entities([item], 'claims'))[item])
+}
+
+// The Wikidata item of a note made from IMDb, Steam, Open Library or Wikidata itself
+async function itemOf(sourceId: string): Promise<string | undefined> {
+	const id = sourceId.trim()
+	if (/^Q\d+$/.test(id)) return id
+	const work = /^\/works\/(OL\d+W)$/.exec(id)?.[1]
+	const filter = /^tt\d+$/.test(id) ? `haswbstatement:P345=${id}`
+		: /^steam:\d+$/.test(id) ? `haswbstatement:P1733=${id.slice(6)}`
+		: work ? `haswbstatement:P648=${work}` : ''
+	return filter ? (await searchItems('', filter, 1))[0] : undefined
+}
+
+// The title in the reader's own language, when it is not English; null without one
+export async function localTitle(sourceId: string): Promise<string | null> {
+	const lang = languages()[0] ?? 'en'
+	if (lang === 'en' || lang.startsWith('en-')) return null
+	const item = await itemOf(sourceId)
+	if (!item) return null
+	const langs = languages().filter(l => l !== 'en' && l !== 'mul')
+	return textIn((await entities([item], 'labels', langs))[item]?.labels, langs)
 }
 
 // "Award received" (P166) with its year (P585), named in the note's language.
