@@ -137,8 +137,12 @@ export function isInvalidNftMedia(url: string): boolean {
 	if (lower.indexOf('nft-placeholder') >= 0) return true
 	if (lower.indexOf('1a09c26b1c30427b26944c47fc7bb9') >= 0) return true
 	if (lower.indexOf('d81a09c26b1c30427b26944c47fc7bb9') >= 0) return true
+	// projects whose image hosts are gone: their tokens' pictures are looked up again (OpenSea keeps copies)
+	if (DEAD_MEDIA_HOSTS.some(host => lower.indexOf(`//${host}/`) >= 0)) return true
 	return false
 }
+
+const DEAD_MEDIA_HOSTS = ['cdn.secondlive.world', 'api.quest3.xyz']
 
 export function mediaUrl(value: unknown): string {
 	const raw = typeof value === 'string' ? value.trim() : ''
@@ -1514,7 +1518,7 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 	if (openseaKey) {
 		try {
 			const osImg = await openseaNftImage(chain, contract, tokenId, openseaKey)
-			if (osImg) return osImg
+			if (osImg && !isInvalidNftMedia(osImg)) return osImg
 		} catch {
 			// fallback
 		}
@@ -1526,7 +1530,7 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 			if (res.status === 200 && res.json) {
 				const data = res.json as BlockscoutItem
 				const img = mediaUrl(data.thumbnails?.['500x500']) || mediaUrl(data.media_url) || mediaUrl(data.image_url) || mediaUrl(data.metadata?.image)
-				if (img) return img
+				if (img && !isInvalidNftMedia(img)) return img
 			}
 		} catch {
 			// fallback
@@ -1536,7 +1540,7 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 	if (rpc) {
 		try {
 			const img = await tokenImage(rpc, contract, tokenId)
-			if (img) return img
+			if (img && !isInvalidNftMedia(img)) return img
 		} catch {
 			// fallback
 		}
@@ -1549,7 +1553,25 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 			// fallback
 		}
 	}
-	return ''
+	// the token's own metadata host gone (quest3, Galxe): OpenSea keeps its copy, read from the token's page without a key
+	return openseaPageImage(chain, contract, tokenId)
+}
+
+// OpenSea's cached picture of a token, read off its page in a hidden webview (desktop); '' when the page has none
+export async function openseaPageImage(chain: string, contract: string, tokenId: string): Promise<string> {
+	const osChain = OPENSEA_CHAINS[chain]
+	if (!osChain || !contract || !tokenId) return ''
+	const slug = osChain === 'matic' ? 'polygon' : osChain
+	const media = `seadn.io/${osChain}/${contract.toLowerCase()}`
+	// the page's own picture of this token, not another one listed beside it, at full size
+	// the token's picture among the page's image sources (attributes are set even where the tiny hidden webview draws nothing), at full size
+	const pick = `(() => { const src = [...document.querySelectorAll('img[src]')].map(i => i.getAttribute('src') || '').find(s => s.toLowerCase().includes(${JSON.stringify(media)})); return src ? src.split('?')[0] : '' })()`
+	try {
+		const found = await readPage(`https://opensea.io/item/${slug}/${contract.toLowerCase()}/${tokenId}`, pick, 45000, `${pick} !== ''`)
+		return mediaUrl(found) || ''
+	} catch {
+		return ''
+	}
 }
 
 export function groupHeldByContract(tokens: HeldNft[]): HeldContract[] {

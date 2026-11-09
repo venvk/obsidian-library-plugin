@@ -127,10 +127,12 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `api.themoviedb.org`, `image.tmdb.org` | Movie and series details, with a key | IMDb id, key |
 | `www.wikidata.org`, `en.wikipedia.org`, `commons.wikimedia.org`, `upload.wikimedia.org` | Search, Rotten Tomatoes, trailers, covers, matching Netflix titles, awards of albums, titles and people, photos on a person's canvas | Search text, ids, Netflix ids, album title and artist |
 | `openlibrary.org`, `covers.openlibrary.org` | Books, chapters, covers | Title, author, ISBN, genres |
+| `api.tcgdex.net`, `assets.tcgdex.net`, `api.scryfall.com`, `cards.scryfall.io`, `db.ygoprodeck.com`, `images.ygoprodeck.com` | Collection: Pokémon, Magic and Yu-Gi-Oh! cards, their sets and prices, no key | Card name, set |
 | `api.audible.com`, `itunes.apple.com`, `books.apple.com`, `is1-ssl.mzstatic.com` to `is5-ssl.mzstatic.com`, `librivox.org`, `archive.org` | Audiobook search, length, covers, chapters | Title and author |
 | `www.googleapis.com`, `books.google.com` | Book search with a key, covers | Title, key |
 | `api.rawg.io`, `media.rawg.io` | Games, with a key | Title or id, genre, key |
 | `store.steampowered.com`, `steamcommunity.com`, `api.steampowered.com`, `cdn.cloudflare.steamstatic.com`, `video.akamai.steamstatic.com`, `shared.akamai.steamstatic.com`, `shared.fastly.steamstatic.com` | Games, trailers, Steam import, achievements | Title or app id; sign-in, library and achievements on import |
+| `api.graphql.imdb.com` | The current IMDb score of every film and series, no key | IMDb ID |
 | `www.imdb.com`, `api.graphql.imdb.com` | IMDb connector | Sign-in; ratings and watchlist are read, scores and new titles are sent, removals of deleted notes |
 | `www.netflix.com` | Netflix connector | Sign-in; viewing activity and thumbs are read, scores are sent as thumbs; unticked or deleted titles are hidden from the history, unstarted series go to My List |
 | `accounts.google.com`, `www.youtube.com` | YouTube connector | Sign-in; the watch history is read (the last 7 days, then one older month a day) with each video's length and watched share; per video, its description, publish date, your like and whether you're subscribed; the like and subscribe buttons in a note send them back |

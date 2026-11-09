@@ -17,7 +17,7 @@ import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constant
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
 import type { WatchSite } from "./watchSites";
-import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, newCategory, ownCreators, sectionOrder, splitOrder, type SectionEntry } from "./categories";
+import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, isNftCategory, newCategory, ownCreators, sectionOrder, splitOrder, type SectionEntry } from "./categories";
 import { tr } from "./i18n";
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, tokenFromInput } from "./anilistSync";
 import { codeFromInput, exchangeCode, makeVerifier, malAuthUrl, malClientPair } from "./malSync";
@@ -271,6 +271,18 @@ export class LibrarySettingTab extends PluginSettingTab {
 					row.addToggle((toggle) =>
 						toggle.setValue(settings.showDiary).onChange(async (value) => {
 							settings.showDiary = value;
+							await this.plugin.saveSettings();
+						}),
+					);
+				},
+			},
+			{
+				name: tr("settings.activity.name"),
+				desc: tr("settings.activity.desc"),
+				render: (row) => {
+					row.addToggle((toggle) =>
+						toggle.setValue(settings.showActivity).onChange(async (value) => {
+							settings.showActivity = value;
 							await this.plugin.saveSettings();
 						}),
 					);
@@ -1224,6 +1236,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 			["game", tr("settings.default.game") + " — Steam, Wikidata, RAWG"],
 			["music", tr("settings.default.music") + " — Deezer"],
 			["anime", tr("settings.default.anime") + " — AniList, MyAnimeList"],
+			["collectible", tr("settings.default.collectible") + " — TCGdex, Scryfall, YGOPRODeck"],
 			["manual", tr("settings.category.manual")],
 		];
 		for (const [value, label] of options) d.addOption(value, label);
@@ -1289,8 +1302,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 		for (const property of rankableProperties(this.libraryFrontmatter(), this.plugin.settings.coverProperty)) {
 			offer(tr("settings.stats.groupProperties"), property, { kind: "property", key: property });
 		}
+		for (const cat of this.plugin.settings.categories.filter((c) => isNftCategory(c))) {
+			for (const key of ["Creator", "Platforms"]) {
+				const top: IStatsTop = { kind: "property", key, scope: cat.typeValue };
+				offer(tr("settings.stats.groupProperties"), topLabel(top, this.plugin.settings.categories), top);
+			}
+		}
 		for (const cat of this.plugin.settings.categories) {
-			if (!ownCreators(cat)) continue;
+			if (!ownCreators(cat) || isNftCategory(cat)) continue;
 			const top: IStatsTop = { kind: "property", key: "Creator", scope: cat.typeValue };
 			offer(tr("settings.stats.groupProperties"), topLabel(top, this.plugin.settings.categories), top);
 		}

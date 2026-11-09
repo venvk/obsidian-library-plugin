@@ -28,6 +28,8 @@ import { GameAggregatorProvider } from './providers/gameAggregator'
 import { AnimeAggregatorProvider } from './providers/animeAggregator'
 import { GameTrailerFinder } from './providers/gameTrailer'
 import { DeezerProvider } from './providers/deezer'
+import { COLLECTIBLE_SOURCE, CollectibleProvider, setCards, type SetCard } from './providers/collectibles'
+import { MissingModal } from './ui/missingModal'
 import { AnimeProvider } from './providers/anime'
 import { MalProvider } from './providers/mal'
 import { KitsuProvider } from './providers/kitsu'
@@ -45,7 +47,7 @@ import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
-import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
+import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
 import { PromptModal } from './ui/promptModal'
@@ -60,7 +62,7 @@ import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRed
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
 import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
-import { addLog, addReadRange, tickLabel, todayIso } from './diary'
+import { addLog, addReadRange, logRating, tickLabel, todayIso } from './diary'
 import { categoryCanvas, libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type MapTitle, type PersonCard } from './libraryMap'
 import { albumAwards, localTitle, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
@@ -152,6 +154,8 @@ const CANVAS_ROLES = [
 
 // Raised when an import brings something the existing NFT notes lack, so an update fills them by itself.
 const NFT_DATA_VERSION = 1
+// a collectible's condition, stored in English, shown translated
+const CONDITIONS = ['mint', 'nearMint', 'excellent', 'good', 'played', 'poor']
 
 const SOURCE_SCORES = ['Rating IMDB', 'Rating RT', 'Rating MC', 'Rating RAWG', 'Rating AniList', 'Rating MAL']
 
@@ -269,6 +273,7 @@ export default class LibraryPlugin extends Plugin {
 	private bannerTimer: number | null = null
 	private bannerRetries = 0
 	private coverActions = new WeakMap<MarkdownView, HTMLElement>()
+	categorySyncing = false
 	private isRefreshing = false
 	private settingTab: LibrarySettingTab | null = null
 	private malRefreshing: Promise<string | null> | null = null
@@ -392,6 +397,7 @@ export default class LibraryPlugin extends Plugin {
 			new WikidataGameProvider()
 		))
 		this.registry.register(new DeezerProvider())
+		this.registry.register(new CollectibleProvider())
 		this.registry.register(new AnimeAggregatorProvider(new AnimeProvider(() => this.settings), new MalProvider(() => MAL_CLIENT_ID, () => this.settings), new KitsuProvider(() => this.settings)))
 		this.registry.register(new ComicsAggregatorProvider(
 			new ComicsProvider(() => this.apiKey('comicVineApiKey')),
@@ -904,14 +910,15 @@ export default class LibraryPlugin extends Plugin {
 			const category = await this.categoryFor(target)
 			const path = await this.uniqueNotePath(title, category.folder)
 			const file = await this.app.vault.create(path, await this.templateText(category))
-			const tracking = trackingOf(category.contentType)
+			const tracking = category.contentType === 'collectible' ? null : trackingOf(category.contentType)
 			await this.app.fileManager.processFrontMatter(file, (fm) => {
 				Object.assign(fm, {
 					Type: category.typeValue,
 					Name: title,
 					'My Rating': null,
-					...(tracking !== 'progress' ? { Complete: false } : {}),
-					...(tracking !== 'watched' ? { Progress: '' } : {}),
+					...(tracking && tracking !== 'progress' ? { Complete: false } : {}),
+					...(tracking ? {} : { Count: 1 }),
+					...(tracking && tracking !== 'watched' ? { Progress: '' } : {}),
 					Date: todayDmy(),
 				})
 			})
@@ -932,6 +939,17 @@ export default class LibraryPlugin extends Plugin {
 			if (!meta) {
 				new Notice(tr('notice.notFound'))
 				return
+			}
+
+			if (provider.id === COLLECTIBLE_SOURCE) {
+				const copy = this.app.vault.getMarkdownFiles().find(note => toStr(this.app.metadataCache.getFileCache(note)?.frontmatter?.['Source ID']) === result.sourceId)
+				if (copy) {
+					let count = 1
+					await this.app.fileManager.processFrontMatter(copy, (cur: Record<string, unknown>) => { count = (Number(cur.Count) || 1) + 1; cur.Count = count })
+					new Notice(tr('collection.copyAdded', { count: formatNumber(count) }))
+					void this.app.workspace.getLeaf(false).openFile(copy)
+					return
+				}
 			}
 
 			const url = toStr(meta.fields.URL)
@@ -960,13 +978,14 @@ export default class LibraryPlugin extends Plugin {
 		const path = await this.uniqueNotePath(title, category.folder, disambiguator)
 		const file = await this.app.vault.create(path, await this.templateText(category))
 		// series/anime/books track progress, movies a watched switch (Complete), others both
-		const tracking = trackingOf(category.contentType)
+		const tracking = category.contentType === 'collectible' ? null : trackingOf(category.contentType)
 		await this.app.fileManager.processFrontMatter(file, (fm) => {
 			Object.assign(fm, {
 				Type: category.typeValue,
-				...(tracking !== 'watched' ? { Progress: meta.progressTotal ? `0/${String(meta.progressTotal)}` : '' } : {}),
+				...(tracking && tracking !== 'watched' ? { Progress: meta.progressTotal ? `0/${String(meta.progressTotal)}` : '' } : {}),
 				'My Rating': null,
-				...(tracking !== 'progress' ? { Complete: false } : {}),
+				...(tracking && tracking !== 'progress' ? { Complete: false } : {}),
+				...(tracking ? {} : { Count: 1 }),
 				Date: (source === NFT_SOURCE && (extra.Date || extra.Minted || extra.Acquired)) ? (extra.Date || extra.Minted || extra.Acquired) : (source === NFT_SOURCE ? '-' : todayDmy()),
 				Source: source,
 				'Source ID': sourceId,
@@ -4923,6 +4942,43 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// Update: anime sites first, one after the other (they write the same notes), then games
+	// One category's connected services, then its notes' sources again; a note changes only when something new came in
+	async syncCategory(category: ICategory): Promise<void> {
+		if (this.categorySyncing) return
+		this.categorySyncing = true
+		const s = this.settings
+		const kind = category.contentType
+		try {
+			if (kind === 'anime' || kind === 'comic') {
+				if (s.malTokens) await this.malImport(true)
+				if (s.anilistToken.trim()) await this.anilistImport(true)
+				if (s.kitsuTokens) await this.kitsuImport(true)
+			}
+			// Netflix brings anime too, into the Anime category
+			if (kind === 'movie' || kind === 'series' || kind === 'anime') {
+				if (kind !== 'anime' && s.traktTokens) await this.traktImport(true)
+				for (const site of ['imdb', 'netflix'] as const) if (s.watchSites[site].connected) await this.watchImport(site, true)
+			}
+			if (kind === 'game') {
+				if (s.psnTokens) await this.psnImport(true)
+				if (s.steamId.trim()) await this.steamImport(true)
+				if (s.nintendoTokens) await this.nintendoImport(true)
+				if (s.epicTokens) await this.epicImport(true)
+				if (s.eaTokens) await this.eaImport(true)
+			}
+			if (kind === 'manual' && category.typeValue === VIDEO_CATEGORY && s.watchSites.youtube.connected) await this.watchImport('youtube', true)
+			if (isNftCategory(category) && walletPairs(s.nftWallets).length > 0) await this.nftImport(true)
+			if (!isNftCategory(category)) {
+				// a background pass already walking would turn this one away: it waits its turn
+				while (this.enrichRunning && !this.unloaded) await this.pause(500)
+				await this.enrichPass(true, category)
+			}
+			new Notice(tr('notice.categorySynced', { category: category.name }))
+		} finally {
+			this.categorySyncing = false
+		}
+	}
+
 	async updateAll(): Promise<void> {
 		if (this.settings.malTokens) await this.malImport(true)
 		if (this.settings.anilistToken.trim()) await this.anilistImport(true)
@@ -5391,7 +5447,7 @@ export default class LibraryPlugin extends Plugin {
 		return this.enrichPass(true)
 	}
 
-	private async enrichPass(force: boolean): Promise<void> {
+	private async enrichPass(force: boolean, only?: ICategory): Promise<void> {
 		if (this.enrichRunning) {
 			if (force) new Notice(tr('notice.searching'))
 			return
@@ -5409,7 +5465,7 @@ export default class LibraryPlugin extends Plugin {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 				if (!fm) continue
 				const category = this.settings.categories.find(c => c.typeValue === toStr(fm.Type))
-				if (!category) continue
+				if (!category || (only && category.typeValue !== only.typeValue)) continue
 				if (!force && this.settings.enrichMarks[file.path] === this.manifest.version) continue
 				const provider = this.registry.forType(category.contentType)
 				const sourceId = toStr(fm['Source ID'])
@@ -6015,7 +6071,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		const nft = toStr(fm.Source) === NFT_SOURCE
-		addNames(tr(nft ? 'header.collection' : 'header.creator'), creators)
+		addNames(tr(nft ? 'header.collection' : kind === 'collectible' ? 'collection.illustrator' : 'header.creator'), creators)
 		if (nft) {
 			const standard = toStr(fm.Standard)
 			if (standard) addRow(tr('header.standard'), standard)
@@ -6130,6 +6186,7 @@ export default class LibraryPlugin extends Plugin {
 		if (kind === 'book' || kind === 'comic') this.addFormats(infoSide, file, fm, kind)
 		// a book with chapters is ticked in its chapter list; one without keeps its place here
 		if (kind === 'book' && !hasChapters(fm) && !isTemplateFile(file.path)) this.addBookProgress(infoSide, file, fm)
+		if (kind === 'collectible' && !isTemplateFile(file.path)) this.addCollectibleRows(infoSide, file, fm)
 
 		const runtime = runtimeMinutes(fm.Runtime)
 		// a length typed over the estimate is no estimate
@@ -6173,7 +6230,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
-		if (trackingOf(kind) !== 'progress' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
+		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
 			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
@@ -6274,6 +6331,76 @@ export default class LibraryPlugin extends Plugin {
 
 	// Pages for paper and ebooks, time for an audiobook, typed in the header. An audiobook's Progress is in minutes,
 	// so its share and its time in the statistics are exact; a place kept in pages before becomes the same share.
+	// a card's set and how much of it is here, its number, rarity, price, how many copies and their condition
+	private addCollectibleRows(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
+		const seriesId = toStr(fm['Series ID'])
+		const total = Number(fm['Series Total']) || 0
+		const series = toStr(fm.Series)
+		if (series) {
+			const row = infoSide.createDiv({ cls: 'note-header-row note-header-book-progress' })
+			row.createEl('b', { text: `${tr('collection.series')}: ` })
+			row.appendText(series)
+			if (seriesId && total > 0) {
+				const owned = this.ownedOf(seriesId).size
+				row.appendText(` · ${tr('collection.owned', { owned: formatNumber(owned), total: formatNumber(total) })}`)
+				if (owned < total) {
+					const button = row.createEl('button', { cls: 'note-header-pill', text: tr('collection.showMissing') })
+					button.addEventListener('click', (e) => {
+						e.preventDefault()
+						new MissingModal(this.app, series, async () => {
+							const have = this.ownedOf(seriesId)
+							return (await setCards(seriesId).catch(() => [] as SetCard[])).filter(card => !have.has(card.sourceId))
+						}, card => {
+							void this.createFromResult('collectible', { provider: COLLECTIBLE_SOURCE, sourceId: card.sourceId, title: card.name, year: null, cover: card.image, subtitle: null, raw: null })
+						}).open()
+					})
+				}
+			}
+		}
+		const plain = (label: string, value: string): void => {
+			if (!value) return
+			const row = infoSide.createDiv({ cls: 'note-header-row' })
+			row.createEl('b', { text: `${label}: ` })
+			row.appendText(value)
+		}
+		plain(tr('collection.number'), toStr(fm.Number))
+		plain(tr('collection.rarity'), toStr(fm.Rarity))
+		const cost = Number(fm.Price)
+		const currency = toStr(fm.Currency)
+		if (cost > 0) plain(tr('collection.price'), /^[A-Z]{3}$/.test(currency) ? formatNumber(cost, { style: 'currency', currency }) : formatNumber(cost))
+
+		const row = infoSide.createDiv({ cls: 'note-header-row note-header-book-progress' })
+		row.createEl('b', { text: `${tr('collection.count')}: ` })
+		const count = row.createEl('input', { cls: 'note-header-progress-input', attr: { type: 'number', min: '0', value: String(Number(fm.Count) || 1), 'aria-label': tr('collection.count') } })
+		count.addEventListener('change', () => {
+			const n = Math.max(0, Math.round(Number(count.value)))
+			if (!Number.isFinite(n)) return
+			void this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => { cur.Count = n })
+		})
+		const conditionRow = infoSide.createDiv({ cls: 'note-header-row note-header-book-progress' })
+		conditionRow.createEl('b', { text: `${tr('collection.condition')}: ` })
+		const condition = conditionRow.createEl('select', { cls: 'dropdown', attr: { 'aria-label': tr('collection.condition') } })
+		const current = toStr(fm.Condition)
+		condition.createEl('option', { text: '', value: '' })
+		for (const value of CONDITIONS) {
+			const option = condition.createEl('option', { text: tr(`collection.condition.${value}`), value })
+			if (value === current) option.selected = true
+		}
+		condition.addEventListener('change', () => {
+			void this.app.fileManager.processFrontMatter(file, (cur: Record<string, unknown>) => { cur.Condition = condition.value || null })
+		})
+	}
+
+	// Source IDs of the cards of a set in the library
+	private ownedOf(seriesId: string): Set<string> {
+		const out = new Set<string>()
+		for (const note of this.app.vault.getMarkdownFiles()) {
+			const nfm = this.app.metadataCache.getFileCache(note)?.frontmatter
+			if (nfm && toStr(nfm['Series ID']) === seriesId && toStr(nfm['Source ID'])) out.add(toStr(nfm['Source ID']))
+		}
+		return out
+	}
+
 	private addBookProgress(infoSide: HTMLElement, file: TFile, fm: Record<string, unknown>): void {
 		const match = toStr(fm.Progress).match(progressPattern)
 		const read = match ? Number(match[1]) : 0
@@ -6885,6 +7012,8 @@ export default class LibraryPlugin extends Plugin {
 				img.src = url
 				img.alt = ''
 				img.setAttribute('loading', 'lazy')
+				// a still the source no longer has leaves no broken frame behind
+				img.addEventListener('error', () => link.remove())
 				link.appendChild(img)
 				// plain clicks enlarge in place; modifier clicks keep the browser's save
 				link.addEventListener('click', (event) => {
@@ -7164,7 +7293,7 @@ export default class LibraryPlugin extends Plugin {
 				const rate = (): void => {
 					// only the exact rating clears it: a 7.5 from IMDb clicked as 8 becomes 8
 					const next = value === points ? null : points
-					this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next })
+					this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current['My Rating'] = next; logRating(current, todayIso(), next) })
 						.catch((err: unknown) => console.error('Library: rating not saved', file.path, err))
 				}
 				half.addEventListener('mouseenter', () => show(points))
@@ -7316,6 +7445,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.traktLastImport !== 'number') this.settings.traktLastImport = 0
 		if (typeof this.settings.comingSoonCollapsed !== 'boolean') this.settings.comingSoonCollapsed = false
 		if (typeof this.settings.showDiary !== 'boolean') this.settings.showDiary = true
+		if (typeof this.settings.showActivity !== 'boolean') this.settings.showActivity = true
 		if (typeof this.settings.showStats !== 'boolean') this.settings.showStats = true
 		if (typeof this.settings.showProfile !== 'boolean') this.settings.showProfile = true
 		if (!this.settings.airing || typeof this.settings.airing !== 'object' || Object.values(this.settings.airing).some(value => !Array.isArray(value))) {

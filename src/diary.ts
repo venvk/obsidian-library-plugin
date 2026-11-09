@@ -1,6 +1,6 @@
 import { seasonsOf, type EpisodeChange, type TrackKind } from './episodes'
 import { seasonIndex } from './watchSites'
-import { clockOf, toStrArray } from './util'
+import { clockOf, toStr, toStrArray } from './util'
 
 // A note's diary lives in its "Log" property: "2026-10-18 S2E5", or a bare date for a finished title.
 export interface LogEntry {
@@ -42,6 +42,21 @@ export function addReadRange(fm: Record<string, unknown>, date: string, from: nu
 	const start = today >= 0 ? same.exec(log[today] ?? '')?.[1] : from > 0 ? show(from) : ''
 	const entry = `${date} ${prefix}${start ? `${start}–` : ''}${show(to)}`
 	fm.Log = today >= 0 ? log.map((old, i) => (i === today ? entry : old)) : [...log, entry]
+}
+
+// A rating goes in the diary as "★ 7"; a second one the same day replaces the first, a cleared one leaves it out
+export function logRating(fm: Record<string, unknown>, date: string, points: number | null): void {
+	const log = toStrArray(fm.Log).filter(entry => !entry.startsWith(`${date} ★`))
+	fm.Log = points === null ? log : [...log, `${date} ★ ${String(points)}`]
+}
+
+// The days a note saw something happen: its diary, and the day in its Date (added or watched) when the diary has nothing then
+export function activityDays(fm: Record<string, unknown>): string[] {
+	const days = logOf(fm).map(entry => entry.date)
+	const dmy = /^(\d{2})\.(\d{2})\.(\d{4})$/.exec(toStr(fm.Date).trim())
+	const added = dmy ? `${dmy[3] ?? ''}-${dmy[2] ?? ''}-${dmy[1] ?? ''}` : ''
+	if (added && days.indexOf(added) < 0) days.push(added)
+	return days
 }
 
 // What a tick adds to the diary, read before it is applied; null when nothing new gets watched.

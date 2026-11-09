@@ -782,7 +782,13 @@ sort trigger, the chosen one in the accent colour. */
 	background: var(--background-secondary);
 }
 
+/* a webview lays out its guest page only as a flex box */
+.note-header-player webview {
+	display: flex !important;
+}
+
 .note-header-player iframe,
+.note-header-player webview,
 .note-header-player video {
 	display: block;
 	width: 100%;
@@ -1191,8 +1197,9 @@ sort trigger, the chosen one in the accent colour. */
 	display: grid;
 	/* --stats-cols columns (enough for two rows) while each can be 180px wide, fewer when not */
 	grid-template-columns: repeat(auto-fit, minmax(max(180px, (100% - (var(--stats-cols, 4) - 1) * 24px) / var(--stats-cols, 4)), 1fr));
-	/* the tops row as tall as its lists, the second row takes the rest of the time column */
-	grid-template-rows: auto 1fr;
+	/* every row as tall as its own blocks: taste and the activity grid stay compact beside a taller time column */
+	grid-template-rows: auto auto;
+	align-content: start;
 	grid-auto-rows: auto;
 	grid-auto-flow: row dense;
 	gap: 20px 24px;
@@ -1227,9 +1234,9 @@ sort trigger, the chosen one in the accent colour. */
 	background: var(--library-time-chart);
 	position: relative;
 	width: 100%;
-	max-width: 190px;
+	max-width: 150px;
 	aspect-ratio: 1 / 1;
-	margin: 0 auto 12px;
+	margin: 0 auto 8px;
 	border-radius: 50%;
 }
 
@@ -1246,7 +1253,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-time-total {
-	font-size: 0.78em;
+	font-size: 0.68em;
 	font-weight: 600;
 	line-height: 1.15;
 	height: auto;
@@ -1269,7 +1276,7 @@ sort trigger, the chosen one in the accent colour. */
 .library-time-legend {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
+	gap: 3px;
 }
 
 .library-time-item {
@@ -1305,8 +1312,8 @@ sort trigger, the chosen one in the accent colour. */
 .library-time-facts {
 	display: flex;
 	flex-direction: column;
-	gap: 6px;
-	margin-top: 14px;
+	gap: 4px;
+	margin-top: 8px;
 }
 
 .library-time-facts-title {
@@ -2317,6 +2324,11 @@ sort trigger, the chosen one in the accent colour. */
 	align-self: stretch;
 }
 
+/* beside the activity grid taste takes two columns */
+.library-stats-tops .library-stats-taste.is-narrow {
+	grid-area: 2 / 1 / auto / span 2;
+}
+
 /* Three 180px cells no longer fit beside the time column: taste takes the full width. */
 @container library (max-width: 960px) {
 	.library-stats-tops .library-stats-taste {
@@ -3055,4 +3067,91 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-up-next-categories[hidden] {
 	display: none;
+}
+
+.library-category-map-btn.is-syncing .svg-icon {
+	animation: library-spin 1s linear infinite;
+}
+
+@keyframes library-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* the diary as one cell a day, Monday on top: the rest of the stats' second row, --library-cell set to fit */
+.library-activity {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 0;
+	padding: 14px 16px;
+	grid-row: 2;
+	grid-column: auto / span var(--library-span, 1);
+	--library-cell: 12px;
+	--library-gap: 3px;
+}
+
+.library-activity.is-full {
+	grid-row: auto;
+	grid-column: 1 / -1;
+}
+
+.library-activity-title {
+	font-size: var(--font-ui-small);
+	color: var(--text-muted);
+}
+
+.library-activity-name {
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+/* the weeks share the width evenly, square cells, nothing past either edge */
+.library-activity-months,
+.library-activity-grid {
+	display: grid;
+	grid-auto-flow: column;
+	grid-template-columns: repeat(var(--library-weeks, 53), minmax(0, 1fr));
+	column-gap: var(--library-gap);
+}
+
+.library-activity-months {
+	height: 1.4em;
+	overflow: hidden;
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+}
+
+.library-activity-month {
+	grid-column: var(--library-week);
+	grid-row: 1;
+	white-space: nowrap;
+}
+
+.library-activity-grid {
+	grid-template-rows: repeat(7, auto);
+	row-gap: var(--library-gap);
+}
+
+.library-activity-day {
+	aspect-ratio: 1;
+	border-radius: 2px;
+	background: var(--background-modifier-border);
+}
+
+.library-activity-day.is-level-1 {
+	background: color-mix(in srgb, var(--interactive-accent) 30%, var(--background-modifier-border));
+}
+
+.library-activity-day.is-level-2 {
+	background: color-mix(in srgb, var(--interactive-accent) 55%, var(--background-modifier-border));
+}
+
+.library-activity-day.is-level-3 {
+	background: color-mix(in srgb, var(--interactive-accent) 80%, var(--background-modifier-border));
+}
+
+.library-activity-day.is-level-4 {
+	background: var(--interactive-accent);
 }

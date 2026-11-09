@@ -10,10 +10,11 @@ export const TYPE_DEFAULTS: Record<string, string> = {
 	game: 'Game',
 	music: 'Music',
 	anime: 'Anime',
+	collectible: 'Collectible',
 	manual: 'Manual',
 }
 
-export const MEDIA: ContentType[] = ['movie', 'series', 'book', 'comic', 'game', 'music', 'anime', 'manual']
+export const MEDIA: ContentType[] = ['movie', 'series', 'book', 'comic', 'game', 'music', 'anime', 'collectible', 'manual']
 
 // the video connectors' category (YouTube): fixed like the built-in ones
 export const VIDEO_CATEGORY = 'Video'
