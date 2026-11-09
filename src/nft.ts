@@ -1,6 +1,6 @@
 import { requestUrl } from 'obsidian'
 import { NFT_CATEGORY } from './categories'
-import { dmyOf, parseDate, publicHttpsUrl, sleep } from './util'
+import { dmyOf, parseDate, publicHttpsUrl, sleep, within } from './util'
 import { readPage } from './watchSites'
 
 // NFTs held by the wallets you list, read from each chain's explorer: Blockscout for
@@ -1513,11 +1513,14 @@ export function cleanCollectionName(raw: string, creator = '', tokenId = ''): st
 	return name.trim() || raw
 }
 
+// one source that never answers (a dead metadata host) must not hold the whole queue
+const STEP_MS = 15000
+
 export async function fetchNftTokenImage(chain: string, contract: string, tokenId: string, openseaKey = ''): Promise<string> {
 	if (!contract || !tokenId) return ''
 	if (openseaKey) {
 		try {
-			const osImg = await openseaNftImage(chain, contract, tokenId, openseaKey)
+			const osImg = await within(openseaNftImage(chain, contract, tokenId, openseaKey), STEP_MS, '')
 			if (osImg && !isInvalidNftMedia(osImg)) return osImg
 		} catch {
 			// fallback
@@ -1526,8 +1529,8 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 	const host = BLOCKSCOUT[chain]
 	if (host) {
 		try {
-			const res = await requestUrl({ url: `https://${host}/api/v2/tokens/${contract}/instances/${tokenId}`, headers: { accept: 'application/json' }, throw: false })
-			if (res.status === 200 && res.json) {
+			const res = await within(requestUrl({ url: `https://${host}/api/v2/tokens/${contract}/instances/${tokenId}`, headers: { accept: 'application/json' }, throw: false }), STEP_MS, null)
+			if (res && res.status === 200 && res.json) {
 				const data = res.json as BlockscoutItem
 				const img = mediaUrl(data.thumbnails?.['500x500']) || mediaUrl(data.media_url) || mediaUrl(data.image_url) || mediaUrl(data.metadata?.image)
 				if (img && !isInvalidNftMedia(img)) return img
@@ -1539,7 +1542,7 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 	const rpc = PUBLIC_RPC[chain] || ETHERSCAN_CHAINS[chain]?.rpc || ROUTESCAN_CHAINS[chain]?.rpc
 	if (rpc) {
 		try {
-			const img = await tokenImage(rpc, contract, tokenId)
+			const img = await within(tokenImage(rpc, contract, tokenId), STEP_MS, '')
 			if (img && !isInvalidNftMedia(img)) return img
 		} catch {
 			// fallback
@@ -1547,7 +1550,7 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 	}
 	if (chain === 'BNB') {
 		try {
-			const img = await nftscanImage('bnb.nftscan.com', contract, tokenId)
+			const img = await within(nftscanImage('bnb.nftscan.com', contract, tokenId), STEP_MS * 3, '')
 			if (img && !isInvalidNftMedia(img)) return img
 		} catch {
 			// fallback

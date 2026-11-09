@@ -11,6 +11,8 @@ The title row of a section holds:
 - the fold arrow. A folded section shows one row of cards that scrolls sideways. The fold is remembered.
 - the number of titles, and, for movies, series, anime, music, games, and videos, the time you spent on them. Hover over the time to see the exact hours.
 - Filter, when at least two titles differ in it: year, genre, the artist for music, country, or platform. Each list shows how many titles have that value, and the button shows how many filters are on. Clear filters turns them all off.
+- a canvas button that opens this section's titles on the library map.
+- a sync button that runs the category's connected services: MyAnimeList, AniList and Kitsu for anime and manga; Trakt, IMDb and Netflix for films and series; PlayStation, Steam, Nintendo, Epic and EA for games; YouTube for Video; wallets for NFT. It then asks the sources again for every note of the category, and a note changes only when something new came in.
 - the sort menu on the right.
 
 Sort a section by:
@@ -57,8 +59,8 @@ Depending on the note it also has:
 
 - platform badges under the title (such as PlayStation, Steam, Switch, Epic Games, EA App) with each platform's playtime; pointing at the time row shows the exact total and per-platform breakdown;
 - Mark complete, for movies, videos, games, albums, comics, and manual notes: it turns `Complete` on, and pressed again, off. It works with the note's properties hidden;
-- a trailer: Watch trailer plays it inside Obsidian;
-- a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close;
+- a trailer: Watch trailer plays it inside Obsidian; on desktop it opens in a built-in browser view that names the page, which YouTube now requires, and plays as your account when YouTube is connected. On mobile it uses the old player.
+- a row of stills: click one to enlarge it, then use the arrow keys to move through them and Escape to close; missing stills leave no empty frame in the gallery.
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
 - for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected;
 - for a YouTube video, the video itself, the like and dislike buttons, the channel's link and Subscribe button, the publish date, the views, and the rewatches; see [[YouTube]].
