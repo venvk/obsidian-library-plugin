@@ -287,6 +287,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.comicvine.name': 'Comic Vine API key',
 		'settings.comicvine.desc': 'Comics are searched in Comic Vine first, with covers and issue counts. Free key: https://comicvine.gamespot.com/api/',
 		'settings.comicvine.placeholder': 'Example: ab12cd34ef56…',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 		'settings.section.categories': 'Categories',
 		'settings.categories.desc':
 			'Each category shows notes whose Type frontmatter equals the value below.',
@@ -844,6 +849,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'settings.comicvine.name': 'Ключ API Comic Vine',
 		'settings.comicvine.desc': 'Комиксы сначала ищутся в Comic Vine, с обложками и числом выпусков. Бесплатный ключ: https://comicvine.gamespot.com/api/',
 		'settings.comicvine.placeholder': 'Пример: ab12cd34ef56…',
+		'settings.numista.name': 'Ключ API Numista',
+		'settings.numista.desc': 'Монеты, банкноты и жетоны в категории «Коллекция» ищутся в Numista. Бесплатный ключ: https://en.numista.com/api/',
+		'collection.issuer': 'Эмитент',
+		'collection.value': 'Номинал',
+		'collection.composition': 'Материал',
 		'settings.google.name': 'Ключ API Google Books',
 		'settings.google.desc': 'Добавляет Google Books в поиск книг. Бесплатный ключ: https://console.cloud.google.com/apis/library/books.googleapis.com',
 		'settings.google.placeholder': 'Пример: AIzaSy…',
@@ -1916,6 +1926,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	es: {
 		'header.listened': 'Escuchado',
@@ -2521,6 +2536,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	fr: {
 		'header.listened': 'Écouté',
@@ -3126,6 +3146,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	zh: {
 		'header.listened': '已收听',
@@ -3731,6 +3756,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ar: {
 		'header.listened': 'تم الاستماع',
@@ -4336,6 +4366,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	he: {
 		'header.listened': 'הושמע',
@@ -4941,6 +4976,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	uk: {
@@ -5544,6 +5584,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	ja: {
@@ -6147,6 +6192,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	tl: {
@@ -6750,6 +6800,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	ko: {
@@ -7353,6 +7408,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	nl: {
@@ -7956,6 +8016,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	cs: {
@@ -8559,6 +8624,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	hr: {
@@ -9162,6 +9232,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	hi: {
@@ -9765,6 +9840,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	bn: {
@@ -10368,6 +10448,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	vi: {
@@ -10971,6 +11056,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	tr: {
@@ -11574,6 +11664,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	it: {
@@ -12177,6 +12272,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	jv: {
@@ -12780,6 +12880,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	ur: {
@@ -13383,6 +13488,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	pl: {
@@ -13986,6 +14096,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	th: {
@@ -14589,6 +14704,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	az: {
@@ -15192,6 +15312,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	fa: {
@@ -15795,6 +15920,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	ro: {
@@ -16398,6 +16528,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	si: {
@@ -17001,6 +17136,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	be: {
@@ -17604,6 +17744,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	kk: {
@@ -18207,6 +18352,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 
 	uz: {
@@ -18810,6 +18960,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	af: {
 		'header.listened': 'Geluister',
@@ -19411,6 +19566,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	am: {
 		'header.listened': 'ተደምጧል',
@@ -20012,6 +20172,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	bg: {
 		'header.listened': 'Изслушано',
@@ -20613,6 +20778,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ca: {
 		'header.listened': 'Escoltat',
@@ -21214,6 +21384,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	da: {
 		'header.listened': 'Lyttet',
@@ -21815,6 +21990,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	dv: {
 		'header.listened': 'އަޑުއެހިއެވެ',
@@ -22416,6 +22596,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	el: {
 		'header.listened': 'Ακούστηκε',
@@ -23017,6 +23202,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	eo: {
 		'header.listened': 'Aŭskultita',
@@ -23618,6 +23808,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	eu: {
 		'header.listened': 'Entzunda',
@@ -24219,6 +24414,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	fi: {
 		'header.listened': 'Kuunneltu',
@@ -24820,6 +25020,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ga: {
 		'header.listened': 'Éiste',
@@ -25421,6 +25626,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	gl: {
 		'header.listened': 'Escoitado',
@@ -26022,6 +26232,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	hu: {
 		'header.listened': 'Meghallgatva',
@@ -26623,6 +26838,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	id: {
 		'header.listened': 'Telah didengarkan',
@@ -27224,6 +27444,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ka: {
 		'header.listened': 'მოსმენილი',
@@ -27825,6 +28050,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	kh: {
 		'header.listened': 'បានស្តាប់',
@@ -28426,6 +28656,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	kn: {
 		'header.listened': 'Listened',
@@ -29027,6 +29262,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ky: {
 		'header.listened': 'Угулган',
@@ -29628,6 +29868,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	la: {
 		'header.listened': 'Auditum',
@@ -30229,6 +30474,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	lt: {
 		'header.listened': 'Perklausyta',
@@ -30830,6 +31080,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	lv: {
 		'header.listened': 'Noklausīts',
@@ -31431,6 +31686,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	kab: {
 		'header.listened': 'Listened',
@@ -32032,6 +32292,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ml: {
 		'header.listened': 'കേട്ടത്',
@@ -32633,6 +32898,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ms: {
 		'header.listened': 'Didengar',
@@ -33234,6 +33504,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ne: {
 		'header.listened': 'सुनिएको',
@@ -33835,6 +34110,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	nn: {
 		'header.listened': 'Hørt',
@@ -34436,6 +34716,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	no: {
 		'header.listened': 'Hørt',
@@ -35037,6 +35322,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	or: {
 		'header.listened': 'ଶୁଣିଲେ |',
@@ -35638,6 +35928,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	oc: {
 		'header.listened': 'Listened',
@@ -36239,6 +36534,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	pt: {
 		'header.listened': 'Ouvido',
@@ -36840,6 +37140,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sa: {
 		'header.listened': 'श्रुतवान्',
@@ -37441,6 +37746,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sk: {
 		'header.listened': 'Vypočuté',
@@ -38042,6 +38352,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sl: {
 		'header.listened': 'Poslušano',
@@ -38643,6 +38958,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sq: {
 		'header.listened': 'Dëgjuar',
@@ -39244,6 +39564,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sr: {
 		'header.listened': 'Listened',
@@ -39845,6 +40170,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sv: {
 		'header.listened': 'Lyssnade',
@@ -40446,6 +40776,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	sw: {
 		'header.listened': 'Imesikilizwa',
@@ -41047,6 +41382,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	ta: {
 		'header.listened': 'கேட்டது',
@@ -41648,6 +41988,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	te: {
 		'header.listened': 'విన్నది',
@@ -42249,6 +42594,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	tt: {
 		'header.listened': 'Тыңланган',
@@ -42850,6 +43200,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	'zh-TW': {
 		'header.listened': '已收聽',
@@ -43451,6 +43806,11 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 	'pt-BR': {
 		'header.listened': 'Ouvido',
@@ -44052,12 +44412,17 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'stats.notes1': '{count} note',
 		'stats.notes2': '{count} notes',
 		'stats.notes5': '{count} notes',
+		'settings.numista.name': 'Numista API key',
+		'settings.numista.desc': 'Coins, banknotes and tokens in the Collection category come from Numista. Free key: https://en.numista.com/api/',
+		'collection.issuer': 'Issuer',
+		'collection.value': 'Face value',
+		'collection.composition': 'Composition',
 	},
 }
 
 // The settings that hold an API key, a client id or a secret.
-export type ApiKeyName = 'omdbApiKey' | 'tmdbApiKey' | 'googleBooksApiKey' | 'rawgApiKey' | 'twitchClientId' | 'twitchClientSecret' | 'comicVineApiKey' | 'etherscanApiKey' | 'openseaApiKey'
-export const API_KEY_NAMES: ApiKeyName[] = ['omdbApiKey', 'tmdbApiKey', 'googleBooksApiKey', 'rawgApiKey', 'twitchClientId', 'twitchClientSecret', 'comicVineApiKey', 'etherscanApiKey', 'openseaApiKey']
+export type ApiKeyName = 'omdbApiKey' | 'tmdbApiKey' | 'googleBooksApiKey' | 'rawgApiKey' | 'twitchClientId' | 'twitchClientSecret' | 'comicVineApiKey' | 'etherscanApiKey' | 'openseaApiKey' | 'numistaApiKey'
+export const API_KEY_NAMES: ApiKeyName[] = ['omdbApiKey', 'tmdbApiKey', 'googleBooksApiKey', 'rawgApiKey', 'twitchClientId', 'twitchClientSecret', 'comicVineApiKey', 'etherscanApiKey', 'openseaApiKey', 'numistaApiKey']
 
 export interface ICategory {
 	name: string
@@ -44116,6 +44481,7 @@ export interface ILibrarySettings {
 	googleBooksApiKey: string
 	rawgApiKey: string
 	comicVineApiKey: string
+	numistaApiKey: string
 	anilistToken: string
 	malClientId: string
 	malClientSecret: string
@@ -44234,6 +44600,7 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 	googleBooksApiKey: '',
 	rawgApiKey: '',
 	comicVineApiKey: '',
+	numistaApiKey: '',
 	anilistToken: '',
 	malClientId: '',
 	malClientSecret: '',

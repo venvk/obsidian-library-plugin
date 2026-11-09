@@ -397,7 +397,7 @@ export default class LibraryPlugin extends Plugin {
 			new WikidataGameProvider()
 		))
 		this.registry.register(new DeezerProvider())
-		this.registry.register(new CollectibleProvider())
+		this.registry.register(new CollectibleProvider(() => this.apiKey('numistaApiKey')))
 		this.registry.register(new AnimeAggregatorProvider(new AnimeProvider(() => this.settings), new MalProvider(() => MAL_CLIENT_ID, () => this.settings), new KitsuProvider(() => this.settings)))
 		this.registry.register(new ComicsAggregatorProvider(
 			new ComicsProvider(() => this.apiKey('comicVineApiKey')),
@@ -5592,6 +5592,7 @@ export default class LibraryPlugin extends Plugin {
 			book: k('googleBooksApiKey'),
 			googlebook: k('googleBooksApiKey'),
 			comic: k('comicVineApiKey'),
+			collectible: k('numistaApiKey'),
 			game: `${k('rawgApiKey')}|${k('twitchClientId')}|${k('twitchClientSecret')}`
 		}
 	}
@@ -6363,6 +6364,9 @@ export default class LibraryPlugin extends Plugin {
 			row.createEl('b', { text: `${label}: ` })
 			row.appendText(value)
 		}
+		plain(tr('collection.issuer'), toStr(fm.Issuer))
+		plain(tr('collection.value'), toStr(fm.Value))
+		plain(tr('collection.composition'), toStr(fm.Composition))
 		plain(tr('collection.number'), toStr(fm.Number))
 		plain(tr('collection.rarity'), toStr(fm.Rarity))
 		const cost = Number(fm.Price)

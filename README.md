@@ -130,6 +130,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `www.wikidata.org`, `en.wikipedia.org`, `commons.wikimedia.org`, `upload.wikimedia.org` | Search, Rotten Tomatoes, trailers, covers, matching Netflix titles, awards of albums, titles and people, photos on a person's canvas | Search text, ids, Netflix ids, album title and artist |
 | `openlibrary.org`, `covers.openlibrary.org` | Books, chapters, covers | Title, author, ISBN, genres |
 | `api.tcgdex.net`, `assets.tcgdex.net`, `api.scryfall.com`, `cards.scryfall.io`, `db.ygoprodeck.com`, `images.ygoprodeck.com` | Collection: Pokémon, Magic and Yu-Gi-Oh! cards, their sets and prices, no key | Card name, set |
+| `api.numista.com`, `en.numista.com` | Collection: coins, banknotes and tokens, with your Numista key | Search text, Numista ID, key |
 | `api.audible.com`, `itunes.apple.com`, `books.apple.com`, `is1-ssl.mzstatic.com` to `is5-ssl.mzstatic.com`, `librivox.org`, `archive.org` | Audiobook search, length, covers, chapters | Title and author |
 | `www.googleapis.com`, `books.google.com` | Book search with a key, covers | Title, key |
 | `api.rawg.io`, `media.rawg.io` | Games, with a key | Title or id, genre, key |

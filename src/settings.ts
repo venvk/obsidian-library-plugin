@@ -38,6 +38,7 @@ type TextKey =
 	| "rawgApiKey"
 	| "tmdbApiKey"
 	| "comicVineApiKey"
+	| "numistaApiKey"
 	| "coverProperty"
 	| "skipFields"
 	| "twitchClientId"
@@ -448,6 +449,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 					this.keyRow("settings.twitchId", "twitchClientId", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.twitchSecret", "twitchClientSecret", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.comicvine", "comicVineApiKey", tr("settings.comicvine.placeholder")),
+					this.keyRow("settings.numista", "numistaApiKey", tr("settings.comicvine.placeholder")),
 					this.keyRow("settings.etherscan", "etherscanApiKey", tr("settings.rawg.placeholder")),
 					this.keyRow("settings.opensea", "openseaApiKey", tr("settings.rawg.placeholder")),
 				],
