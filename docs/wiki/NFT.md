@@ -38,4 +38,4 @@ A wallet, a network and a collection are links. A wallet's canvas shows its toke
 
 ## When a picture is missing
 
-Some pictures live only on the project's own server. When that server is gone, Library tries the explorer, IPFS gateways, NFTScan and OpenSea. If none has it, the card stays empty and every import tries again.
+Some pictures live only on the project's own server. When that server is gone, Library tries the explorer, IPFS gateways, NFTScan and OpenSea. Pictures from hosts that are gone, such as quest3 and SecondLive, are fetched again from the token's OpenSea page, without an OpenSea key, on desktop. If none has it, the card stays empty and every import tries again.

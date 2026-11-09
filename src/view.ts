@@ -1,4 +1,4 @@
-import { App, ItemView, WorkspaceLeaf, TFile, setIcon, setTooltip } from 'obsidian'
+import { App, ItemView, WorkspaceLeaf, TFile, getLanguage, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
 import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, isNftCategory } from './categories'
@@ -9,8 +9,8 @@ import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
 import { comparisonOfTheDay, comparisonText } from './facts'
 import { renderTrophies } from './ui/trophyIcons'
 import { tasteOf } from './taste'
-import { logOf, todayIso } from './diary'
-import { renderPlatforms } from './ui/platformIcons'
+import { activityDays, logOf, todayIso } from './diary'
+import { renderPlatformLabels, renderPlatforms } from './ui/platformIcons'
 import { YOUTUBE_TYPE } from './youtube'
 import {
 	toStr,
@@ -246,7 +246,7 @@ export class LibraryRenderer {
 	}
 
 	collectStats(): { columns: StatsColumn[]; time: TimeSlice[]; undated: number } {
-		const tops = this.plugin.settings.stats.tops.filter(top => top.scope !== NFT_CATEGORY && !this.plugin.settings.categories.some(c => c.typeValue === top.scope && isNftCategory(c)))
+		const tops = this.plugin.settings.stats.tops
 		const properties = tops.filter(top => top.kind === 'property')
 		const counts = properties.map(() => new Map<string, { label: string; count: number }>())
 		const rated = new Map<ICategory, CardData[]>()
@@ -262,7 +262,26 @@ export class LibraryRenderer {
 			if (!cat) continue
 
 			const isNft = isCollectible(fm) || cat.typeValue === NFT_CATEGORY || toStr(fm.Source) === 'nft' || isNftCategory(cat)
-			if (isNft) continue
+			if (isNft) {
+				// an NFT counts only in its own collection and chain tops, and only as the library shows it: spam and OATs while hidden stay out
+				if (!isNftCategory(cat) && toStr(fm.Source) !== 'nft') continue
+				const spam = fm.Spam === true || (fm.Spam !== false && looksLikeSpam(toStr(fm.Name), toStr(fm.Contract)))
+				if ((spam && !this.plugin.settings.showNftSpam) || (fm.OAT === true && !this.plugin.settings.showNftOat)) continue
+				const tokens = Math.max(1, Number(fm.Count) || 1)
+				properties.forEach((top, i) => {
+					const tally = counts[i]
+					if (!tally || top.scope !== cat.typeValue) return
+					for (const value of propertyValues(fm, top.key)) {
+						const clean = linkLabel(value).trim()
+						const key = clean.toLowerCase()
+						if (!key) continue
+						const entry = tally.get(key)
+						if (entry) entry.count += tokens
+						else tally.set(key, { label: clean, count: tokens })
+					}
+				})
+				continue
+			}
 
 			properties.forEach((top, i) => {
 				const tally = counts[i]
@@ -420,6 +439,8 @@ export class LibraryRenderer {
 		row.createSpan({ cls: 'library-time-name', text: comparisonText(comparison) })
 	}
 
+	private activityObserver: ResizeObserver | null = null
+
 	renderStats(root: HTMLElement, cards?: CardData[]): HTMLElement | null {
 		if (!this.plugin.settings.showStats) return null
 		const stats = this.collectStats()
@@ -523,9 +544,15 @@ export class LibraryRenderer {
 					const row = col.createDiv({ cls: 'library-stats-medal' })
 					row.createSpan({ cls: 'library-stats-medal-icon', text: medals[i] || '' })
 					const label = row.createDiv({ cls: 'library-stats-medal-label' })
-					const nameEl = label.createSpan({ cls: 'library-stats-medal-name', text: name })
-					if (NAME_FIELDS.some(key => key.toLowerCase() === column.top.key.toLowerCase())) this.plugin.linkName(nameEl, name)
-					label.createSpan({ cls: 'library-stats-medal-count', text: `${count} ${trCount('stats.works', count)}` })
+					const scope = this.plugin.settings.categories.find(c => c.typeValue === column.top.scope)
+					const nft = !!scope && isNftCategory(scope)
+					// a chain shows as the coloured badge its notes carry
+					if (nft && column.top.key.toLowerCase() === 'platforms') renderPlatformLabels(label, { Platforms: [name] })
+					else {
+						const nameEl = label.createSpan({ cls: 'library-stats-medal-name', text: name })
+						if (NAME_FIELDS.some(key => key.toLowerCase() === column.top.key.toLowerCase())) this.plugin.linkName(nameEl, name)
+					}
+					label.createSpan({ cls: 'library-stats-medal-count', text: nft ? trCount('stats.tokens', count) : `${count} ${trCount('stats.works', count)}` })
 				})
 				continue
 			}
@@ -630,9 +657,25 @@ export class LibraryRenderer {
 			}
 		}
 
-		// As many columns as fill two rows (the time column's height); taste counts three cells.
-		if (box.parentElement) {
-			const cells = Array.from(box.children).reduce((n, el) => n + (el.hasClass('library-stats-taste') ? 3 : 1), 0)
+		const activity = !!cards && this.plugin.settings.showActivity
+		if (activity && !box.parentElement) body.prepend(box)
+		// With the activity grid the tops fill the first row and the grid the rest of the second, beside the diary and taste.
+		// Without it, as many columns as fill two rows (the time column's height); taste counts three cells.
+		const blocks = Array.from(box.children)
+		const tops = blocks.filter(el => !el.hasClass('library-stats-taste') && !el.hasClass('library-diary-col')).length
+		if (activity && cards) {
+			const cols = Math.max(2, tops)
+			// taste gives up a column so the grid shares its row
+			const taste = blocks.find(el => el.hasClass('library-stats-taste'))
+			// two columns are enough only while the columns are wide; with many tops it keeps three, or its chart runs over
+			const tasteSpan = cols >= 6 ? 3 : cols >= 3 ? 2 : cols
+			if (taste && tasteSpan === 2) taste.addClass('is-narrow')
+			const used = blocks.reduce((n, el) => n + (el === taste ? tasteSpan : el.hasClass('library-diary-col') ? 1 : 0), 0)
+			box.setCssProps({ '--stats-cols': String(cols) })
+			this.renderActivity(box, cards, cols - used >= 1 ? cols - used : 0)
+			if (box.childElementCount === blocks.length && blocks.length === 0) box.remove()
+		} else if (box.parentElement) {
+			const cells = blocks.reduce((n, el) => n + (el.hasClass('library-stats-taste') ? 3 : 1), 0)
 			box.setCssProps({ '--stats-cols': String(Math.max(1, Math.ceil(cells / 2))) })
 		}
 
@@ -679,6 +722,99 @@ export class LibraryRenderer {
 			void this.plugin.persistSettings()
 		})
 		if (settings.comingSoonCollapsed) applyCollapsed(true)
+	}
+
+	// The diary as a grid of days, the way GitHub draws contributions: the more logged that day, the stronger the cell.
+	// It takes the rest of the second row; the cells stay small, and room left over shows older weeks.
+	private renderActivity(box: HTMLElement, cards: CardData[], span: number): void {
+		const today = todayIso()
+		const counts = new Map<string, number>()
+		// the notes behind each day, for its tooltip
+		const titles = new Map<string, string[]>()
+		let first = today
+		for (const card of cards) {
+			// a token's or a card's Date is when it was made, not anything the reader did
+			const days = isCollectible(card.fm) ? logOf(card.fm).map(entry => entry.date) : activityDays(card.fm)
+			for (const date of days) {
+				if (date > today) continue
+				counts.set(date, (counts.get(date) ?? 0) + 1)
+				const names = titles.get(date) ?? []
+				if (names.indexOf(card.name) < 0) names.push(card.name)
+				titles.set(date, names)
+				if (date < first) first = date
+			}
+		}
+		if (counts.size === 0) return
+		const end = new Date()
+		end.setHours(0, 0, 0, 0)
+		const back = Math.round((end.getTime() - new Date(`${first}T00:00:00`).getTime()) / 86400000)
+		// as far back as the diary goes: a week, three months, half a year or a year
+		const minWeeks = back < 7 ? 1 : back < 31 ? 13 : back < 92 ? 26 : 53
+
+		const panel = box.createDiv({ cls: 'library-stats-col library-profile-panel library-activity' })
+		if (span > 0) panel.setCssProps({ '--library-span': String(span) })
+		else panel.addClass('is-full')
+		const title = panel.createDiv({ cls: 'library-activity-title' })
+		const months = panel.createDiv({ cls: 'library-activity-months' })
+		const grid = panel.createDiv({ cls: 'library-activity-grid' })
+		const gap = 3
+		let drawn = 0
+		const draw = (): void => {
+			if (!panel.isConnected) return
+			const width = grid.clientWidth
+			if (width <= 0) return
+			// the period's weeks at 10 to 18px a cell; the latest weeks only when the room is short, older ones when it is spare
+			const cell = Math.max(10, Math.min(18, Math.floor((width + gap) / minWeeks) - gap))
+			const weeks = Math.max(1, Math.min(53, Math.floor((width + gap) / (cell + gap))))
+			if (weeks === drawn && panel.style.getPropertyValue('--library-cell') === `${String(cell)}px`) return
+			drawn = weeks
+			panel.setCssProps({ '--library-cell': `${String(cell)}px`, '--library-weeks': String(weeks) })
+			const start = new Date(end)
+			start.setDate(start.getDate() - ((end.getDay() + 6) % 7) - (weeks - 1) * 7)
+			const from = todayIso(start)
+			let max = 0
+			let total = 0
+			for (const [date, n] of counts) {
+				if (date < from) continue
+				max = Math.max(max, n)
+				total += n
+			}
+			title.empty()
+			title.createSpan({ cls: 'library-activity-name', text: tr('stats.activity') })
+			title.createSpan({ text: ` · ${trCount('stats.activity', total)}` })
+			months.empty()
+			grid.empty()
+			let week = 0
+			let month = -1
+			let labelled = -3
+			for (const day = new Date(start); day <= end; day.setDate(day.getDate() + 1)) {
+				if (day.getDay() === 1 && day > start) week++
+				// a month's name over its first whole week, unless the previous name is still too close
+				if (day.getDay() === 1 && day.getMonth() !== month) {
+					month = day.getMonth()
+					if (week - labelled >= 3) {
+						labelled = week
+						const label = months.createSpan({ cls: 'library-activity-month', text: day.toLocaleDateString(getLanguage() + '-u-nu-latn', { month: 'short' }) })
+						label.setCssProps({ '--library-week': String(week + 1) })
+					}
+				}
+				const iso = todayIso(day)
+				const n = counts.get(iso) ?? 0
+				const level = n === 0 ? 0 : Math.min(4, Math.ceil((n / Math.max(1, max)) * 4))
+				const cell = grid.createDiv({ cls: `library-activity-day is-level-${String(level)}` })
+				const names = titles.get(iso) ?? []
+				const listed = names.length > 6 ? `${names.slice(0, 6).join(', ')} +${String(names.length - 6)}` : names.join(', ')
+				const head = `${relativeDay(iso, today)}: ${trCount('stats.activity', n)}${names.length > 0 ? ` · ${trCount('stats.notes', names.length)}` : ''}`
+				setTooltip(cell, listed ? `${head}\n${listed}` : head, { placement: 'top' })
+			}
+		}
+		// kept on the renderer: an observer nothing holds can be collected and stop drawing
+		this.activityObserver?.disconnect()
+		if (typeof ResizeObserver !== 'undefined') {
+			this.activityObserver = new ResizeObserver(() => draw())
+			this.activityObserver.observe(panel)
+		}
+		window.requestAnimationFrame(() => draw())
 	}
 
 	private renderVotes(info: HTMLElement, fm: Record<string, unknown>): void {
@@ -1206,6 +1342,21 @@ export class LibraryView extends ItemView {
 			mapBtn.addEventListener('click', (e) => {
 				e.stopPropagation()
 				void this.plugin.buildCategoryMap(spec.category!)
+			})
+
+			// the category's connected services and sources, pulled again
+			const syncBtn = toolbar.createEl('button', {
+				cls: 'library-category-map-btn',
+				attr: { 'aria-label': tr('cmd.categorySync', { category: spec.title }) }
+			})
+			setTooltip(syncBtn, tr('cmd.categorySync', { category: spec.title }), { placement: 'top' })
+			setIcon(syncBtn, 'refresh-cw')
+			syncBtn.addEventListener('click', (e) => {
+				e.stopPropagation()
+				if (this.plugin.categorySyncing) return
+				syncBtn.addClass('is-syncing')
+				const done = (): void => { syncBtn.removeClass('is-syncing') }
+				void this.plugin.syncCategory(spec.category!).then(done, done)
 			})
 		}
 

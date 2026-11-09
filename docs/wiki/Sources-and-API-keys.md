@@ -8,8 +8,17 @@ Every kind of title is searched in open sources that need no key:
 | Anime | MyAnimeList, AniList, Kitsu |
 | Comics | Wikidata; AniList for manga, manhwa, and light novels |
 | Music | Deezer |
+| Collections | TCGdex, Scryfall and YGOPRODeck |
 
 Anime results come from all three sites at once, MyAnimeList's first. A title two sites list shows once.
+
+## Collections
+
+Trading cards are searched in TCGdex (Pokémon), Scryfall (Magic) and YGOPRODeck (Yu-Gi-Oh!), with no key needed. A card note gets its picture, set (`Series`), number, year, rarity, illustrator and current price (Cardmarket, EUR; USD when only that is known).
+
+Its header shows "N of M collected" for the set and a **Missing cards** button that lists the set's cards not in the library; a click adds one. The header also has Copies (field `Count`) and Condition (Mint, Near mint, Excellent, Good, Played, Poor; field `Condition`). Adding a card that is already in the library raises its Copies instead of making a second note.
+
+Frontmatter fields: `Series`, `Series ID`, `Series Total`, `Number`, `Rarity`, `Price`, `Currency`, `Count`, `Condition`.
 
 Settings > Library > Connectors > Anime · Manga decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
 
@@ -78,6 +87,8 @@ Searching a book also finds its audiobooks on Audible, Apple Books, LibriVox and
 ## IMDb search
 
 With IMDb connected, movie and series searches start with IMDb's own results. See [[IMDb and Netflix|IMDb-and-Netflix]].
+
+IMDb scores come from IMDb itself, current and with no key, so a new film or series gets its score as soon as IMDb has one. A refresh or a category sync updates it.
 
 ## Etherscan and OpenSea
 

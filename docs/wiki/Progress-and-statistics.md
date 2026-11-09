@@ -77,6 +77,8 @@ Log:
 
 A line with only a date is a title you finished. Imports from connected accounts don't write diary lines, so a synced history doesn't all land on today. The diary starts from your first tick; there are no dates before it.
 
+A rating you set with the stars is written into the diary as `★ 7`; a second rating the same day replaces it.
+
 The statistics panel shows your three latest diary lines, newest first. Settings > Library > Statistics > Diary hides them; your notes keep their `Log`.
 
 ## Statistics panel
@@ -87,6 +89,9 @@ The panel at the top of the Library tab shows the columns you pick in Settings >
 - a property: the three most common values of any property your notes use, such as genres, directors, actors, or a `Shelf` from your [[template|Templates-and-skipped-properties]];
 - Top developers and Top channels: the creators of your games and of your [[YouTube]] videos. They have their own columns, so Top directors counts only movies, series, anime, and the other kinds. Both are added for you while Top directors is listed;
 - a platform you connected: PlayStation (games, time played, trophy level, and trophies by grade), MyAnimeList (anime and manga on your lists), and Nintendo Switch (games and time played).
+- Top collections and Top blockchains: they count the tokens of the NFTs the library shows (spam and OATs only while they are shown). Chains appear as the coloured badges NFT notes carry.
+
+Activity grid shows a cell per day, as on GitHub, brighter the more happened that day. It counts the diary (`Log`) and each note's `Date`, the day it was watched or added; NFTs and cards count only their diary. It shows up to a year, fewer weeks when the diary is short or the room is narrow. Point at a cell to see the day's titles. Turn it on or off in Settings > Library > Statistics ("Activity grid"). It shares the second statistics row with "Your taste" and the diary.
 
 Your taste shows your average score and how it compares with other viewers (IMDb, or RAWG and Metacritic for games), a chart of how often you gave each score, your favourite genres (the highest average over at least three titles), and the decade most of your titles come from. It appears once you have scored five titles. Settings > Library > Statistics > Your taste hides it.
 

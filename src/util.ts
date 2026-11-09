@@ -1,7 +1,7 @@
 import { App, normalizePath, TFile } from 'obsidian'
 import { progressPattern, dmyDatePattern, type ICategory, type IStatsTop, type TitleLanguage } from './constants'
 import { formatNumber, tr } from './i18n'
-import { categoryLabel } from './categories'
+import { categoryLabel, isNftCategory } from './categories'
 import { normalizeSeasons } from './trailer'
 import type { ContentType } from './providers/types'
 
@@ -260,6 +260,9 @@ export function topLabel(top: IStatsTop, categories: ICategory[]): string {
 	if (top.kind === 'platform') return tr('stats.psn')
 	if (top.kind === 'property' && top.scope) {
 		const scope = categories.find(c => c.typeValue === top.scope)
+		// an NFT's Creator is its collection, its Platforms the chain
+		if (scope && isNftCategory(scope) && top.key.toLowerCase() === 'creator') return tr('stats.topCollections')
+		if (scope && isNftCategory(scope) && top.key.toLowerCase() === 'platforms') return tr('stats.topChains')
 		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'game') return tr('stats.topDevelopers')
 		if (top.key.toLowerCase() === 'creator' && scope?.contentType === 'manual') return tr('stats.topChannels')
 		return tr('stats.topNamed', { name: `${top.key} · ${scope ? categoryLabel(scope) : top.scope}` })
@@ -341,9 +344,9 @@ export function shownProgress(fm: Record<string, unknown>, kind?: ContentType): 
 }
 
 // A rated title counts as seen, ticked or not.
-// A collectible (an NFT) is held, not watched or read: never started, never in progress.
+// A collectible (an NFT, a card) is held, not watched or read: never started, never in progress.
 export function isCollectible(fm: Record<string, unknown>): boolean {
-	return fm.Source === 'nft' || fm.Type === 'NFT' || fm.Contract !== undefined
+	return fm.Source === 'nft' || fm.Type === 'NFT' || fm.Contract !== undefined || fm.Source === 'collectibles' || fm['Series ID'] !== undefined
 }
 
 // Detects raw public blockchain wallet addresses (EVM, Solana, TON, etc.)

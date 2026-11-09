@@ -1,3 +1,8 @@
+import { Platform } from 'obsidian'
+
+// the partition the sign-in window keeps its sessions in (watchSites.ts)
+const SIGN_IN_PARTITION = 'persist:library-auth'
+
 export interface Embed {
 	kind: 'youtube' | 'vimeo' | 'video'
 	src: string
@@ -98,6 +103,15 @@ export function createEmbedPlayer(embed: Embed, title: string): HTMLElement {
 	if (embed.kind === 'video') {
 		wrapper.appendChild(createEl('video', {
 			attr: { src: embed.src, title, controls: '', preload: 'metadata', playsinline: '' }
+		}))
+		return wrapper
+	}
+	// YouTube refuses its player in Obsidian's own frame (no page to name as the referrer, error 152/153).
+	// On desktop a webview names one, on the sign-in partition, so a connected YouTube account plays it as the reader.
+	if (embed.kind === 'youtube' && Platform.isDesktopApp) {
+		const id = embed.src.slice(embed.src.lastIndexOf('/') + 1)
+		wrapper.appendChild(createEl('webview' as keyof HTMLElementTagNameMap, {
+			attr: { src: `https://www.youtube.com/embed/${id}`, partition: SIGN_IN_PARTITION, httpreferrer: 'https://obsidian.md/', title },
 		}))
 		return wrapper
 	}

@@ -138,6 +138,25 @@ function arrange(results: SearchResult[], year: number | null): SearchResult[] {
 	return [...unique.filter(r => r.year === year), ...unique.filter(r => r.year !== year)]
 }
 
+// IMDb's score for a title from its public GraphQL endpoint, no key; null without one
+export async function imdbRating(imdbId: string): Promise<number | null> {
+	if (!/^tt\d+$/.test(imdbId)) return null
+	try {
+		const resp = await requestUrl({
+			url: 'https://api.graphql.imdb.com/',
+			method: 'POST',
+			contentType: 'application/json',
+			headers: { 'x-imdb-client-name': 'imdb-web-next-localized' },
+			body: JSON.stringify({ query: `{ title(id: "${imdbId}") { ratingsSummary { aggregateRating } } }` }),
+			throw: false,
+		})
+		const rating = (resp.json as { data?: { title?: { ratingsSummary?: { aggregateRating?: number | null } } } } | null)?.data?.title?.ratingsSummary?.aggregateRating
+		return typeof rating === 'number' && rating > 0 ? rating : null
+	} catch {
+		return null
+	}
+}
+
 export class OmdbProvider implements ContentProvider {
 	readonly id = 'omdb'
 	readonly contentTypes: ContentType[] = ['movie', 'series']
@@ -193,6 +212,9 @@ export class OmdbProvider implements ContentProvider {
 				if (isEmptyValue(fields[key])) fields[key] = value
 			}
 		}
+		// IMDb's own score, current: OMDb and Cinemeta lag days to weeks behind a new title
+		const live = await within(imdbRating(imdbId), SEARCH_BUDGET_MS, null)
+		if (live !== null) fields['Rating IMDB'] = live
 	}
 
 	private resting(): boolean {

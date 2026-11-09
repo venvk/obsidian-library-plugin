@@ -78,7 +78,7 @@ export class AddContentModal extends SuggestModal<SearchResult> {
 }
 
 // Search everywhere: every medium at once, a group per medium, in this order.
-const ORDER: ContentType[] = ['movie', 'series', 'anime', 'book', 'comic', 'music', 'game']
+const ORDER: ContentType[] = ['movie', 'series', 'anime', 'book', 'comic', 'music', 'game', 'collectible']
 const PER_MEDIUM = 6
 // a pause after typing, or Enter, starts the search
 const PAUSE_MS = 1000
