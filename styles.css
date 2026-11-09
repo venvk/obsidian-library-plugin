@@ -783,12 +783,14 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 /* a webview lays out its guest page only as a flex box */
-.note-header-player webview {
-	display: flex !important;
+.note-header-player .note-header-webview {
+	display: flex;
+	width: 100%;
+	height: 100%;
+	border: none;
 }
 
 .note-header-player iframe,
-.note-header-player webview,
 .note-header-player video {
 	display: block;
 	width: 100%;
@@ -3115,7 +3117,7 @@ sort trigger, the chosen one in the accent colour. */
 	display: grid;
 	grid-auto-flow: column;
 	grid-template-columns: repeat(var(--library-weeks, 53), minmax(0, 1fr));
-	column-gap: var(--library-gap);
+	gap: 0 var(--library-gap);
 }
 
 .library-activity-months {
@@ -3133,7 +3135,7 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-activity-grid {
 	grid-template-rows: repeat(7, auto);
-	row-gap: var(--library-gap);
+	gap: var(--library-gap);
 }
 
 .library-activity-day {
