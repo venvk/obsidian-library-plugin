@@ -667,8 +667,10 @@ export class LibraryRenderer {
 			const cols = Math.max(2, tops)
 			// taste gives up a column so the grid shares its row
 			const taste = blocks.find(el => el.hasClass('library-stats-taste'))
-			if (taste && cols >= 3) taste.addClass('is-narrow')
-			const used = blocks.reduce((n, el) => n + (el === taste ? (cols >= 3 ? 2 : cols) : el.hasClass('library-diary-col') ? 1 : 0), 0)
+			// two columns are enough only while the columns are wide; with many tops it keeps three, or its chart runs over
+			const tasteSpan = cols >= 6 ? 3 : cols >= 3 ? 2 : cols
+			if (taste && tasteSpan === 2) taste.addClass('is-narrow')
+			const used = blocks.reduce((n, el) => n + (el === taste ? tasteSpan : el.hasClass('library-diary-col') ? 1 : 0), 0)
 			box.setCssProps({ '--stats-cols': String(cols) })
 			this.renderActivity(box, cards, cols - used >= 1 ? cols - used : 0)
 			if (box.childElementCount === blocks.length && blocks.length === 0) box.remove()

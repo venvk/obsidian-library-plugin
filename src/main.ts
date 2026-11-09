@@ -7531,7 +7531,9 @@ export default class LibraryPlugin extends Plugin {
 			if (typeof key !== 'string' || !key.trim()) return
 			const name = key.trim()
 			const within = kind === 'property' && typeof scope === 'string' && scope ? scope : undefined
-			if (within === NFT_CATEGORY || (within && this.settings.categories.some(c => c.typeValue === within && isNftCategory(c)))) return
+			// an NFT top other than its collections and chains has nothing to count
+			const nftScope = within === NFT_CATEGORY || (!!within && this.settings.categories.some(c => c.typeValue === within && isNftCategory(c)))
+			if (nftScope && !['creator', 'platforms'].includes(name.toLowerCase())) return
 			if (kind === 'category' && (name === NFT_CATEGORY || this.settings.categories.some(c => c.typeValue === name && isNftCategory(c)))) return
 			if (stats.tops.some(top => top.kind === kind && top.key.toLowerCase() === name.toLowerCase() && top.scope === within)) return
 			stats.tops.push(within ? { kind, key: name, scope: within } : { kind, key: name })

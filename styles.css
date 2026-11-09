@@ -2322,6 +2322,8 @@ sort trigger, the chosen one in the accent colour. */
 	/* the start of the second row; the other blocks fill the free cells around it */
 	grid-area: 2 / 1 / auto / span 3;
 	align-self: stretch;
+	/* its chart stays inside, whatever the column width */
+	overflow: hidden;
 }
 
 /* beside the activity grid taste takes two columns */

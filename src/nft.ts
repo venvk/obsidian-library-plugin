@@ -1563,14 +1563,15 @@ export async function fetchNftTokenImage(chain: string, contract: string, tokenI
 // OpenSea's cached picture of a token, read off its page in a hidden webview (desktop); '' when the page has none
 export async function openseaPageImage(chain: string, contract: string, tokenId: string): Promise<string> {
 	const osChain = OPENSEA_CHAINS[chain]
-	if (!osChain || !contract || !tokenId) return ''
+	// the note's values go into code run on the page: only a plain address and a plain id get that far
+	const address = contract.toLowerCase()
+	if (!osChain || !/^(?:0x[0-9a-f]{40}|[1-9a-hj-np-z]{32,44})$/.test(address) || !/^\d{1,78}$/.test(tokenId)) return ''
 	const slug = osChain === 'matic' ? 'polygon' : osChain
-	const media = `seadn.io/${osChain}/${contract.toLowerCase()}`
-	// the page's own picture of this token, not another one listed beside it, at full size
+	const media = `seadn.io/${osChain.replace(/[^a-z_]/g, '')}/${address.replace(/[^0-9a-z]/g, '')}`
 	// the token's picture among the page's image sources (attributes are set even where the tiny hidden webview draws nothing), at full size
-	const pick = `(() => { const src = [...document.querySelectorAll('img[src]')].map(i => i.getAttribute('src') || '').find(s => s.toLowerCase().includes(${JSON.stringify(media)})); return src ? src.split('?')[0] : '' })()`
+	const pick = `(() => { const src = [...document.querySelectorAll('img[src]')].map(i => i.getAttribute('src') || '').find(s => s.toLowerCase().includes('${media}')); return src ? src.split('?')[0] : '' })()`
 	try {
-		const found = await readPage(`https://opensea.io/item/${slug}/${contract.toLowerCase()}/${tokenId}`, pick, 45000, `${pick} !== ''`)
+		const found = await readPage(`https://opensea.io/item/${slug}/${address}/${tokenId}`, pick, 45000, `${pick} !== ''`)
 		return mediaUrl(found) || ''
 	} catch {
 		return ''
