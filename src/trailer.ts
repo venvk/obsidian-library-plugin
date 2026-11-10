@@ -111,6 +111,7 @@ export function createEmbedPlayer(embed: Embed, title: string): HTMLElement {
 	if (embed.kind === 'youtube' && Platform.isDesktopApp) {
 		const id = embed.src.slice(embed.src.lastIndexOf('/') + 1)
 		wrapper.appendChild(createEl('webview' as keyof HTMLElementTagNameMap, {
+			cls: 'note-header-webview',
 			attr: { src: `https://www.youtube.com/embed/${id}`, partition: SIGN_IN_PARTITION, httpreferrer: 'https://obsidian.md/', title },
 		}))
 		return wrapper

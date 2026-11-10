@@ -72,6 +72,8 @@ const price = (value: unknown): number | null => {
 	const n = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN
 	return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null
 }
+// "1999–2003", or the one year when both ends agree
+const span = (from: number | undefined, to: number | undefined): string => (from && to && to !== from ? `${String(from)}–${String(to)}` : from ? String(from) : '')
 const year = (date: string | undefined): number | null => (date && /^\d{4}/.test(date) ? Number(date.slice(0, 4)) : null)
 
 let setNames: Promise<Record<string, string>> | null = null
@@ -85,19 +87,86 @@ function pokemonSetNames(): Promise<Record<string, string>> {
 	return setNames
 }
 
+const NUMISTA = 'https://api.numista.com/v3'
+
+interface NumistaBrief { id: number; title: string; issuer?: { name?: string }; min_year?: number; max_year?: number; obverse_thumbnail?: string }
+interface NumistaType extends NumistaBrief {
+	url?: string
+	value?: { text?: string }
+	composition?: { text?: string }
+	obverse?: { picture?: string }
+	reverse?: { picture?: string }
+}
+
 export class CollectibleProvider implements ContentProvider {
 	readonly id = COLLECTIBLE_SOURCE
 	readonly contentTypes: ContentType[] = ['collectible']
 
+	// coins and banknotes need the reader's own Numista key; cards need none
+	constructor(private readonly numistaKey: () => string = () => '') {}
+
+	private async numista<T>(path: string): Promise<T | null> {
+		const key = this.numistaKey().trim()
+		if (!key) return null
+		try {
+			const resp = await requestUrl({ url: `${NUMISTA}${path}`, headers: { 'Numista-API-Key': key, Accept: 'application/json' }, throw: false })
+			return resp.status === 200 ? (resp.json as T) : null
+		} catch {
+			return null
+		}
+	}
+
 	async search(query: string): Promise<SearchResult[]> {
 		const q = query.trim()
 		if (!q) return []
-		const [pokemon, mtg, ygo] = await Promise.all([
+		const [pokemon, mtg, ygo, coins] = await Promise.all([
 			within(this.searchPokemon(q), SEARCH_BUDGET_MS * 2, [] as SearchResult[]),
 			within(this.searchMtg(q), SEARCH_BUDGET_MS * 2, [] as SearchResult[]),
 			within(this.searchYgo(q), SEARCH_BUDGET_MS * 2, [] as SearchResult[]),
+			within(this.searchNumista(q), SEARCH_BUDGET_MS * 2, [] as SearchResult[]),
 		])
-		return [...pokemon, ...mtg, ...ygo]
+		return [...pokemon, ...mtg, ...ygo, ...coins]
+	}
+
+	private async searchNumista(q: string): Promise<SearchResult[]> {
+		const list = await this.numista<{ types?: NumistaBrief[] }>(`/types?count=30&lang=en&q=${encodeURIComponent(q)}`)
+		return (list?.types ?? []).map(coin => ({
+			provider: this.id,
+			sourceId: `numista:${String(coin.id)}`,
+			title: coin.title,
+			year: coin.min_year ?? null,
+			cover: coin.obverse_thumbnail ?? null,
+			subtitle: ['Numista', coin.issuer?.name, span(coin.min_year, coin.max_year)].filter(Boolean).join(' · '),
+			raw: null,
+		}))
+	}
+
+	private async fetchNumista(id: string): Promise<NormalizedMetadata | null> {
+		if (!/^\d+$/.test(id)) return null
+		const coin = await this.numista<NumistaType>(`/types/${id}?lang=en`)
+		if (!coin) return null
+		// a price is known per issue: the first issue's, at a middle grade when there are several
+		const issues = await this.numista<Array<{ id: number }>>(`/types/${id}/issues?lang=en`)
+		const issue = issues?.[0]?.id
+		const prices = issue ? (await this.numista<{ prices?: Array<{ grade?: string; price?: number }> }>(`/types/${id}/issues/${String(issue)}/prices?currency=EUR`))?.prices ?? [] : []
+		const cost = price((prices.find(p => p.grade === 'vf') ?? prices[Math.floor(prices.length / 2)])?.price)
+		const pictures = [coin.obverse?.picture, coin.reverse?.picture].filter((url): url is string => !!url)
+		return {
+			fields: {
+				Name: coin.title,
+				Cover: pictures[0] ?? null,
+				Gallery: pictures,
+				Year: coin.min_year ?? null,
+				Issuer: coin.issuer?.name ?? null,
+				Value: coin.value?.text ?? null,
+				Composition: coin.composition?.text ?? null,
+				Price: cost,
+				Currency: cost ? 'EUR' : null,
+				URL: coin.url ?? `https://en.numista.com/${id}`,
+			},
+			progressTotal: null,
+			imdbId: null,
+		}
 	}
 
 	private async searchPokemon(q: string): Promise<SearchResult[]> {
@@ -151,6 +220,7 @@ export class CollectibleProvider implements ContentProvider {
 		if (game === 'pokemon') return this.fetchPokemon(id)
 		if (game === 'mtg') return this.fetchMtg(id, raw as ScryfallCard | undefined)
 		if (game === 'ygo') return this.fetchYgo(id, raw as YgoCard | undefined)
+		if (game === 'numista') return this.fetchNumista(id)
 		return null
 	}
 
