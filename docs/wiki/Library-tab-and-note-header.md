@@ -2,6 +2,8 @@
 
 Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, then the sections in the order you set in Settings > Library > Categories: one per category, with Soon and Up next among them. While they are on, Soon and Up next are listed there like categories, and you can drag them anywhere in the list, or move them with arrows on a phone. By default Soon comes first and Up next last.
 
+The search button in the tab's header, or the `Search your library` command, finds a note by its title, creator, source id or NFT contract. It searches a second after you stop typing, as soon as you finish a word with a space, or on Enter. Results come in groups by category, ten notes each with the count of all matches in the heading; a click on a heading folds its group, and the folds are remembered.
+
 The buttons in the tab's header add a title (+), search your whole library, run every import now (Update), build the [[library map|Library-blocks-and-map]], and open the plugin's settings.
 
 ### A section

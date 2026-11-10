@@ -826,15 +826,26 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// The library's notes by category, in the settings' order; a category with no notes has no group.
 	openLibrarySearch(): void {
-		const types = new Set(this.settings.categories.map(c => c.typeValue))
-		const files = this.app.vault.getMarkdownFiles().filter(f => {
-			if (isTemplateFile(f.path)) return false
-			const type: unknown = this.app.metadataCache.getFileCache(f)?.frontmatter?.Type
-			return typeof type === 'string' && types.has(type)
-		})
-		new LibrarySearchModal(this.app, files, (file) => {
-			void this.app.workspace.getLeaf(false).openFile(file)
+		const byType = new Map<string, TFile[]>()
+		for (const category of this.settings.categories) byType.set(category.typeValue, [])
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (isTemplateFile(file.path)) continue
+			const type: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.Type
+			if (typeof type === 'string') byType.get(type)?.push(file)
+		}
+		const groups = this.settings.categories
+			.map(category => ({ key: `library:${category.typeValue}`, label: categoryLabel(category), files: byType.get(category.typeValue) ?? [] }))
+			.filter(group => group.files.length > 0)
+		new LibrarySearchModal(this.app, groups, {
+			folded: (key) => this.settings.searchFolded.indexOf(key) >= 0,
+			toggle: (key) => {
+				const folded = this.settings.searchFolded
+				this.settings.searchFolded = folded.indexOf(key) >= 0 ? folded.filter(k => k !== key) : [...folded, key]
+				void this.persistSettings()
+			},
+			onPick: (file) => { void this.app.workspace.getLeaf(false).openFile(file) }
 		}).open()
 	}
 
