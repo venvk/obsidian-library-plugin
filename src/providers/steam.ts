@@ -18,6 +18,7 @@ interface SteamAppDetails {
 	type?: string
 	name?: string
 	header_image?: string
+	short_description?: string
 	release_date?: { coming_soon?: boolean; date?: string }
 	developers?: string[]
 	publishers?: string[]
@@ -144,6 +145,7 @@ export class SteamProvider implements ContentProvider {
 			// Metacritic 0-100; notes store 0-10.
 			const score = app.metacritic?.score
 			if (typeof score === 'number' && score > 0) fields['Rating MC'] = Math.round(score) / 10
+			if (app.short_description) fields.Description = app.short_description
 			Object.assign(fields, steamMedia(app))
 			const youtube = await this.trailers.youtube(id, app.name ?? '')
 			if (youtube) fields.Trailer = youtube

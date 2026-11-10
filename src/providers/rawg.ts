@@ -26,6 +26,7 @@ interface RawgDetails {
 	publishers?: { name: string }[]
 	rating?: number | null
 	metacritic?: number | null
+	description_raw?: string
 }
 
 export class RawgProvider implements ContentProvider {
@@ -126,6 +127,7 @@ export class RawgProvider implements ContentProvider {
 				fields['Rating MC'] = Math.round(details.metacritic) / 10
 			}
 
+			if (details.description_raw) fields.Description = details.description_raw
 			Object.assign(fields, await this.media(sourceId, details.name, params))
 			return { fields, progressTotal: 1, imdbId: null }
 		} catch (e) {

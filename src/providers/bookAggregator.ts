@@ -1,6 +1,6 @@
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 import { AudiobookProvider, isAudiobookId } from './audiobooks'
-import { findChapters } from './openlibrary'
+import { findChapters, workDescription } from './openlibrary'
 import { tr } from '../i18n'
 import { SEARCH_BUDGET_MS, within } from '../util'
 
@@ -56,6 +56,7 @@ export class BookAggregatorProvider implements ContentProvider {
 				author: text(Array.isArray(creator) ? creator[0] : creator)
 			})
 			if (titles.length >= 2) meta.fields.Chapters = titles.map((title) => ({ title }))
+			if (!meta.fields.Description) meta.fields.Description = await within(workDescription(sourceId), SEARCH_BUDGET_MS, '')
 		}
 		return meta
 	}

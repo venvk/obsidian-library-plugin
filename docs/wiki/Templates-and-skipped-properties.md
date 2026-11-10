@@ -34,6 +34,7 @@ If the template is moved or deleted, Library shows "Template not found" and crea
 Settings > Library > General > Skip properties takes the fields that notes should not get from the sources, separated by commas, for example `Cast, Gallery, Trailer`. New notes leave them out, and a refresh doesn't add them. Values already in your notes stay; delete them by hand if you want them gone.
 
 - Capitals don't matter.
+- List `Description` to keep the folded Description callout out of your notes. A note that already has one keeps it.
 - The cover can be listed under either name: with Cover property set to `image`, both `Cover` and `image` skip it.
 - Only fields from the sources can be skipped. The seven properties Library manages, and the fields connected accounts write, such as `Platforms`, `Playtime`, `Last Played`, or the trophy counts, are always written.
 - Some fields feed features. Without `Runtime` the time chart can't count a title, without `Seasons`, `Chapters`, or `Tracks` there is nothing to tick in the note header, and without `Genre` or `Country` the filters have less to offer.

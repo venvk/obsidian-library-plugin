@@ -19,7 +19,7 @@ import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
 import { OmdbProvider } from './providers/omdb'
-import { OpenLibraryProvider, editionCovers, findChapters } from './providers/openlibrary'
+import { OpenLibraryProvider, editionCovers, findChapters, workDescription } from './providers/openlibrary'
 import { GoogleBooksProvider } from './providers/googlebooks'
 import { BookAggregatorProvider } from './providers/bookAggregator'
 import { CinemetaEnricher } from './providers/cinemeta'
@@ -46,7 +46,7 @@ import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } f
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat, viaPinata } from './nft'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -118,6 +118,7 @@ import {
 	within,
 	SEARCH_BUDGET_MS,
 	safeUrl,
+	plainText,
 	linkLabel,
 	linkTarget,
 	NAME_FIELDS,
@@ -993,6 +994,7 @@ export default class LibraryPlugin extends Plugin {
 			const record = fm as Record<string, unknown>
 			this.applyMetaFields(record, meta)
 		})
+		await this.describe(file, meta.fields.Description)
 		return file
 	}
 
@@ -1998,6 +2000,20 @@ export default class LibraryPlugin extends Plugin {
 	private async addDescription(file: TFile, description: string): Promise<void> {
 		const callout = descriptionCallout(description)
 		await this.app.vault.process(file, text => withDescription(text, callout))
+	}
+
+	// What the source says a title is about, as a folded callout in the note's body. Written once:
+	// a note that has one, edited or not, keeps it. true when the note changed.
+	private async describe(file: TFile, description: unknown): Promise<boolean> {
+		const about = plainText(description)
+		if (!about || this.skipped('Description')) return false
+		const callout = descriptionCallout(about)
+		let added = false
+		await this.app.vault.process(file, text => {
+			added = !hasDescription(text)
+			return added ? withDescription(text, callout) : text
+		})
+		return added
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
@@ -5186,7 +5202,8 @@ export default class LibraryPlugin extends Plugin {
 	private applyMetaFields(fm: Record<string, unknown>, meta: NormalizedMetadata): void {
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
-			if (isEmptyValue(value) || this.skipped(key)) continue
+			// a description is the note's text, not a property (describe)
+			if (isEmptyValue(value) || key === 'Description' || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			if (!isEmptyValue(fm[target])) continue
 			fm[target] = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
@@ -5467,8 +5484,11 @@ export default class LibraryPlugin extends Plugin {
 				const sourceId = toStr(fm['Source ID'])
 				// no Source ID, no provider, or Open Library (nothing to fetch by id): no request
 				const fetches = !!provider && !!sourceId && provider.refreshable?.(sourceId) !== false
+				// an Open Library book has nothing to refetch but what it is about, asked once
+				const work = !fetches && category.contentType === 'book' && sourceId.startsWith('/works/') && !this.skipped('Description')
+					&& !hasDescription(await this.app.vault.cachedRead(file))
 				// offline every fetch would fail: leave the rest unmarked for the next launch
-				if (fetches && !navigator.onLine) {
+				if ((fetches || work) && !navigator.onLine) {
 					complete = false
 					break
 				}
@@ -5488,6 +5508,8 @@ export default class LibraryPlugin extends Plugin {
 					const res = await this.enrichNote(file, category.contentType, provider, sourceId)
 					ok = res.ok
 					changed = res.changed
+				} else if (work) {
+					changed = await this.describe(file, await workDescription(sourceId))
 				}
 				if (ok) {
 					if (changed) updated++
@@ -5495,7 +5517,7 @@ export default class LibraryPlugin extends Plugin {
 					marked++
 					if (marked % 10 === 0) await this.persistSettings()
 				}
-				if (fetches) {
+				if (fetches || work) {
 					await this.enrichSleep(ENRICH_STEP_DELAY)
 					if (this.unloaded) return
 				}
@@ -5537,11 +5559,13 @@ export default class LibraryPlugin extends Plugin {
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
 			const changed = this.applyMetaPatch(testCurrent, meta)
-			if (!changed) return { ok: true, changed: false }
-			await this.app.fileManager.processFrontMatter(file, (current) => {
-				this.applyMetaPatch(current as Record<string, unknown>, meta)
-			})
-			return { ok: true, changed: true }
+			if (changed) {
+				await this.app.fileManager.processFrontMatter(file, (current) => {
+					this.applyMetaPatch(current as Record<string, unknown>, meta)
+				})
+			}
+			const described = await this.describe(file, meta.fields.Description)
+			return { ok: true, changed: changed || described }
 		} catch (e) {
 			console.error('Library: metadata pass error', e)
 			return { ok: false, changed: false }
@@ -5639,12 +5663,13 @@ export default class LibraryPlugin extends Plugin {
 			}
 
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
-			const changed = this.applyMetaPatch(testCurrent, meta)
+			let changed = this.applyMetaPatch(testCurrent, meta)
 			if (changed) {
 				await this.app.fileManager.processFrontMatter(file, (current) => {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
 				})
 			}
+			if (await this.describe(file, meta.fields.Description)) changed = true
 
 			if (force) {
 				new Notice(tr(changed ? 'notice.refreshed' : 'notice.notFound', { name: toStr(meta.fields.Name) || file.basename }))
@@ -5707,6 +5732,7 @@ export default class LibraryPlugin extends Plugin {
 			cur['Source ID'] = result.sourceId
 			this.applyMetaPatch(cur, meta)
 		})
+		await this.describe(file, meta.fields.Description)
 		new Notice(tr('notice.refreshed', { name: toStr(meta.fields.Name) || file.basename }))
 	}
 
@@ -5715,7 +5741,7 @@ export default class LibraryPlugin extends Plugin {
 		let changed = false
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
-			if (isEmptyValue(value) || this.skipped(key)) continue
+			if (isEmptyValue(value) || key === 'Description' || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			// any known cover property counts as present, so a rename does not duplicate it
 			const present = key === 'Cover' ? coverValue(current, this.coverProperty()) : current[target]

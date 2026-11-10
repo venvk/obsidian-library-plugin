@@ -11,6 +11,7 @@ interface ComicVineVolume {
 	site_detail_url?: string
 	api_detail_url?: string
 	description?: string
+	deck?: string
 }
 
 interface ComicVineSearchResponse {
@@ -118,6 +119,9 @@ export class ComicsProvider implements ContentProvider {
 				Cover: this.cover(vol),
 				URL: vol.site_detail_url || `https://comicvine.gamespot.com/volume/${ComicsProvider.VOLUME_TYPE}-${this.volumeId(sourceId)}/`
 			}
+
+			const about = vol.deck || vol.description
+			if (about) fields.Description = about
 
 			const issueCount = vol.count_of_issues && vol.count_of_issues > 0 ? vol.count_of_issues : null
 			return { fields, progressTotal: issueCount, imdbId: null }

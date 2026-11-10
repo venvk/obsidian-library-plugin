@@ -22,6 +22,7 @@ interface TmdbImagesResponse {
 
 interface TmdbMovieDetails {
 	runtime?: number
+	overview?: string
 }
 
 interface TmdbSeasonDetails {
@@ -38,6 +39,7 @@ interface TmdbSeason {
 
 interface TmdbTvDetails {
 	episode_run_time?: number[]
+	overview?: string
 	seasons?: TmdbSeason[]
 }
 
@@ -120,6 +122,7 @@ export class TmdbEnricher implements MetadataEnricher {
 		const gallery = this.galleryOf(images)
 		if (gallery.length > 0) fields.Gallery = gallery
 		if (typeof details?.runtime === 'number' && details.runtime > 0) fields.Runtime = details.runtime
+		if (details?.overview) fields.Description = details.overview
 	}
 
 	private async tvFields(fields: Record<string, unknown>, id: number): Promise<void> {
@@ -131,6 +134,7 @@ export class TmdbEnricher implements MetadataEnricher {
 		if (trailer) fields.Trailer = trailer
 		const runtime = details?.episode_run_time?.[0]
 		if (typeof runtime === 'number' && runtime > 0) fields.Runtime = runtime
+		if (details?.overview) fields.Description = details.overview
 		const seasons = await this.seasonFields(id, details?.seasons ?? [])
 		if (seasons.length > 0) fields.Seasons = seasons
 	}

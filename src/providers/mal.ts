@@ -8,6 +8,7 @@ interface MalAnime {
 	title: string
 	alternative_titles?: { en?: string; ja?: string }
 	start_date?: string
+	synopsis?: string
 	mean?: number
 	num_episodes?: number
 	average_episode_duration?: number
@@ -18,7 +19,7 @@ interface MalAnime {
 
 // `id`, `title` and `main_picture` come with every answer; the rest is asked for.
 const SEARCH_FIELDS = 'alternative_titles,start_date'
-const DETAIL_FIELDS = 'alternative_titles,start_date,mean,num_episodes,average_episode_duration,genres,studios'
+const DETAIL_FIELDS = 'alternative_titles,start_date,mean,num_episodes,average_episode_duration,genres,studios,synopsis'
 
 // MyAnimeList anime; needs only the Client ID, silent without it. Notes carry
 // `mal:` ids and refresh back here.
@@ -96,6 +97,7 @@ export class MalProvider implements ContentProvider {
 				URL: `https://myanimelist.net/anime/${id}`
 			}
 			if (typeof anime.mean === 'number') fields['Rating MAL'] = anime.mean
+			if (anime.synopsis) fields.Description = anime.synopsis
 			// MyAnimeList gives seconds; `Runtime` keeps one episode's minutes.
 			const seconds = anime.average_episode_duration ?? 0
 			if (seconds > 0) fields.Runtime = Math.round(seconds / 60)

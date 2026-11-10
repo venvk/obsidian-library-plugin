@@ -12,6 +12,12 @@ Every kind of title is searched in open sources that need no key:
 
 Anime results come from all three sites at once, MyAnimeList's first. A title two sites list shows once.
 
+## Descriptions
+
+A note gets what its title is about as a folded **Description** callout at the end of its text. It comes from the source the note came from: Cinemeta or TMDB for movies and series, MyAnimeList or AniList for anime and manga, Steam or RAWG for games, Open Library or Google Books for books, Comic Vine for comics. Titles found only in Wikidata, music and collectibles have none.
+
+The text is in the source's language, most often English. It is written once: edit it or fold it open, and Library leaves it alone. Delete it and the next refresh brings it back; to keep it out for good, add `Description` to [[Skip properties|Templates-and-skipped-properties]]. Notes made before 2.6.5 get theirs in the background after the update.
+
 ## Collections
 
 Trading cards are searched in TCGdex (Pokémon), Scryfall (Magic) and YGOPRODeck (Yu-Gi-Oh!), with no key needed. A card note gets its picture, set (`Series`), number, year, rarity, illustrator and current price (Cardmarket, EUR; USD when only that is known).

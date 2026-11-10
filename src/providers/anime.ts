@@ -20,6 +20,7 @@ interface AniListMedia {
 	streamingEpisodes?: { thumbnail?: string | null }[]
 	studios?: { nodes?: { name: string }[] }
 	siteUrl?: string
+	description?: string | null
 }
 
 interface AniListSearchResponse {
@@ -31,7 +32,7 @@ interface AniListMediaResponse {
 }
 
 const MEDIA_FIELDS =
-	'id idMal title { romaji english native } startDate { year } episodes duration genres status averageScore coverImage { extraLarge large } bannerImage trailer { id site } streamingEpisodes { thumbnail } studios(isMain: true) { nodes { name } } siteUrl'
+	'id idMal title { romaji english native } startDate { year } episodes duration genres status averageScore coverImage { extraLarge large } bannerImage trailer { id site } streamingEpisodes { thumbnail } studios(isMain: true) { nodes { name } } siteUrl description(asHtml: false)'
 
 // Anime via AniList GraphQL (no key); a "mal:" note is found here by that id.
 // Jikan (the MyAnimeList proxy) answers 504 too often to search through.
@@ -114,6 +115,7 @@ export class AnimeProvider implements ContentProvider {
 			if (typeof media.averageScore === 'number') fields['Rating AniList'] = media.averageScore / 10
 			// AniList's duration is one episode's length.
 			if (typeof media.duration === 'number' && media.duration > 0) fields.Runtime = media.duration
+			if (media.description) fields.Description = media.description
 			const trailer = this.trailer(media)
 			if (trailer) fields.Trailer = trailer
 			const stills = [

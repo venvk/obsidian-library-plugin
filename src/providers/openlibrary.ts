@@ -81,6 +81,13 @@ async function editionsOf(work: string): Promise<OpenLibraryEdition[]> {
 	return entries
 }
 
+// What a work is about; Open Library keeps it as text or as { value }. '' for anything but a work key.
+export async function workDescription(work: string): Promise<string> {
+	if (!/^\/works\/[\w.-]+$/.test(work)) return ''
+	const about = (await getJson<{ description?: string | { value?: string } }>(`https://openlibrary.org${work}.json`))?.description
+	return (typeof about === 'string' ? about : about?.value) ?? ''
+}
+
 // Every edition's cover of a work, for picking a better one than the work's own
 export async function editionCovers(work: string): Promise<string[]> {
 	if (!/^\/works\/[\w.-]+$/.test(work)) return []

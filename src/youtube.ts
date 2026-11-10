@@ -338,14 +338,27 @@ export function descriptionCallout(description: string, title = tr('header.descr
 	return [`> [!quote]- ${title}`, ...lines].join('\n')
 }
 
+// A description callout's first line, under any language's title.
+function isDescriptionHead(line: string, titles: Set<string>): boolean {
+	const head = /^> \[!quote\][-+]? (.*)$/.exec(line)
+	return !!head && titles.has((head[1] ?? '').trim())
+}
+
+function descriptionTitles(): Set<string> {
+	return new Set(Object.values(I18N).map(block => block['header.description']).filter((title): title is string => !!title))
+}
+
+// true when the note already holds a description callout, yours or an edited one
+export function hasDescription(text: string): boolean {
+	const titles = descriptionTitles()
+	return text.split('\n').some(line => isDescriptionHead(line, titles))
+}
+
 // The note's text with the description callout in place of any it had: one written under
 // another language's title counts too, so switching languages never adds a second one.
 export function withDescription(text: string, callout: string): string {
-	const titles = new Set(Object.values(I18N).map(block => block['header.description']).filter((title): title is string => !!title))
-	const ours = (line: string): boolean => {
-		const head = /^> \[!quote\][-+]? (.*)$/.exec(line)
-		return !!head && titles.has((head[1] ?? '').trim())
-	}
+	const titles = descriptionTitles()
+	const ours = (line: string): boolean => isDescriptionHead(line, titles)
 	const kept: string[] = []
 	const lines = text.split('\n')
 	let found = 0
