@@ -19,7 +19,7 @@ import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
 import { OmdbProvider } from './providers/omdb'
-import { OpenLibraryProvider, editionCovers, findChapters } from './providers/openlibrary'
+import { OpenLibraryProvider, editionCovers, findChapters, workDescription } from './providers/openlibrary'
 import { GoogleBooksProvider } from './providers/googlebooks'
 import { BookAggregatorProvider } from './providers/bookAggregator'
 import { CinemetaEnricher } from './providers/cinemeta'
@@ -37,7 +37,7 @@ import { ComicsProvider } from './providers/comics'
 import { ComicsAggregatorProvider } from './providers/comicsAggregator'
 import { WikidataComicProvider } from './providers/wikidataComics'
 import { MangaProvider } from './providers/manga'
-import { SteamProvider } from './providers/steam'
+import { SteamProvider, steamBlurb } from './providers/steam'
 import { WikidataGameProvider } from './providers/wikidataGames'
 import { TmdbEnricher } from './providers/tmdb'
 import { RottenTomatoesEnricher, idsForNetflix } from './providers/wikidata'
@@ -45,8 +45,8 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat, viaPinata } from './nft'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -64,7 +64,7 @@ import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, addReadRange, logRating, tickLabel, todayIso } from './diary'
 import { categoryCanvas, libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type MapTitle, type PersonCard } from './libraryMap'
-import { albumAwards, localTitle, titleAwards, type Award } from './music'
+import { aboutTitle, albumAwards, localTitle, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
@@ -118,6 +118,7 @@ import {
 	within,
 	SEARCH_BUDGET_MS,
 	safeUrl,
+	plainText,
 	linkLabel,
 	linkTarget,
 	NAME_FIELDS,
@@ -147,7 +148,7 @@ const PHONE_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Appl
 
 // The sections of a name's canvas, in this order.
 const CANVAS_ROLES = [
-	{ label: 'header.creator', fields: ['Creator', 'Director', 'Author', 'Artist'] },
+	{ label: 'header.creator', fields: ['Creator', 'Director', 'Author', 'Artist', 'Narrator'] },
 	{ label: 'header.cast', fields: ['Cast'] },
 	{ label: 'header.genre', fields: ['Genre'] },
 ]
@@ -964,7 +965,7 @@ export default class LibraryPlugin extends Plugin {
 
 			// the category is made only now, once a note is sure to follow
 			const category = await this.categoryFor(target)
-			const file = await this.newNote(category, provider.id, result.sourceId, result.title, meta)
+			const file = await this.newNote(category, provider.id, result.sourceId, result.title, meta, {}, true)
 			await this.app.workspace.getLeaf(false).openFile(file)
 			new Notice(tr('notice.created', { name: toStr(meta.fields.Name) || result.title }))
 		} catch (e) {
@@ -973,7 +974,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	private async newNote(category: ICategory, source: string, sourceId: string, title: string, meta: NormalizedMetadata, extra: Record<string, unknown> = {}): Promise<TFile> {
+	private async newNote(category: ICategory, source: string, sourceId: string, title: string, meta: NormalizedMetadata, extra: Record<string, unknown> = {}, about = false): Promise<TFile> {
 		const disambiguator = source === NFT_SOURCE ? (toStrArray(extra.Platforms)[0] || toStr(extra.Platforms) || undefined) : (toStr(meta.fields.Year) || undefined)
 		const path = await this.uniqueNotePath(title, category.folder, disambiguator)
 		const file = await this.app.vault.create(path, await this.templateText(category))
@@ -993,6 +994,8 @@ export default class LibraryPlugin extends Plugin {
 			const record = fm as Record<string, unknown>
 			this.applyMetaFields(record, meta)
 		})
+		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
+		if (about) await this.describe(file, sourceId, category.contentType, meta.fields)
 		return file
 	}
 
@@ -1178,12 +1181,14 @@ export default class LibraryPlugin extends Plugin {
 	// A genre's or a person's canvas, drawn when it is opened (a click on an
 	// unmade link creates it empty). A canvas you added your own cards to is left alone.
 	private async fillLinkCanvas(file: TFile): Promise<void> {
-		if (this.fillingCanvases.has(file.path)) return
-		this.fillingCanvases.add(file.path)
+		// the path as it is now: drawing may move the canvas into the library
+		const path = file.path
+		if (this.fillingCanvases.has(path)) return
+		this.fillingCanvases.add(path)
 		try {
 			await this.drawLinkCanvas(file)
 		} finally {
-			this.fillingCanvases.delete(file.path)
+			this.fillingCanvases.delete(path)
 		}
 	}
 
@@ -1247,12 +1252,12 @@ export default class LibraryPlugin extends Plugin {
 
 					let text = `# ${toStr(fm.Name) || file.basename}\n\n`
 					const meta: string[] = []
-					if (chain) meta.push(`**${tr('header.chain') || 'Chain'}:** ${chain}`)
-					if (standard) meta.push(`**${tr('header.standard') || 'Standard'}:** ${standard}`)
-					if (count > 0) meta.push(`**${tr('header.count') || 'Count'}:** ${count}`)
+					if (chain) meta.push(`**${tr('header.chain')}:** ${chain}`)
+					if (standard) meta.push(`**${tr('header.standard')}:** ${standard}`)
+					if (count > 0) meta.push(`**${tr('header.count')}:** ${count}`)
 					if (meta.length > 0) text += meta.join(' · ') + '\n\n'
-					if (contractMd) text += `**${tr('header.contract') || 'Contract'}:** ${contractMd}\n\n`
-					if (wallets) text += `**${tr('header.wallet') || 'Wallet'}:** ${wallets}\n\n`
+					if (contractMd) text += `**${tr('header.contract')}:** ${contractMd}\n\n`
+					if (wallets) text += `**${tr('header.wallet')}:** ${wallets}\n\n`
 
 					const localCover = /^!?\[\[([^\]|#]+)/.exec(coverRaw)?.[1]
 					const webCover = safeUrl(coverRaw)
@@ -1998,6 +2003,25 @@ export default class LibraryPlugin extends Plugin {
 	private async addDescription(file: TFile, description: string): Promise<void> {
 		const callout = descriptionCallout(description)
 		await this.app.vault.process(file, text => withDescription(text, callout))
+	}
+
+	// What a title is about, as a folded callout in the note's body. In the reader's language when it can be
+	// found: the source's own translation, else Wikipedia's opening; the source's English text otherwise.
+	// Written once: a note that has one, edited or not, keeps it. true when the note changed.
+	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>): Promise<boolean> {
+		if (this.skipped('Description') || hasDescription(await this.app.vault.read(file))) return false
+		const own = plainText(fields.Description)
+		const about = (fields['Description Local'] === true ? own : plainText(await within(steamBlurb(sourceId), SEARCH_BUDGET_MS, '')))
+			|| plainText(await within(aboutTitle(sourceId, kind, !own), SEARCH_BUDGET_MS * 2, ''))
+			|| own
+		if (!about) return false
+		const callout = descriptionCallout(about)
+		let added = false
+		await this.app.vault.process(file, text => {
+			added = !hasDescription(text)
+			return added ? withDescription(text, callout) : text
+		})
+		return added
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
@@ -3851,7 +3875,7 @@ export default class LibraryPlugin extends Plugin {
 		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
-	// Nintendo: consent first — a third-party signing service carries the requests
+	// Nintendo: consent first: a third-party signing service carries the requests
 	async connectNintendo(): Promise<boolean> {
 		if (!Platform.isDesktopApp) {
 			new Notice(tr('notice.nintendo.desktopOnly'))
@@ -4534,7 +4558,7 @@ export default class LibraryPlugin extends Plugin {
 
 	// Kitsu runs the password grant only (no OAuth apps), so desktop signs in on
 	// the real site inside the auth window and the session is read back from its
-	// storage; mobile keeps the plain form — no webview there.
+	// storage; mobile keeps the plain form: no webview there.
 	connectKitsu(): Promise<boolean> {
 		if (Platform.isDesktopApp) {
 			return new Promise<boolean>((resolve) => {
@@ -5186,7 +5210,8 @@ export default class LibraryPlugin extends Plugin {
 	private applyMetaFields(fm: Record<string, unknown>, meta: NormalizedMetadata): void {
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
-			if (isEmptyValue(value) || this.skipped(key)) continue
+			// a description is the note's text, not a property (describe)
+			if (isEmptyValue(value) || key === 'Description' || key === 'Description Local' || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			if (!isEmptyValue(fm[target])) continue
 			fm[target] = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
@@ -5252,11 +5277,7 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		try {
-			let fetchUrl = url
-			if (fetchUrl.includes('ipfs.filebase.io/ipfs/')) {
-				fetchUrl = fetchUrl.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
-			}
-			const resp = await requestUrl({ url: fetchUrl, throw: false })
+			const resp = await requestUrl({ url: viaPinata(url), throw: false })
 			const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
 			const ext = imageExtension(type ? resp.headers[type] ?? '' : '') ?? sniffImage(resp.arrayBuffer)
 			if (resp.status !== 200 || !ext || resp.arrayBuffer.byteLength === 0) {
@@ -5471,8 +5492,11 @@ export default class LibraryPlugin extends Plugin {
 				const sourceId = toStr(fm['Source ID'])
 				// no Source ID, no provider, or Open Library (nothing to fetch by id): no request
 				const fetches = !!provider && !!sourceId && provider.refreshable?.(sourceId) !== false
+				// an Open Library book has nothing to refetch but what it is about, asked once
+				const work = !fetches && category.contentType === 'book' && sourceId.startsWith('/works/') && !this.skipped('Description')
+					&& !hasDescription(await this.app.vault.read(file))
 				// offline every fetch would fail: leave the rest unmarked for the next launch
-				if (fetches && !navigator.onLine) {
+				if ((fetches || work) && !navigator.onLine) {
 					complete = false
 					break
 				}
@@ -5492,6 +5516,8 @@ export default class LibraryPlugin extends Plugin {
 					const res = await this.enrichNote(file, category.contentType, provider, sourceId)
 					ok = res.ok
 					changed = res.changed
+				} else if (work) {
+					changed = await this.describe(file, sourceId, 'book', { Description: await workDescription(sourceId) })
 				}
 				if (ok) {
 					if (changed) updated++
@@ -5499,7 +5525,7 @@ export default class LibraryPlugin extends Plugin {
 					marked++
 					if (marked % 10 === 0) await this.persistSettings()
 				}
-				if (fetches) {
+				if (fetches || work) {
 					await this.enrichSleep(ENRICH_STEP_DELAY)
 					if (this.unloaded) return
 				}
@@ -5541,11 +5567,13 @@ export default class LibraryPlugin extends Plugin {
 			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
 			const changed = this.applyMetaPatch(testCurrent, meta)
-			if (!changed) return { ok: true, changed: false }
-			await this.app.fileManager.processFrontMatter(file, (current) => {
-				this.applyMetaPatch(current as Record<string, unknown>, meta)
-			})
-			return { ok: true, changed: true }
+			if (changed) {
+				await this.app.fileManager.processFrontMatter(file, (current) => {
+					this.applyMetaPatch(current as Record<string, unknown>, meta)
+				})
+			}
+			const described = await this.describe(file, sourceId, contentType, meta.fields)
+			return { ok: true, changed: changed || described }
 		} catch (e) {
 			console.error('Library: metadata pass error', e)
 			return { ok: false, changed: false }
@@ -5643,12 +5671,13 @@ export default class LibraryPlugin extends Plugin {
 			}
 
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
-			const changed = this.applyMetaPatch(testCurrent, meta)
+			let changed = this.applyMetaPatch(testCurrent, meta)
 			if (changed) {
 				await this.app.fileManager.processFrontMatter(file, (current) => {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
 				})
 			}
+			if (await this.describe(file, sourceId, category.contentType, meta.fields)) changed = true
 
 			if (force) {
 				new Notice(tr(changed ? 'notice.refreshed' : 'notice.notFound', { name: toStr(meta.fields.Name) || file.basename }))
@@ -5711,6 +5740,7 @@ export default class LibraryPlugin extends Plugin {
 			cur['Source ID'] = result.sourceId
 			this.applyMetaPatch(cur, meta)
 		})
+		await this.describe(file, result.sourceId, category.contentType, meta.fields)
 		new Notice(tr('notice.refreshed', { name: toStr(meta.fields.Name) || file.basename }))
 	}
 
@@ -5719,7 +5749,7 @@ export default class LibraryPlugin extends Plugin {
 		let changed = false
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
-			if (isEmptyValue(value) || this.skipped(key)) continue
+			if (isEmptyValue(value) || key === 'Description' || key === 'Description Local' || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			// any known cover property counts as present, so a rename does not duplicate it
 			const present = key === 'Cover' ? coverValue(current, this.coverProperty()) : current[target]
@@ -5870,7 +5900,7 @@ export default class LibraryPlugin extends Plugin {
 			for (let i = 0; i < gallery.length; i++) {
 				const g = gallery[i]
 				if (!g || isInvalidNftMedia(g)) continue
-				const src = coverSrc(this.app, g) || g
+				const src = coverSrc(this.app, g)
 				if (src && !isInvalidNftMedia(src) && nftCandidates.indexOf(src) < 0) {
 					nftCandidates.push(src)
 				}
@@ -5913,11 +5943,7 @@ export default class LibraryPlugin extends Plugin {
 				if (isNft) {
 					img.addEventListener('error', () => {
 						if (!/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(targetUrl)) {
-							let videoSrc = targetUrl
-							if (videoSrc.includes('ipfs.filebase.io/ipfs/')) {
-								videoSrc = videoSrc.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
-							}
-							const video = createEl('video', { attr: { src: videoSrc, muted: '', loop: '', autoplay: '', playsinline: '' } })
+							const video = createEl('video', { attr: { src: viaPinata(targetUrl), muted: '', loop: '', autoplay: '', playsinline: '' } })
 							video.addEventListener('error', () => {
 								const nextIdx = candidateIndex + 1
 								const next = nftCandidates[nextIdx]
@@ -6251,7 +6277,7 @@ export default class LibraryPlugin extends Plugin {
 		this.buildNftTokensBlock(wrap, fm, file, (resolvedMedia) => {
 			const currentMedia = imgSide.querySelector('img, video')
 			if (!currentMedia) {
-				renderHeaderMedia(coverSrc(this.app, resolvedMedia) || resolvedMedia, 0)
+				renderHeaderMedia(coverSrc(this.app, resolvedMedia) ?? '', 0)
 			}
 		})
 		this.buildNftHistoryBlock(wrap, fm)
@@ -6863,7 +6889,7 @@ export default class LibraryPlugin extends Plugin {
 
 		const updateHeaders = (): void => {
 			thTokenId.empty()
-			thTokenId.createSpan({ text: tr('header.tokenId') || 'Token ID' })
+			thTokenId.createSpan({ text: tr('header.tokenId') })
 			if (sortCol === 'tokenId') thTokenId.createSpan({ cls: 'nft-sort-arrow', text: sortAsc ? ' ▲' : ' ▼' })
 
 			thDate.empty()

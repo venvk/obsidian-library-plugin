@@ -566,7 +566,7 @@ export function linkLabel(value: string): string {
 }
 
 // What a name's canvas gathers: the link properties and the plain names older notes keep.
-export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist', 'Wallet']
+export const NAME_FIELDS = ['Genre', 'Creator', 'Cast', 'Director', 'Author', 'Artist', 'Narrator', 'Wallet']
 
 // The file a link property points at, without .canvas: [[Drama.canvas|Drama]] gives Drama.
 export function linkTarget(value: string): string {
@@ -687,6 +687,31 @@ export function coverSrc(app: App, raw: unknown): string | null {
 
 // Per-source search timeout: a stalled server must not hold back the others.
 export const SEARCH_BUDGET_MS = 4000
+
+const ENTITIES: Record<string, string> = { amp: '&', lt: '', gt: '', quot: '"', apos: "'", nbsp: ' ' }
+
+// A source's description as plain text: breaks kept as lines, tags and entities gone.
+// No angle bracket survives, so nothing in it reads as HTML when the note is rendered.
+export function plainText(value: unknown): string {
+	let text = toStr(value).replace(/<\s*(?:br|\/p|\/div|\/li|\/h\d)\b[^>]*>/gi, '\n')
+	// until nothing changes: a tag split around another ("<scr<b>ipt>") is whole again after one pass
+	let before = ''
+	do {
+		before = text
+		text = text.replace(/<[^>]*>/g, '')
+	} while (text !== before)
+	return text
+		.replace(/&(#x?[0-9a-f]+|\w+);/gi, (whole: string, name: string) => {
+			if (name.charAt(0) !== '#') return ENTITIES[name.toLowerCase()] ?? whole
+			const code = name.charAt(1).toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10)
+			return code > 31 && code < 0x110000 && code !== 60 && code !== 62 ? String.fromCodePoint(code) : ''
+		})
+		.replace(/[<>]/g, '')
+		.replace(/[ \t]+/g, ' ')
+		.replace(/ ?\n ?/g, '\n')
+		.replace(/\n{3,}/g, '\n\n')
+		.trim()
+}
 
 export function within<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
 	return new Promise((resolve) => {

@@ -123,6 +123,11 @@ export const IPFS_GATEWAYS = [
 	'https://dweb.link/ipfs/',
 ]
 
+// Filebase serves stored links slowly or not at all in a page; Pinata has the same files.
+export function viaPinata(url: string): string {
+	return url.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
+}
+
 // ipfs:// and ar:// through public gateways; anything else must be public https.
 // ipfs.io and dweb.link time out on most files, so links to them move to Filebase/SeaDN too.
 export function isInvalidNftMedia(url: string): boolean {

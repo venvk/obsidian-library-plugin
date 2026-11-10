@@ -14,7 +14,7 @@ Symlink or copy the repo into `<vault>/.obsidian/plugins/library/`, then enable 
 
 ## Guidelines
 
-- TypeScript is strict — keep it fully typed, no `any`.
+- TypeScript is strict: keep it fully typed, no `any`.
 - UI strings go through `tr()` in `src/i18n.ts`; add keys to every locale in `src/constants.ts`.
 - New content sources implement `ContentProvider` (`src/providers/types.ts`) and register in `src/main.ts`.
 - Run `npm run build` before opening a pull request; it must pass with no errors.

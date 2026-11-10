@@ -39,6 +39,8 @@ const context = await esbuild.context({
 	treeShaking: true,
 	outfile: "main.js",
 	minify: prod,
+	// letters as UTF-8, not \u escapes: the locale table stays under the 5 MB Obsidian Sync limit
+	charset: "utf8",
 });
 
 if (prod) {

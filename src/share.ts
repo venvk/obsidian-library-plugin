@@ -361,7 +361,7 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 		if (collection && collection.toLowerCase() !== name.toLowerCase()) {
 			ctx.fillStyle = '#b4b4c6'
 			ctx.font = '28px sans-serif'
-			const collLabel = tr('header.collection') || 'Collection'
+			const collLabel = tr('header.collection')
 			wrap(ctx, `${collLabel}: ${collection}`, colW, 2).forEach((l) => {
 				ctx.fillText(l, colX, y)
 				y += 38
@@ -376,7 +376,7 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 		if (author && author.toLowerCase() !== name.toLowerCase()) {
 			ctx.fillStyle = '#8a8a9a'
 			ctx.font = '28px sans-serif'
-			const creatorLabel = tr('header.creator') || 'Creator'
+			const creatorLabel = tr('header.creator')
 			wrap(ctx, `${creatorLabel}: ${author}`, colW, 2).forEach((l) => {
 				ctx.fillText(l, colX, y)
 				y += 38
@@ -388,7 +388,7 @@ export async function renderShareCard(app: App, fm: Frontmatter, name: string, c
 		if (mintDate) {
 			ctx.fillStyle = '#7a7a8a'
 			ctx.font = '24px sans-serif'
-			const dateLabel = tr('header.minted') || 'Minted'
+			const dateLabel = tr('header.minted')
 			ctx.fillText(`${dateLabel}: ${mintDate}`, colX, y)
 			y += 34
 		}

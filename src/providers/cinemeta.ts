@@ -16,6 +16,7 @@ interface CinemetaVideo {
 
 interface CinemetaMeta {
 	poster?: string
+	description?: string
 	background?: string
 	runtime?: string
 	trailerStreams?: CinemetaTrailer[]
@@ -44,6 +45,7 @@ export class CinemetaEnricher implements MetadataEnricher {
 			if (!meta || typeof meta !== 'object') return fields
 
 			if (meta.poster) fields.Cover = meta.poster.replace('/poster/small/', '/poster/medium/')
+			if (meta.description) fields.Description = meta.description
 			const trailer = this.trailerOf(meta)
 			if (trailer) fields.Trailer = trailer
 			const runtime = runtimeMinutes(meta.runtime)

@@ -13,6 +13,7 @@ interface GoogleVolumeInfo {
 	publishedDate?: string
 	categories?: string[]
 	pageCount?: number
+	description?: string
 	imageLinks?: { thumbnail?: string; smallThumbnail?: string }
 	industryIdentifiers?: GoogleIdentifier[]
 }
@@ -113,6 +114,7 @@ export class GoogleBooksProvider implements ContentProvider {
 				info.industryIdentifiers?.find((i) => i.type === 'ISBN_13')?.identifier ??
 				info.industryIdentifiers?.find((i) => i.type === 'ISBN_10')?.identifier
 			if (isbn) fields['ISBN'] = isbn
+			if (info.description) fields.Description = info.description
 
 			return { fields, progressTotal: info.pageCount && info.pageCount > 0 ? info.pageCount : null, imdbId: null }
 		} catch (e) {

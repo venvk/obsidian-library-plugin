@@ -24,6 +24,7 @@
 ## What it does
 
 - One note per title. The cover, year, genres, creators, cast, ratings and trailer sit in its properties (frontmatter), where Bases, Dataview and other plugins can read them. Set your own rating with five stars: each half star is one point out of 10, written to `My Rating`; click the same rating again to clear it.
+- What the title is about sits at the end of the note in a folded Description callout, in your language when the source or Wikipedia has it, in English otherwise. Notes you already have get theirs in the background.
 - Episode and chapter lists sit at the top of the note. Tick them off as you go, rate them, and see when the next episode airs. A book's chapter list can be edited with the pencil, and each chapter's notes button opens a section with its name in the note body for quotes and thoughts.
 - The Library tab has a section per kind of media, with filters, sorting by rating, date or progress, an "Up next" shelf and a "Soon" list with the air dates of new episodes. In Settings > Categories, move the Soon list and Up next shelf between categories by dragging, or with arrows on phones; the Library tab follows that order. Searching a book also finds its audiobooks from Audible, Apple Books, LibriVox and the Internet Archive, no key needed, and their listening time counts in the statistics. A book note marks its format (paper, ebook, audiobook) with buttons under the title, saved to `Format`, and the Books filter can show one format.
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
@@ -128,6 +129,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `v3.sg.media-imdb.com`, `m.media-amazon.com` | Movie and series search and posters, with IMDb connected | Title |
 | `api.themoviedb.org`, `image.tmdb.org` | Movie and series details, with a key | IMDb id, key |
 | `www.wikidata.org`, `en.wikipedia.org`, `commons.wikimedia.org`, `upload.wikimedia.org` | Search, Rotten Tomatoes, trailers, covers, matching Netflix titles, awards of albums, titles and people, photos on a person's canvas | Search text, ids, Netflix ids, album title and artist |
+| `<your language>.wikipedia.org` | A title's description in the language Obsidian is set to | The article's title |
 | `openlibrary.org`, `covers.openlibrary.org` | Books, chapters, covers | Title, author, ISBN, genres |
 | `api.tcgdex.net`, `assets.tcgdex.net`, `api.scryfall.com`, `cards.scryfall.io`, `db.ygoprodeck.com`, `images.ygoprodeck.com` | Collection: Pokémon, Magic and Yu-Gi-Oh! cards, their sets and prices, no key | Card name, set |
 | `api.numista.com`, `en.numista.com` | Collection: coins, banknotes and tokens, with your Numista key | Search text, Numista ID, key |

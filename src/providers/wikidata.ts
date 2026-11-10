@@ -63,6 +63,26 @@ export async function entities(ids: string[], props: string, langs: string[] = l
 	return json?.entities ?? {}
 }
 
+// The opening of the item's Wikipedia article, in the first of these languages that has one.
+export async function articleIntro(item: string, langs: string[]): Promise<string> {
+	const links = (await entities([item], 'sitelinks'))[item]?.sitelinks ?? {}
+	for (const lang of langs) {
+		// the tag becomes a host name: letters and hyphens only
+		if (!/^[a-z]{2,3}(?:-[a-z]{2,8})?$/.test(lang)) continue
+		const title = links[`${lang.replace(/-/g, '_')}wiki`]?.title
+		if (!title) continue
+		try {
+			const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`
+			const resp = await requestUrl({ url, headers: HEADERS, throw: false })
+			const page = resp.status === 200 ? resp.json as { type?: string; extract?: string } : null
+			if (page?.type === 'standard' && page.extract) return page.extract
+		} catch (e) {
+			console.error('Library: Wikipedia request error', e)
+		}
+	}
+	return ''
+}
+
 // One property of one item: a full claim list runs to a hundred KB.
 export async function claim(id: string, property: string): Promise<unknown> {
 	const json = await api<{ claims?: Record<string, WikidataClaim[]> }>({ action: 'wbgetclaims', entity: id, property })

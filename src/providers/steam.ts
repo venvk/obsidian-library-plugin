@@ -2,6 +2,15 @@ import { requestUrl } from 'obsidian'
 import type { GameTrailerFinder } from './gameTrailer'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 import { releasedDmy } from '../util'
+import { languages } from './wikidata'
+
+// Steam's name for an Obsidian language; the store keeps a description in each.
+const STEAM_LANGUAGES: Record<string, string> = {
+	ar: 'arabic', bg: 'bulgarian', cs: 'czech', da: 'danish', de: 'german', el: 'greek', es: 'spanish', fi: 'finnish',
+	fr: 'french', hu: 'hungarian', id: 'indonesian', it: 'italian', ja: 'japanese', ko: 'koreana', nl: 'dutch',
+	no: 'norwegian', nb: 'norwegian', pl: 'polish', pt: 'portuguese', 'pt-br': 'brazilian', ro: 'romanian', ru: 'russian',
+	sv: 'swedish', th: 'thai', tr: 'turkish', uk: 'ukrainian', vi: 'vietnamese', zh: 'schinese', 'zh-tw': 'tchinese'
+}
 
 interface SteamSearchItem {
 	id: number
@@ -18,6 +27,7 @@ interface SteamAppDetails {
 	type?: string
 	name?: string
 	header_image?: string
+	short_description?: string
 	release_date?: { coming_soon?: boolean; date?: string }
 	developers?: string[]
 	publishers?: string[]
@@ -53,6 +63,16 @@ export async function steamMediaFor(appId: number): Promise<Record<string, unkno
 		console.error('Library: Steam media error', e)
 		return {}
 	}
+}
+
+// The store's blurb for a steam: id in the reader's language; '' in English or a language Steam has none in.
+// Asked apart from the details: in that language the whole answer, dates and genres too, would be translated.
+export async function steamBlurb(sourceId: string): Promise<string> {
+	const id = /^steam:(\d+)$/.exec(sourceId)?.[1]
+	const language = languages().map(lang => STEAM_LANGUAGES[lang]).find(Boolean)
+	if (!id || !language) return ''
+	const resp = await requestUrl({ url: `https://store.steampowered.com/api/appdetails?appids=${id}&l=${language}&filters=basic`, throw: false })
+	return resp.status === 200 ? (resp.json as SteamAppDetailsResponse)[id]?.data?.short_description ?? '' : ''
 }
 
 export class SteamProvider implements ContentProvider {
@@ -144,6 +164,7 @@ export class SteamProvider implements ContentProvider {
 			// Metacritic 0-100; notes store 0-10.
 			const score = app.metacritic?.score
 			if (typeof score === 'number' && score > 0) fields['Rating MC'] = Math.round(score) / 10
+			if (app.short_description) fields.Description = app.short_description
 			Object.assign(fields, steamMedia(app))
 			const youtube = await this.trailers.youtube(id, app.name ?? '')
 			if (youtube) fields.Trailer = youtube

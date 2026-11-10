@@ -12,6 +12,14 @@ Every kind of title is searched in open sources that need no key:
 
 Anime results come from all three sites at once, MyAnimeList's first. A title two sites list shows once.
 
+## Descriptions
+
+A note gets what its title is about as a folded **Description** callout at the end of its text. It comes from the source the note came from: Cinemeta or TMDB for movies and series, MyAnimeList or AniList for anime and manga, Steam or RAWG for games, Open Library or Google Books for books, Comic Vine for comics. Titles found only in Wikidata, music and collectibles have none.
+
+With Obsidian in a language other than English, Library looks for the text in that language first: Steam's and TMDB's own translations, then the opening of the title's Wikipedia article. When neither has it, the source's English text is used. A title whose source has no description gets the Wikipedia opening too.
+
+It is written once: edit it or fold it open, and Library leaves it alone. Delete it and the next refresh brings it back; to keep it out for good, add `Description` to [[Skip properties|Templates-and-skipped-properties]]. Notes made before 2.6.5 get theirs in the background after the update.
+
 ## Collections
 
 Trading cards are searched in TCGdex (Pokémon), Scryfall (Magic) and YGOPRODeck (Yu-Gi-Oh!), with no key needed. A card note gets its picture, set (`Series`), number, year, rarity, illustrator and current price (Cardmarket, EUR; USD when only that is known).
@@ -19,6 +27,10 @@ Trading cards are searched in TCGdex (Pokémon), Scryfall (Magic) and YGOPRODeck
 Its header shows "N of M collected" for the set and a **Missing cards** button that lists the set's cards not in the library; a click adds one. The header also has Copies (field `Count`) and Condition (Mint, Near mint, Excellent, Good, Played, Poor; field `Condition`). Adding a card that is already in the library raises its Copies instead of making a second note.
 
 Frontmatter fields: `Series`, `Series ID`, `Series Total`, `Number`, `Rarity`, `Price`, `Currency`, `Count`, `Condition`.
+
+Coins, banknotes and tokens come from Numista once you add a [Numista key](#numista). Search by name in the same category. A coin note gets both sides as pictures, its year, issuer, face value (`Value`), metal (`Composition`) and a price in EUR when Numista has one. Copies and Condition work as for cards.
+
+Frontmatter fields: `Issuer`, `Value`, `Composition`, `Price`, `Currency`, `Count`, `Condition`.
 
 Settings > Library > Connectors > Anime · Manga decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
 
@@ -32,6 +44,7 @@ An optional key adds a service, listed first in search, or extra data:
 | [RAWG](#rawg) | Games | RAWG results with its rating, the Metacritic score, screenshots, covers for games not on Steam, and its own recommendations |
 | [Twitch](#twitch-for-game-trailers) | Games | A YouTube trailer from IGDB for nearly every game |
 | [Comic Vine](#comic-vine) | Comics | Comic Vine results with covers and issue counts |
+| [Numista](#numista) | Collections | Coins, banknotes and tokens with their pictures, issuer, value, composition and price |
 
 Keys go in Settings > Library > API keys. They stay in the plugin's settings in your vault and go only to their own service. If you sync or share your `.obsidian` folder, they go with it.
 
@@ -79,6 +92,10 @@ Without them, a game's trailer comes from Wikidata when it lists one, or from St
 ## Comic Vine
 
 Sign in at [comicvine.gamespot.com/api](https://comicvine.gamespot.com/api/) to see your key. Paste it into Comic Vine API key.
+
+## Numista
+
+Create a free account at [numista.com](https://en.numista.com/api/) and request an API key there. Paste it into Numista API key. Without the key, the Collection category searches cards only.
 
 ## Audiobooks
 

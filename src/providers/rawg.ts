@@ -26,6 +26,7 @@ interface RawgDetails {
 	publishers?: { name: string }[]
 	rating?: number | null
 	metacritic?: number | null
+	description_raw?: string
 }
 
 export class RawgProvider implements ContentProvider {
@@ -34,9 +35,25 @@ export class RawgProvider implements ContentProvider {
 
 	private static readonly BASE = 'https://api.rawg.io/api/games'
 
+	// After a server error RAWG is left alone this long: an outage answers each request only after 20 seconds.
+	private static readonly REST = 10 * 60 * 1000
+
 	private getKey: () => string
 
 	private trailers: GameTrailerFinder
+
+	private restingSince = 0
+
+	private resting(): boolean {
+		return Date.now() - this.restingSince < RawgProvider.REST
+	}
+
+	// true for a server error, which starts the rest; a miss (404) is not one
+	private down(status: number): boolean {
+		if (status < 500) return false
+		this.restingSince = Date.now()
+		return true
+	}
 
 	// A RAWG id needs a key to look up.
 	refreshable(): boolean {
@@ -57,10 +74,10 @@ export class RawgProvider implements ContentProvider {
 	async search(query: string): Promise<SearchResult[]> {
 		try {
 			const key = this.getKey().trim()
-			if (!key) return []
+			if (!key || this.resting()) return []
 			const params = new URLSearchParams({ key, search: query, page_size: '20' })
 			const resp = await requestUrl({ url: `${RawgProvider.BASE}?${params.toString()}`, throw: false })
-			if (resp.status !== 200) return []
+			if (this.down(resp.status) || resp.status !== 200) return []
 			const data = resp.json as RawgSearchResponse
 			return (data.results ?? []).map((item) => ({
 				provider: this.id,
@@ -78,7 +95,7 @@ export class RawgProvider implements ContentProvider {
 	}
 
 	// RAWG's screenshots; trailer from YouTube (IGDB, Wikidata), else the Steam
-	// page — RAWG's own video list is mostly empty.
+	// page: RAWG's own video list is mostly empty.
 	private async media(id: string, name: string, params: URLSearchParams): Promise<Record<string, unknown>> {
 		const out: Record<string, unknown> = {}
 		const get = async <T>(path: string): Promise<T | null> => {
@@ -102,10 +119,10 @@ export class RawgProvider implements ContentProvider {
 	async fetch(sourceId: string): Promise<NormalizedMetadata | null> {
 		try {
 			const key = this.getKey().trim()
-			if (!key) return null
+			if (!key || this.resting()) return null
 			const params = new URLSearchParams({ key })
 			const resp = await requestUrl({ url: `${RawgProvider.BASE}/${encodeURIComponent(sourceId)}?${params.toString()}`, throw: false })
-			if (resp.status !== 200) return null
+			if (this.down(resp.status) || resp.status !== 200) return null
 			const details = resp.json as RawgDetails
 
 			const creators = (details.developers ?? details.publishers ?? []).map((d) => d.name)
@@ -126,6 +143,7 @@ export class RawgProvider implements ContentProvider {
 				fields['Rating MC'] = Math.round(details.metacritic) / 10
 			}
 
+			if (details.description_raw) fields.Description = details.description_raw
 			Object.assign(fields, await this.media(sourceId, details.name, params))
 			return { fields, progressTotal: 1, imdbId: null }
 		} catch (e) {

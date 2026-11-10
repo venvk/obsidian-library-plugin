@@ -1581,7 +1581,7 @@ sort trigger, the chosen one in the accent colour. */
 	cursor: pointer;
 }
 
-/* Lightbox: no modal box at all — just the picture, enlarged, on a near-black
+/* Lightbox: no modal box at all, only the picture, enlarged, on a near-black
    backdrop. A click anywhere (or Escape) brings the note back. */
 .library-lightbox {
 	position: fixed;

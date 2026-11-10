@@ -8,6 +8,7 @@ interface MangaMedia {
 	title?: { romaji?: string | null; english?: string | null; native?: string | null }
 	startDate?: { year?: number | null }
 	format?: string | null
+	description?: string | null
 	chapters?: number | null
 	volumes?: number | null
 	genres?: string[]
@@ -19,7 +20,7 @@ interface MangaMedia {
 const search = (adult: boolean): string => 'query ($s: String) { Page(perPage: 15) { media(search: $s, type: MANGA, sort: SEARCH_MATCH' +
 	(adult ? '' : ', isAdult: false') + ') { id title { romaji english native } startDate { year } format coverImage { large } } } }'
 const MEDIA = 'query ($id: Int) { Media(id: $id, type: MANGA) { id title { romaji english native } startDate { year }' +
-	' chapters volumes genres coverImage { extraLarge large } staff(perPage: 8) { edges { role node { name { full } } } } siteUrl } }'
+	' chapters volumes genres coverImage { extraLarge large } staff(perPage: 8) { edges { role node { name { full } } } } siteUrl description(asHtml: false) } }'
 
 // Manga/manhwa from AniList (no key); notes carry the `manga:` prefix, so the
 // anime sync never touches them.
@@ -82,6 +83,7 @@ export class MangaProvider implements ContentProvider {
 			Cover: media.coverImage?.extraLarge ?? media.coverImage?.large ?? null,
 			URL: media.siteUrl ?? `https://anilist.co/manga/${String(id)}`
 		}
+		if (media.description) fields.Description = media.description
 		const total = media.chapters ?? media.volumes ?? null
 		return { fields, progressTotal: total && total > 0 ? total : null, imdbId: null }
 	}

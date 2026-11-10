@@ -1,4 +1,4 @@
-import { entities, languages, searchItems, textIn, type WikidataEntity } from './providers/wikidata'
+import { articleIntro, entities, languages, searchItems, textIn, type WikidataEntity } from './providers/wikidata'
 
 // A note's awards, looked up on Wikidata when the note is opened.
 
@@ -56,13 +56,17 @@ export async function titleAwards(sourceId: string): Promise<Award[]> {
 	return awardsOf((await entities([item], 'claims'))[item])
 }
 
-// The Wikidata item of a note made from IMDb, Steam, Open Library or Wikidata itself
-async function itemOf(sourceId: string): Promise<string | undefined> {
+// The Wikidata item of a note made from IMDb, Steam, Open Library, MyAnimeList, AniList or Wikidata itself.
+// A bare number is an AniList anime only in an anime note: RAWG and Comic Vine ids are bare numbers too.
+async function itemOf(sourceId: string, kind?: string): Promise<string | undefined> {
 	const id = sourceId.trim()
 	if (/^Q\d+$/.test(id)) return id
 	const work = /^\/works\/(OL\d+W)$/.exec(id)?.[1]
 	const filter = /^tt\d+$/.test(id) ? `haswbstatement:P345=${id}`
 		: /^steam:\d+$/.test(id) ? `haswbstatement:P1733=${id.slice(6)}`
+		: /^mal:\d+$/.test(id) ? `haswbstatement:P4086=${id.slice(4)}`
+		: /^manga:\d+$/.test(id) ? `haswbstatement:P8731=${id.slice(6)}`
+		: kind === 'anime' && /^\d+$/.test(id) ? `haswbstatement:P8729=${id}`
 		: work ? `haswbstatement:P648=${work}` : ''
 	return filter ? (await searchItems('', filter, 1))[0] : undefined
 }
@@ -75,6 +79,15 @@ export async function localTitle(sourceId: string): Promise<string | null> {
 	if (!item) return null
 	const langs = languages().filter(l => l !== 'en' && l !== 'mul')
 	return textIn((await entities([item], 'labels', langs))[item]?.labels, langs)
+}
+
+// What a title is about, from Wikipedia in the reader's language; in English too when asked,
+// for a title whose source says nothing. '' for an English reader otherwise, with no request made.
+export async function aboutTitle(sourceId: string, kind: string, english: boolean): Promise<string> {
+	const langs = languages().filter(lang => lang !== 'mul' && (english || lang !== 'en'))
+	if (langs.length === 0) return ''
+	const item = await itemOf(sourceId, kind)
+	return item ? articleIntro(item, langs) : ''
 }
 
 // "Award received" (P166) with its year (P585), named in the note's language.
