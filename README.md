@@ -29,7 +29,7 @@
 - Statistics count your titles and the hours of watching or reading they took, list your top directors, developers and channels, and put the time in perspective: "in that time you could have watched every Bond film". Your taste shows how your scores compare with other viewers and your favourite genres and decade, next to your latest diary entries.
 - Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
 - A sync button on each category pulls new data from its connected services and sources. The statistics can show an activity grid, a cell per day as on GitHub.
-- A Collection category keeps Pokémon, Magic and Yu-Gi-Oh! cards with their set, price and the cards still missing. A book without chapters writes the pages or listening time you got through that day.
+- A Collection category keeps Pokémon, Magic and Yu-Gi-Oh! cards with their set, price and the cards still missing, and coins, banknotes and tokens from Numista with your free Numista key. A book without chapters writes the pages or listening time you got through that day.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
 - One command draws your library as a canvas, with posters grouped around the actors and creators they share, and each category has its own, grouped by creator, actor and genre.
 - Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
