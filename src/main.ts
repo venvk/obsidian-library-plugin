@@ -147,7 +147,7 @@ const PHONE_AGENT = 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Appl
 
 // The sections of a name's canvas, in this order.
 const CANVAS_ROLES = [
-	{ label: 'header.creator', fields: ['Creator', 'Director', 'Author', 'Artist'] },
+	{ label: 'header.creator', fields: ['Creator', 'Director', 'Author', 'Artist', 'Narrator'] },
 	{ label: 'header.cast', fields: ['Cast'] },
 	{ label: 'header.genre', fields: ['Genre'] },
 ]
@@ -1195,6 +1195,12 @@ export default class LibraryPlugin extends Plugin {
 		} catch {
 			return
 		}
+		// one a link click just made moves, titles or not, out of the vault root into the library
+		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`
+		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
+			await this.ensureFolder(folder)
+			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
+		}
 		const sections = new Map<string, { path: string; name: string; cover: string }[]>()
 		// a person is named in Creator or Cast; their titles' IMDb ids find them on Wikidata
 		let person = false
@@ -1290,12 +1296,6 @@ export default class LibraryPlugin extends Plugin {
 		}
 		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)
-		// one a link click just made moves out of the vault root into the library
-		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`
-		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
-			await this.ensureFolder(folder)
-			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
-		}
 	}
 
 	// A canvas text node's height for its markdown, rendered off screen in the same classes the canvas
