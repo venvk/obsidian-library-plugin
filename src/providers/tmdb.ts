@@ -1,5 +1,6 @@
 import { requestUrl } from 'obsidian'
 import type { ContentType, MetadataEnricher, SeasonEntry } from './types'
+import { languages } from './wikidata'
 
 interface TmdbFindResponse {
 	movie_results?: { id?: number }[]
@@ -20,9 +21,14 @@ interface TmdbImagesResponse {
 	backdrops?: { file_path?: string }[]
 }
 
+interface TmdbTranslations {
+	translations?: Array<{ iso_639_1?: string; data?: { overview?: string } }>
+}
+
 interface TmdbMovieDetails {
 	runtime?: number
 	overview?: string
+	translations?: TmdbTranslations
 }
 
 interface TmdbSeasonDetails {
@@ -40,6 +46,7 @@ interface TmdbSeason {
 interface TmdbTvDetails {
 	episode_run_time?: number[]
 	overview?: string
+	translations?: TmdbTranslations
 	seasons?: TmdbSeason[]
 }
 
@@ -114,7 +121,7 @@ export class TmdbEnricher implements MetadataEnricher {
 	private async movieFields(fields: Record<string, unknown>, id: number): Promise<void> {
 		const [videos, details, images] = await Promise.all([
 			this.get<TmdbVideosResponse>(`/movie/${String(id)}/videos`),
-			this.get<TmdbMovieDetails>(`/movie/${String(id)}`),
+			this.get<TmdbMovieDetails>(`/movie/${String(id)}`, { append_to_response: 'translations' }),
 			this.get<TmdbImagesResponse>(`/movie/${String(id)}/images`, { include_image_language: 'en,null' })
 		])
 		const trailer = this.trailerOf(videos)
@@ -122,19 +129,29 @@ export class TmdbEnricher implements MetadataEnricher {
 		const gallery = this.galleryOf(images)
 		if (gallery.length > 0) fields.Gallery = gallery
 		if (typeof details?.runtime === 'number' && details.runtime > 0) fields.Runtime = details.runtime
-		if (details?.overview) fields.Description = details.overview
+		this.describe(fields, details)
+	}
+
+	// The overview in the reader's language when TMDB has it translated, else the English one.
+	private describe(fields: Record<string, unknown>, details: { overview?: string; translations?: TmdbTranslations } | null): void {
+		const lang = (languages()[0] ?? 'en').split('-')[0]
+		const local = lang === 'en' ? '' : (details?.translations?.translations ?? []).find(t => t.iso_639_1 === lang && t.data?.overview)?.data?.overview
+		if (local) {
+			fields.Description = local
+			fields['Description Local'] = true
+		} else if (details?.overview) fields.Description = details.overview
 	}
 
 	private async tvFields(fields: Record<string, unknown>, id: number): Promise<void> {
 		const [videos, details] = await Promise.all([
 			this.get<TmdbVideosResponse>(`/tv/${String(id)}/videos`),
-			this.get<TmdbTvDetails>(`/tv/${String(id)}`)
+			this.get<TmdbTvDetails>(`/tv/${String(id)}`, { append_to_response: 'translations' })
 		])
 		const trailer = this.trailerOf(videos)
 		if (trailer) fields.Trailer = trailer
 		const runtime = details?.episode_run_time?.[0]
 		if (typeof runtime === 'number' && runtime > 0) fields.Runtime = runtime
-		if (details?.overview) fields.Description = details.overview
+		this.describe(fields, details)
 		const seasons = await this.seasonFields(id, details?.seasons ?? [])
 		if (seasons.length > 0) fields.Seasons = seasons
 	}

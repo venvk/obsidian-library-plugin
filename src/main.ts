@@ -64,7 +64,7 @@ import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, addReadRange, logRating, tickLabel, todayIso } from './diary'
 import { categoryCanvas, libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type MapTitle, type PersonCard } from './libraryMap'
-import { albumAwards, localTitle, titleAwards, type Award } from './music'
+import { aboutTitle, albumAwards, localTitle, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
@@ -994,7 +994,7 @@ export default class LibraryPlugin extends Plugin {
 			const record = fm as Record<string, unknown>
 			this.applyMetaFields(record, meta)
 		})
-		await this.describe(file, meta.fields.Description)
+		await this.describe(file, sourceId, category.contentType, meta.fields)
 		return file
 	}
 
@@ -2002,11 +2002,16 @@ export default class LibraryPlugin extends Plugin {
 		await this.app.vault.process(file, text => withDescription(text, callout))
 	}
 
-	// What the source says a title is about, as a folded callout in the note's body. Written once:
-	// a note that has one, edited or not, keeps it. true when the note changed.
-	private async describe(file: TFile, description: unknown): Promise<boolean> {
-		const about = plainText(description)
-		if (!about || this.skipped('Description')) return false
+	// What a title is about, as a folded callout in the note's body. In the reader's language when it can be
+	// found: the source's own translation, else Wikipedia's opening; the source's English text otherwise.
+	// Written once: a note that has one, edited or not, keeps it. true when the note changed.
+	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>): Promise<boolean> {
+		if (this.skipped('Description') || hasDescription(await this.app.vault.read(file))) return false
+		const own = plainText(fields.Description)
+		const about = (fields['Description Local'] === true ? own : '')
+			|| plainText(await within(aboutTitle(sourceId, kind, !own), SEARCH_BUDGET_MS * 2, ''))
+			|| own
+		if (!about) return false
 		const callout = descriptionCallout(about)
 		let added = false
 		await this.app.vault.process(file, text => {
@@ -5203,7 +5208,7 @@ export default class LibraryPlugin extends Plugin {
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
 			// a description is the note's text, not a property (describe)
-			if (isEmptyValue(value) || key === 'Description' || this.skipped(key)) continue
+			if (isEmptyValue(value) || key === 'Description' || key === 'Description Local' || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			if (!isEmptyValue(fm[target])) continue
 			fm[target] = LINK_FIELDS.indexOf(key) >= 0 ? this.toLinks(value) : value
@@ -5486,7 +5491,7 @@ export default class LibraryPlugin extends Plugin {
 				const fetches = !!provider && !!sourceId && provider.refreshable?.(sourceId) !== false
 				// an Open Library book has nothing to refetch but what it is about, asked once
 				const work = !fetches && category.contentType === 'book' && sourceId.startsWith('/works/') && !this.skipped('Description')
-					&& !hasDescription(await this.app.vault.cachedRead(file))
+					&& !hasDescription(await this.app.vault.read(file))
 				// offline every fetch would fail: leave the rest unmarked for the next launch
 				if ((fetches || work) && !navigator.onLine) {
 					complete = false
@@ -5509,7 +5514,7 @@ export default class LibraryPlugin extends Plugin {
 					ok = res.ok
 					changed = res.changed
 				} else if (work) {
-					changed = await this.describe(file, await workDescription(sourceId))
+					changed = await this.describe(file, sourceId, 'book', { Description: await workDescription(sourceId) })
 				}
 				if (ok) {
 					if (changed) updated++
@@ -5564,7 +5569,7 @@ export default class LibraryPlugin extends Plugin {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
 				})
 			}
-			const described = await this.describe(file, meta.fields.Description)
+			const described = await this.describe(file, sourceId, contentType, meta.fields)
 			return { ok: true, changed: changed || described }
 		} catch (e) {
 			console.error('Library: metadata pass error', e)
@@ -5669,7 +5674,7 @@ export default class LibraryPlugin extends Plugin {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
 				})
 			}
-			if (await this.describe(file, meta.fields.Description)) changed = true
+			if (await this.describe(file, sourceId, category.contentType, meta.fields)) changed = true
 
 			if (force) {
 				new Notice(tr(changed ? 'notice.refreshed' : 'notice.notFound', { name: toStr(meta.fields.Name) || file.basename }))
@@ -5732,7 +5737,7 @@ export default class LibraryPlugin extends Plugin {
 			cur['Source ID'] = result.sourceId
 			this.applyMetaPatch(cur, meta)
 		})
-		await this.describe(file, meta.fields.Description)
+		await this.describe(file, result.sourceId, category.contentType, meta.fields)
 		new Notice(tr('notice.refreshed', { name: toStr(meta.fields.Name) || file.basename }))
 	}
 
@@ -5741,7 +5746,7 @@ export default class LibraryPlugin extends Plugin {
 		let changed = false
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
-			if (isEmptyValue(value) || key === 'Description' || this.skipped(key)) continue
+			if (isEmptyValue(value) || key === 'Description' || key === 'Description Local' || this.skipped(key)) continue
 			const target = this.fieldTarget(key)
 			// any known cover property counts as present, so a rename does not duplicate it
 			const present = key === 'Cover' ? coverValue(current, this.coverProperty()) : current[target]

@@ -2,6 +2,15 @@ import { requestUrl } from 'obsidian'
 import type { GameTrailerFinder } from './gameTrailer'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 import { releasedDmy } from '../util'
+import { languages } from './wikidata'
+
+// Steam's name for an Obsidian language; the store keeps a description in each.
+const STEAM_LANGUAGES: Record<string, string> = {
+	ar: 'arabic', bg: 'bulgarian', cs: 'czech', da: 'danish', de: 'german', el: 'greek', es: 'spanish', fi: 'finnish',
+	fr: 'french', hu: 'hungarian', id: 'indonesian', it: 'italian', ja: 'japanese', ko: 'koreana', nl: 'dutch',
+	no: 'norwegian', nb: 'norwegian', pl: 'polish', pt: 'portuguese', 'pt-br': 'brazilian', ro: 'romanian', ru: 'russian',
+	sv: 'swedish', th: 'thai', tr: 'turkish', uk: 'ukrainian', vi: 'vietnamese', zh: 'schinese', 'zh-tw': 'tchinese'
+}
 
 interface SteamSearchItem {
 	id: number
@@ -146,6 +155,16 @@ export class SteamProvider implements ContentProvider {
 			const score = app.metacritic?.score
 			if (typeof score === 'number' && score > 0) fields['Rating MC'] = Math.round(score) / 10
 			if (app.short_description) fields.Description = app.short_description
+			// the same blurb in the reader's language, asked apart: with it the whole answer, dates and genres too, would be translated
+			const language = languages().map(lang => STEAM_LANGUAGES[lang]).find(Boolean)
+			if (language) {
+				const local = await requestUrl({ url: `${SteamProvider.STORE}/api/appdetails?appids=${String(id)}&l=${language}&filters=basic`, throw: false })
+				const blurb = local.status === 200 ? (local.json as SteamAppDetailsResponse)[String(id)]?.data?.short_description : ''
+				if (blurb) {
+					fields.Description = blurb
+					fields['Description Local'] = true
+				}
+			}
 			Object.assign(fields, steamMedia(app))
 			const youtube = await this.trailers.youtube(id, app.name ?? '')
 			if (youtube) fields.Trailer = youtube
