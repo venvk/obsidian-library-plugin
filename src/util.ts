@@ -693,9 +693,14 @@ const ENTITIES: Record<string, string> = { amp: '&', lt: '', gt: '', quot: '"', 
 // A source's description as plain text: breaks kept as lines, tags and entities gone.
 // No angle bracket survives, so nothing in it reads as HTML when the note is rendered.
 export function plainText(value: unknown): string {
-	return toStr(value)
-		.replace(/<\s*(?:br|\/p|\/div|\/li|\/h\d)\b[^>]*>/gi, '\n')
-		.replace(/<[^>]*>/g, '')
+	let text = toStr(value).replace(/<\s*(?:br|\/p|\/div|\/li|\/h\d)\b[^>]*>/gi, '\n')
+	// until nothing changes: a tag split around another ("<scr<b>ipt>") is whole again after one pass
+	let before = ''
+	do {
+		before = text
+		text = text.replace(/<[^>]*>/g, '')
+	} while (text !== before)
+	return text
 		.replace(/&(#x?[0-9a-f]+|\w+);/gi, (whole: string, name: string) => {
 			if (name.charAt(0) !== '#') return ENTITIES[name.toLowerCase()] ?? whole
 			const code = name.charAt(1).toLowerCase() === 'x' ? parseInt(name.slice(2), 16) : parseInt(name.slice(1), 10)
