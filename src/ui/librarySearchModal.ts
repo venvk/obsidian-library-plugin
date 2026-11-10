@@ -12,6 +12,8 @@ export interface LibraryGroup {
 	key: string
 	label: string
 	files: TFile[]
+	// albums, videos and tokens have square covers, the rest posters
+	square: boolean
 }
 
 interface Hit {
@@ -28,6 +30,8 @@ interface Hit {
 export interface LibrarySearchOptions {
 	folded: (key: string) => boolean
 	toggle: (key: string) => void
+	// the note's cover as an image address, null without one
+	coverOf: (file: TFile) => string | null
 	onPick: (file: TFile) => void
 }
 
@@ -179,8 +183,16 @@ export class LibrarySearchModal extends SuggestModal<Hit> {
 			})
 		}
 		const fm = this.app.metadataCache.getFileCache(hit.file)?.frontmatter
-		const row = el.createDiv({ cls: 'library-search-suggestion' })
-		row.createDiv({ cls: 'suggestion-title', text: toStr(fm?.Name) || hit.file.basename })
+		const row = el.createDiv({ cls: this.groups[hit.group]?.square ? 'library-suggest is-square' : 'library-suggest' })
+		// a small cover, loaded only when its row is on screen; a note without one keeps the titles in line
+		const cover = this.options.coverOf(hit.file)
+		const blank = (): HTMLElement => createDiv({ cls: 'library-suggest-cover' })
+		if (cover) {
+			const img = row.createEl('img', { cls: 'library-suggest-cover', attr: { src: cover, alt: '', loading: 'lazy', decoding: 'async' } })
+			img.addEventListener('error', () => img.replaceWith(blank()))
+		} else row.appendChild(blank())
+		const info = row.createDiv({ cls: 'library-suggest-info' })
+		info.createDiv({ cls: 'library-suggest-title', text: toStr(fm?.Name) || hit.file.basename })
 
 		const parts: string[] = []
 		if (fm?.Year) parts.push(toStr(fm.Year))
@@ -188,7 +200,7 @@ export class LibrarySearchModal extends SuggestModal<Hit> {
 		else if (fm?.['Source ID']) parts.push(toStr(fm['Source ID']))
 		const tokens = toStrArray(fm?.Tokens).length
 		if (tokens > 0) parts.push(`${formatNumber(tokens)} ${tr('header.tokens')}`)
-		if (parts.length > 0) row.createDiv({ cls: 'suggestion-note', text: parts.join(' · ') })
+		if (parts.length > 0) info.createDiv({ cls: 'library-suggest-meta', text: parts.join(' · ') })
 	}
 
 	onChooseSuggestion(hit: Hit): void {

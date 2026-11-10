@@ -836,7 +836,7 @@ export default class LibraryPlugin extends Plugin {
 			if (typeof type === 'string') byType.get(type)?.push(file)
 		}
 		const groups = this.settings.categories
-			.map(category => ({ key: `library:${category.typeValue}`, label: categoryLabel(category), files: byType.get(category.typeValue) ?? [] }))
+			.map(category => ({ key: `library:${category.typeValue}`, label: categoryLabel(category), files: byType.get(category.typeValue) ?? [], square: category.contentType === 'music' || category.contentType === 'manual' }))
 			.filter(group => group.files.length > 0)
 		new LibrarySearchModal(this.app, groups, {
 			folded: (key) => this.settings.searchFolded.indexOf(key) >= 0,
@@ -845,6 +845,7 @@ export default class LibraryPlugin extends Plugin {
 				this.settings.searchFolded = folded.indexOf(key) >= 0 ? folded.filter(k => k !== key) : [...folded, key]
 				void this.persistSettings()
 			},
+			coverOf: (file) => coverSrc(this.app, coverValue(this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}, this.coverProperty())),
 			onPick: (file) => { void this.app.workspace.getLeaf(false).openFile(file) }
 		}).open()
 	}
