@@ -65,6 +65,16 @@ export async function steamMediaFor(appId: number): Promise<Record<string, unkno
 	}
 }
 
+// The store's blurb for a steam: id in the reader's language; '' in English or a language Steam has none in.
+// Asked apart from the details: in that language the whole answer, dates and genres too, would be translated.
+export async function steamBlurb(sourceId: string): Promise<string> {
+	const id = /^steam:(\d+)$/.exec(sourceId)?.[1]
+	const language = languages().map(lang => STEAM_LANGUAGES[lang]).find(Boolean)
+	if (!id || !language) return ''
+	const resp = await requestUrl({ url: `https://store.steampowered.com/api/appdetails?appids=${id}&l=${language}&filters=basic`, throw: false })
+	return resp.status === 200 ? (resp.json as SteamAppDetailsResponse)[id]?.data?.short_description ?? '' : ''
+}
+
 export class SteamProvider implements ContentProvider {
 	readonly id = 'steam'
 	// Registered through GameAggregatorProvider only, never bound to a registry type.
@@ -155,16 +165,6 @@ export class SteamProvider implements ContentProvider {
 			const score = app.metacritic?.score
 			if (typeof score === 'number' && score > 0) fields['Rating MC'] = Math.round(score) / 10
 			if (app.short_description) fields.Description = app.short_description
-			// the same blurb in the reader's language, asked apart: with it the whole answer, dates and genres too, would be translated
-			const language = languages().map(lang => STEAM_LANGUAGES[lang]).find(Boolean)
-			if (language) {
-				const local = await requestUrl({ url: `${SteamProvider.STORE}/api/appdetails?appids=${String(id)}&l=${language}&filters=basic`, throw: false })
-				const blurb = local.status === 200 ? (local.json as SteamAppDetailsResponse)[String(id)]?.data?.short_description : ''
-				if (blurb) {
-					fields.Description = blurb
-					fields['Description Local'] = true
-				}
-			}
 			Object.assign(fields, steamMedia(app))
 			const youtube = await this.trailers.youtube(id, app.name ?? '')
 			if (youtube) fields.Trailer = youtube

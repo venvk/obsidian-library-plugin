@@ -37,7 +37,7 @@ import { ComicsProvider } from './providers/comics'
 import { ComicsAggregatorProvider } from './providers/comicsAggregator'
 import { WikidataComicProvider } from './providers/wikidataComics'
 import { MangaProvider } from './providers/manga'
-import { SteamProvider } from './providers/steam'
+import { SteamProvider, steamBlurb } from './providers/steam'
 import { WikidataGameProvider } from './providers/wikidataGames'
 import { TmdbEnricher } from './providers/tmdb'
 import { RottenTomatoesEnricher, idsForNetflix } from './providers/wikidata'
@@ -965,7 +965,7 @@ export default class LibraryPlugin extends Plugin {
 
 			// the category is made only now, once a note is sure to follow
 			const category = await this.categoryFor(target)
-			const file = await this.newNote(category, provider.id, result.sourceId, result.title, meta)
+			const file = await this.newNote(category, provider.id, result.sourceId, result.title, meta, {}, true)
 			await this.app.workspace.getLeaf(false).openFile(file)
 			new Notice(tr('notice.created', { name: toStr(meta.fields.Name) || result.title }))
 		} catch (e) {
@@ -974,7 +974,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
-	private async newNote(category: ICategory, source: string, sourceId: string, title: string, meta: NormalizedMetadata, extra: Record<string, unknown> = {}): Promise<TFile> {
+	private async newNote(category: ICategory, source: string, sourceId: string, title: string, meta: NormalizedMetadata, extra: Record<string, unknown> = {}, about = false): Promise<TFile> {
 		const disambiguator = source === NFT_SOURCE ? (toStrArray(extra.Platforms)[0] || toStr(extra.Platforms) || undefined) : (toStr(meta.fields.Year) || undefined)
 		const path = await this.uniqueNotePath(title, category.folder, disambiguator)
 		const file = await this.app.vault.create(path, await this.templateText(category))
@@ -994,7 +994,8 @@ export default class LibraryPlugin extends Plugin {
 			const record = fm as Record<string, unknown>
 			this.applyMetaFields(record, meta)
 		})
-		await this.describe(file, sourceId, category.contentType, meta.fields)
+		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
+		if (about) await this.describe(file, sourceId, category.contentType, meta.fields)
 		return file
 	}
 
@@ -1180,12 +1181,14 @@ export default class LibraryPlugin extends Plugin {
 	// A genre's or a person's canvas, drawn when it is opened (a click on an
 	// unmade link creates it empty). A canvas you added your own cards to is left alone.
 	private async fillLinkCanvas(file: TFile): Promise<void> {
-		if (this.fillingCanvases.has(file.path)) return
-		this.fillingCanvases.add(file.path)
+		// the path as it is now: drawing may move the canvas into the library
+		const path = file.path
+		if (this.fillingCanvases.has(path)) return
+		this.fillingCanvases.add(path)
 		try {
 			await this.drawLinkCanvas(file)
 		} finally {
-			this.fillingCanvases.delete(file.path)
+			this.fillingCanvases.delete(path)
 		}
 	}
 
@@ -1196,12 +1199,6 @@ export default class LibraryPlugin extends Plugin {
 			if (!nodes.every(node => typeof node.id === 'string' && node.id.startsWith('lib-'))) return
 		} catch {
 			return
-		}
-		// one a link click just made moves, titles or not, out of the vault root into the library
-		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`
-		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
-			await this.ensureFolder(folder)
-			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
 		}
 		const sections = new Map<string, { path: string; name: string; cover: string }[]>()
 		// a person is named in Creator or Cast; their titles' IMDb ids find them on Wikidata
@@ -1298,6 +1295,12 @@ export default class LibraryPlugin extends Plugin {
 		}
 		const fresh = JSON.stringify(linkCanvas(file.basename, ordered, card), null, '\t')
 		if (fresh !== text) await this.app.vault.modify(file, fresh)
+		// one a link click just made moves out of the vault root into the library
+		const folder = `${this.settings.libraryFolder ? `${this.settings.libraryFolder}/` : ''}Canvases`
+		if (!text.trim() && file.parent?.path !== folder && !this.app.vault.getAbstractFileByPath(`${folder}/${file.name}`)) {
+			await this.ensureFolder(folder)
+			await this.app.fileManager.renameFile(file, `${folder}/${file.name}`)
+		}
 	}
 
 	// A canvas text node's height for its markdown, rendered off screen in the same classes the canvas
@@ -2008,7 +2011,7 @@ export default class LibraryPlugin extends Plugin {
 	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>): Promise<boolean> {
 		if (this.skipped('Description') || hasDescription(await this.app.vault.read(file))) return false
 		const own = plainText(fields.Description)
-		const about = (fields['Description Local'] === true ? own : '')
+		const about = (fields['Description Local'] === true ? own : plainText(await within(steamBlurb(sourceId), SEARCH_BUDGET_MS, '')))
 			|| plainText(await within(aboutTitle(sourceId, kind, !own), SEARCH_BUDGET_MS * 2, ''))
 			|| own
 		if (!about) return false
