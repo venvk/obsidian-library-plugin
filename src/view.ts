@@ -2,7 +2,7 @@ import { App, ItemView, WorkspaceLeaf, TFile, getLanguage, setIcon, setTooltip }
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
 import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, isNftCategory } from './categories'
-import { cleanCollectionName, looksLikeSpam } from './nft'
+import { cleanCollectionName, looksLikeSpam, viaPinata } from './nft'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
 import { compactNumber, formatNumber, relativeDay, tr, trCount } from './i18n'
@@ -856,9 +856,7 @@ export class LibraryRenderer {
 		const cover = card.cover || coverValue(fm, this.plugin.settings.coverProperty)
 		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
 		let cardCover = coverSrc(this.app, cover)
-		if (cardCover && isCollectible(fm) && cardCover.includes('ipfs.filebase.io/ipfs/')) {
-			cardCover = cardCover.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
-		}
+		if (cardCover && isCollectible(fm)) cardCover = viaPinata(cardCover)
 		// some NFT pictures are short videos
 		if (cardCover && /\.(mp4|webm|mov)(\?|$)/i.test(cardCover)) {
 			imgDiv.createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } })
@@ -878,11 +876,7 @@ export class LibraryRenderer {
 						return
 					}
 				}
-				let vidSrc = curSrc || cardCover
-				if (vidSrc.includes('ipfs.filebase.io/ipfs/')) {
-					vidSrc = vidSrc.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
-				}
-				img.replaceWith(createEl('video', { attr: { src: vidSrc, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } }))
+				img.replaceWith(createEl('video', { attr: { src: viaPinata(curSrc || cardCover), muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } }))
 			}, { once: false })
 		} else {
 			const type = toStr(fm.Type).toLowerCase()
@@ -1221,7 +1215,7 @@ export class LibraryView extends ItemView {
 			}
 			const values = [...counts.keys()].sort((a, b) => facet === 'year' ? Number(b) - Number(a) : a.localeCompare(b))
 			return { facet, label, counts, values, chosen: filters.chosen[facet] ?? '' }
-		// a book's format shows from its first value: the other formats are simply not marked yet
+		// a book's format shows from its first value: the other formats are not marked yet
 		}).filter(group => group.counts.size >= (group.facet === 'format' ? 1 : 2) || group.chosen)
 		if (groups.length === 0) return
 		const active = groups.filter(group => group.chosen).length

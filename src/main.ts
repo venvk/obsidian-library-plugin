@@ -45,7 +45,7 @@ import { isContentType } from './providers/types'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './providers/types'
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
-import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat } from './nft'
+import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat, viaPinata } from './nft'
 import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
@@ -1253,12 +1253,12 @@ export default class LibraryPlugin extends Plugin {
 
 					let text = `# ${toStr(fm.Name) || file.basename}\n\n`
 					const meta: string[] = []
-					if (chain) meta.push(`**${tr('header.chain') || 'Chain'}:** ${chain}`)
-					if (standard) meta.push(`**${tr('header.standard') || 'Standard'}:** ${standard}`)
-					if (count > 0) meta.push(`**${tr('header.count') || 'Count'}:** ${count}`)
+					if (chain) meta.push(`**${tr('header.chain')}:** ${chain}`)
+					if (standard) meta.push(`**${tr('header.standard')}:** ${standard}`)
+					if (count > 0) meta.push(`**${tr('header.count')}:** ${count}`)
 					if (meta.length > 0) text += meta.join(' · ') + '\n\n'
-					if (contractMd) text += `**${tr('header.contract') || 'Contract'}:** ${contractMd}\n\n`
-					if (wallets) text += `**${tr('header.wallet') || 'Wallet'}:** ${wallets}\n\n`
+					if (contractMd) text += `**${tr('header.contract')}:** ${contractMd}\n\n`
+					if (wallets) text += `**${tr('header.wallet')}:** ${wallets}\n\n`
 
 					const localCover = /^!?\[\[([^\]|#]+)/.exec(coverRaw)?.[1]
 					const webCover = safeUrl(coverRaw)
@@ -3851,7 +3851,7 @@ export default class LibraryPlugin extends Plugin {
 		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
-	// Nintendo: consent first — a third-party signing service carries the requests
+	// Nintendo: consent first: a third-party signing service carries the requests
 	async connectNintendo(): Promise<boolean> {
 		if (!Platform.isDesktopApp) {
 			new Notice(tr('notice.nintendo.desktopOnly'))
@@ -4534,7 +4534,7 @@ export default class LibraryPlugin extends Plugin {
 
 	// Kitsu runs the password grant only (no OAuth apps), so desktop signs in on
 	// the real site inside the auth window and the session is read back from its
-	// storage; mobile keeps the plain form — no webview there.
+	// storage; mobile keeps the plain form: no webview there.
 	connectKitsu(): Promise<boolean> {
 		if (Platform.isDesktopApp) {
 			return new Promise<boolean>((resolve) => {
@@ -5252,11 +5252,7 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		try {
-			let fetchUrl = url
-			if (fetchUrl.includes('ipfs.filebase.io/ipfs/')) {
-				fetchUrl = fetchUrl.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
-			}
-			const resp = await requestUrl({ url: fetchUrl, throw: false })
+			const resp = await requestUrl({ url: viaPinata(url), throw: false })
 			const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
 			const ext = imageExtension(type ? resp.headers[type] ?? '' : '') ?? sniffImage(resp.arrayBuffer)
 			if (resp.status !== 200 || !ext || resp.arrayBuffer.byteLength === 0) {
@@ -5870,7 +5866,7 @@ export default class LibraryPlugin extends Plugin {
 			for (let i = 0; i < gallery.length; i++) {
 				const g = gallery[i]
 				if (!g || isInvalidNftMedia(g)) continue
-				const src = coverSrc(this.app, g) || g
+				const src = coverSrc(this.app, g)
 				if (src && !isInvalidNftMedia(src) && nftCandidates.indexOf(src) < 0) {
 					nftCandidates.push(src)
 				}
@@ -5913,11 +5909,7 @@ export default class LibraryPlugin extends Plugin {
 				if (isNft) {
 					img.addEventListener('error', () => {
 						if (!/\.(png|jpe?g|webp|gif|avif|svg)(\?|$)/i.test(targetUrl)) {
-							let videoSrc = targetUrl
-							if (videoSrc.includes('ipfs.filebase.io/ipfs/')) {
-								videoSrc = videoSrc.replace('https://ipfs.filebase.io/ipfs/', 'https://gateway.pinata.cloud/ipfs/')
-							}
-							const video = createEl('video', { attr: { src: videoSrc, muted: '', loop: '', autoplay: '', playsinline: '' } })
+							const video = createEl('video', { attr: { src: viaPinata(targetUrl), muted: '', loop: '', autoplay: '', playsinline: '' } })
 							video.addEventListener('error', () => {
 								const nextIdx = candidateIndex + 1
 								const next = nftCandidates[nextIdx]
@@ -6251,7 +6243,7 @@ export default class LibraryPlugin extends Plugin {
 		this.buildNftTokensBlock(wrap, fm, file, (resolvedMedia) => {
 			const currentMedia = imgSide.querySelector('img, video')
 			if (!currentMedia) {
-				renderHeaderMedia(coverSrc(this.app, resolvedMedia) || resolvedMedia, 0)
+				renderHeaderMedia(coverSrc(this.app, resolvedMedia) ?? '', 0)
 			}
 		})
 		this.buildNftHistoryBlock(wrap, fm)
@@ -6863,7 +6855,7 @@ export default class LibraryPlugin extends Plugin {
 
 		const updateHeaders = (): void => {
 			thTokenId.empty()
-			thTokenId.createSpan({ text: tr('header.tokenId') || 'Token ID' })
+			thTokenId.createSpan({ text: tr('header.tokenId') })
 			if (sortCol === 'tokenId') thTokenId.createSpan({ cls: 'nft-sort-arrow', text: sortAsc ? ' ▲' : ' ▼' })
 
 			thDate.empty()

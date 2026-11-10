@@ -78,7 +78,7 @@ export class RawgProvider implements ContentProvider {
 	}
 
 	// RAWG's screenshots; trailer from YouTube (IGDB, Wikidata), else the Steam
-	// page — RAWG's own video list is mostly empty.
+	// page: RAWG's own video list is mostly empty.
 	private async media(id: string, name: string, params: URLSearchParams): Promise<Record<string, unknown>> {
 		const out: Record<string, unknown> = {}
 		const get = async <T>(path: string): Promise<T | null> => {

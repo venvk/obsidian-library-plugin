@@ -60,7 +60,7 @@ type Page = "general" | "categories" | "connectors" | "wallets" | "keys" | "stat
 const PAGES: Page[] = ["general", "categories", "connectors", "wallets", "keys", "stats"];
 const PAGE_ICONS: Record<Page, string> = { general: "settings", categories: "layout-grid", connectors: "plug", wallets: "wallet", keys: "key-round", stats: "bar-chart-3" };
 
-// A group of rows; a group scopes row names — each category is its own (each has "Type value").
+// A group of rows; a group scopes row names: each category is its own (each has "Type value").
 interface Section {
 	page: Page;
 	heading?: string;

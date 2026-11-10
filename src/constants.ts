@@ -34413,7 +34413,7 @@ export const I18N: Record<SupportedLocale, Record<string, string>> = {
 		'kitsu.loginTitle': 'Logg inn på Kitsu',
 		'kitsu.username': 'E-post eller brukarnamn',
 		'kitsu.password': 'Passord',
-		'settings.kitsu.desc': 'Kitsu-lista di kjem med framdrift og vurderingar. Endringar du gjer i Obsidian blir synkroniserte tilbake til Kitsu. Du loggar inn med Kitsu-kontoen din; tillegget lagar berre innloggings­tokenet.',
+		'settings.kitsu.desc': 'Kitsu-lista di kjem med framdrift og vurderingar. Endringar du gjer i Obsidian blir synkroniserte tilbake til Kitsu. Du loggar inn med Kitsu-kontoen din; tillegget lagar berre innloggingstokenet.',
 		'cmd.kitsuPush': 'Send gjeldande notat til Kitsu',
 		'cmd.kitsuPull': 'Hent framdrift frå Kitsu',
 		'cmd.kitsuImport': 'Importer frå Kitsu',

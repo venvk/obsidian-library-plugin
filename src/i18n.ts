@@ -1,16 +1,23 @@
 import { getLanguage } from 'obsidian'
 import { localeMap, I18N, type SupportedLocale } from './constants'
 
+// The locale of an Obsidian language tag, resolved once per tag: tr() runs for every label drawn.
+const resolved: Record<string, SupportedLocale> = {}
+// Longest subtag wins: 'zh-tw' is zh-TW, not zh; 'kab' does not match 'ka'.
+const tags: string[] = Object.keys(localeMap).sort((a, b) => b.length - a.length)
+
+function localeOf(language: string): SupportedLocale {
+	const known = resolved[language]
+	if (known) return known
+	const match: string | undefined = tags.find(lang => {
+		const l = lang.toLowerCase()
+		return language === l || language.startsWith(l + '-')
+	})
+	return resolved[language] = (match ? localeMap[match] : undefined) ?? 'en'
+}
+
 export function tr(key: string, vars?: Record<string, string | number>): string {
-	const language: string = getLanguage().toLowerCase()
-	// Longest subtag wins: 'zh-tw' is zh-TW, not zh; 'kab' does not match 'ka'.
-	const match: string | undefined = Object.keys(localeMap)
-		.sort((a, b) => b.length - a.length)
-		.find(lang => {
-			const l = lang.toLowerCase()
-			return language === l || language.startsWith(l + '-')
-		})
-	const locale: SupportedLocale = (match ? localeMap[match] : undefined) ?? 'en'
+	const locale = localeOf(getLanguage().toLowerCase())
 	const template: string = I18N[locale]?.[key] ?? I18N.en[key] ?? key
 	if (!vars) return template
 	return template.replace(/\{(\w+)\}/g, (_, name: string) =>
