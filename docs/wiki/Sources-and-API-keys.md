@@ -20,6 +20,10 @@ Its header shows "N of M collected" for the set and a **Missing cards** button t
 
 Frontmatter fields: `Series`, `Series ID`, `Series Total`, `Number`, `Rarity`, `Price`, `Currency`, `Count`, `Condition`.
 
+Coins, banknotes and tokens come from Numista once you add a [Numista key](#numista). Search by name in the same category. A coin note gets both sides as pictures, its year, issuer, face value (`Value`), metal (`Composition`) and a price in EUR when Numista has one. Copies and Condition work as for cards.
+
+Frontmatter fields: `Issuer`, `Value`, `Composition`, `Price`, `Currency`, `Count`, `Condition`.
+
 Settings > Library > Connectors > Anime · Manga decides the name a new anime or manga note gets: English, romaji, or original. A title without a name in that language takes the next one. Titles marked adult appear in search only with Adult titles in search turned on.
 
 An optional key adds a service, listed first in search, or extra data:
@@ -32,6 +36,7 @@ An optional key adds a service, listed first in search, or extra data:
 | [RAWG](#rawg) | Games | RAWG results with its rating, the Metacritic score, screenshots, covers for games not on Steam, and its own recommendations |
 | [Twitch](#twitch-for-game-trailers) | Games | A YouTube trailer from IGDB for nearly every game |
 | [Comic Vine](#comic-vine) | Comics | Comic Vine results with covers and issue counts |
+| [Numista](#numista) | Collections | Coins, banknotes and tokens with their pictures, issuer, value, composition and price |
 
 Keys go in Settings > Library > API keys. They stay in the plugin's settings in your vault and go only to their own service. If you sync or share your `.obsidian` folder, they go with it.
 
@@ -79,6 +84,10 @@ Without them, a game's trailer comes from Wikidata when it lists one, or from St
 ## Comic Vine
 
 Sign in at [comicvine.gamespot.com/api](https://comicvine.gamespot.com/api/) to see your key. Paste it into Comic Vine API key.
+
+## Numista
+
+Create a free account at [numista.com](https://en.numista.com/api/) and request an API key there. Paste it into Numista API key. Without the key, the Collection category searches cards only.
 
 ## Audiobooks
 
