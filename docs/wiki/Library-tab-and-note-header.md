@@ -53,10 +53,10 @@ Soon lists the next episodes of the series and anime you are watching, with thei
 
 A library note shows a header above its text: the cover, creator, cast, years, seasons, the next episode's air date, genres, awards from Wikidata, runtime, last played, ratings, your score, and your progress. The header is drawn on screen; the text of the note stays as you wrote it.
 
-The header arranges itself by the width of the note, not of the window, so a split pane or Readable line length narrows it too:
+The header arranges itself by the width of the note's pane, not of the window, so a split pane narrows it. With Readable line length on, the text stays a narrow column and the header still takes the pane's width, up to 1500 px:
 
 - wide, from about 1000 px: the title, your score and the source ratings in a bar across the top, then the cover, the trailer and the details side by side, then the stills, the description and the rest;
-- the usual width: the cover on the left, the title, ratings and details on the right, the trailer below at full width;
+- a medium pane: the cover on the left, the title, ratings and details on the right, the trailer below at full width;
 - narrow, such as a phone: one column in the order cover, title and ratings, details, description, trailer, stills.
 
 The description is the first lines of the note's Description callout; click it to read it whole. The callout itself stays in the note.
