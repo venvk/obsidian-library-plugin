@@ -95,7 +95,8 @@ export async function aboutTitle(sourceId: string, kind: string, english: boolea
 // The Wikidata video game of this name: an edition's words and a year in brackets aside, under any
 // label or alias it has ("Ведьмак 3: Дикая Охота" is an alias of The Witcher 3: Wild Hunt).
 async function gameNamed(name: string): Promise<string | undefined> {
-	const plain = name.replace(/\([^)]*\)/g, ' ').replace(/\s*[-–—:]?\s*(?:\S+\s+)?(?:edition|version|издание|версия)\b.*$/i, '').trim() || name
+	// (?!\p{L}) and not \b: a word boundary knows Latin letters only
+	const plain = name.replace(/\([^)]*\)/g, ' ').replace(/\s*[-–—:]?\s*(?:\S+\s+)?(?:edition|version|издание|версия)(?!\p{L}).*$/iu, '').trim() || name
 	const ids = await searchItems(plain, 'haswbstatement:P31=Q7889', 5)
 	if (ids.length === 0) return undefined
 	const found = await entities(ids, 'labels|aliases', [...languages(), 'en'])

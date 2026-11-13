@@ -6020,11 +6020,14 @@ export default class LibraryPlugin extends Plugin {
 		imgSide.classList.add('note-header-cover')
 		// a poster stands beside the trailer; a wide or square cover (an album, a video, a token) keeps its own shape
 		const shape = (width: number, height: number): void => { if (width > 0 && height > 0) header.toggleClass('is-wide-cover', width >= height) }
+		// by tag name: in a pop-out window an element is not an instance of this window's classes
 		imgSide.addEventListener('load', (event) => {
-			if (event.target instanceof HTMLImageElement) shape(event.target.naturalWidth, event.target.naturalHeight)
+			const img = event.target as HTMLImageElement
+			if (img.tagName === 'IMG') shape(img.naturalWidth, img.naturalHeight)
 		}, true)
 		imgSide.addEventListener('loadedmetadata', (event) => {
-			if (event.target instanceof HTMLVideoElement) shape(event.target.videoWidth, event.target.videoHeight)
+			const video = event.target as HTMLVideoElement
+			if (video.tagName === 'VIDEO') shape(video.videoWidth, video.videoHeight)
 		}, true)
 		const isNft = toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT'
 		const nftCandidates: string[] = []
@@ -7165,7 +7168,7 @@ export default class LibraryPlugin extends Plugin {
 			})
 			const toggle = (event: Event): void => {
 				// a link is followed, a selection being made is not a click
-				if (event.target instanceof HTMLElement && event.target.closest('a')) return
+				if ((event.target as HTMLElement).closest('a')) return
 				if (!activeWindow.getSelection()?.isCollapsed) return
 				const open = !box.hasClass('is-open')
 				box.toggleClass('is-open', open)
