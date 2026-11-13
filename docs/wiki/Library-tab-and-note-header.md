@@ -61,7 +61,7 @@ The header arranges itself by the width of the note's pane, not of the window, s
 
 The description is the first lines of the note's Description callout; click it to read it whole. In reading view the callout is then not shown a second time; it stays in the note and in the editor. Links in it stay links.
 
-A note without a trailer (a book, most games and anime) has its description under the details, beside the cover. A book's own text is read at the header's width, and its recommendations come after that text. The stills and the recommendations sit in the middle when they are shorter than the header.
+A note without a trailer (a book, most games and anime) has its description and its stills under the details, beside the cover. A book's own text is read at the header's width, and its recommendations come after that text. The stills and the recommendations sit in the middle when they are shorter than the header.
 
 The source ratings are plates in the source's colour (IMDb, Rotten Tomatoes, RAWG, Metacritic), next to your stars, the platform badges and the trophy counts. A title in your language follows the original one on the same line.
 

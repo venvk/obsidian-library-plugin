@@ -745,14 +745,19 @@ sort trigger, the chosen one in the accent colour. */
 	margin: 0;
 }
 
-/* no trailer (a book, most anime and games): the description sits under the details, beside the cover */
+/* no trailer (a book, most anime and games): the description and the stills sit under the details, beside the cover */
 .note-header-wrap .note-header:not(.has-trailer) {
-	grid-template-rows: auto auto 1fr;
+	grid-template-rows: auto auto auto 1fr;
 	grid-template-areas:
 		"cover top"
 		"cover info"
 		"cover about"
-		"gallery gallery";
+		"cover gallery";
+}
+
+/* in that column the stills start where the text does */
+.note-header-wrap .note-header:not(.has-trailer) .note-header-gallery {
+	justify-content: flex-start;
 }
 
 .note-header-wrap .note-header:not(.has-trailer) .note-header-about {
@@ -814,12 +819,12 @@ sort trigger, the chosen one in the accent colour. */
 	}
 
 	.note-header-wrap .note-header:not(.has-trailer) {
-		grid-template-rows: auto auto 1fr;
+		grid-template-rows: auto auto auto 1fr;
 		grid-template-areas:
 			"top top"
 			"cover info"
 			"cover about"
-			"gallery gallery";
+			"cover gallery";
 	}
 
 	/* a 2:3 poster three parts wide is as tall as a 16:9 trailer eight parts wide */
