@@ -7082,7 +7082,6 @@ export default class LibraryPlugin extends Plugin {
 			// the pane then hides the callout it repeats (styles.css)
 			header.closest('.markdown-preview-view')?.addClass('library-has-about')
 			const box = header.createDiv({ cls: 'note-header-about', attr: { role: 'button', tabindex: '0', 'aria-expanded': 'false' } })
-			box.createEl('b', { text: tr('header.description') + ': ' })
 			// a video's description is full of links: they stay links
 			about.split(/(https?:\/\/[^\s<>"]+)/).forEach((part, i) => {
 				const href = i % 2 === 1 ? safeUrl(part) : null

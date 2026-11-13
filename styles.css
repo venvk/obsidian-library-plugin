@@ -701,10 +701,6 @@ sort trigger, the chosen one in the accent colour. */
 	display: block;
 }
 
-.note-header-wrap .note-header-about b {
-	color: var(--text-muted);
-}
-
 .note-header-wrap .note-header-scores {
 	display: flex;
 	flex-wrap: wrap;
