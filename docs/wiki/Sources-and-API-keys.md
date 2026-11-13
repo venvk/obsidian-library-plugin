@@ -18,7 +18,7 @@ A note gets what its title is about as a folded **Description** callout at the e
 
 With Obsidian in a language other than English, Library looks for the text in that language first: Steam's and TMDB's own translations, then the opening of the title's Wikipedia article. When neither has it, the source's English text is used. A title whose source has no description gets the Wikipedia opening too.
 
-It is written once: edit it or fold it open, and Library leaves it alone. Delete it and the next refresh brings it back; to keep it out for good, add `Description` to [[Skip properties|Templates-and-skipped-properties]]. Notes made before 2.6.5 get theirs in the background after the update.
+The note's Refresh button fetches it again in Obsidian's current language, unless you edited it. Otherwise it is written once: edit it or fold it open, and Library leaves it alone. Delete it and the next refresh brings it back; to keep it out for good, add `Description` to [[Skip properties|Templates-and-skipped-properties]]. Notes made before 2.6.5 get theirs in the background after the update.
 
 ## Collections
 

@@ -78,6 +78,7 @@ Depending on the note it also has:
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
 - for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected;
 - for a YouTube video, the video itself, the like and dislike buttons, the channel's link and Subscribe button, the publish date, the views, and the rewatches; see [[YouTube]].
+- a Refresh button at the top right, the same as the `Refresh metadata for current note` command: it asks the source again for the fields the note lacks, and looks up the description, the awards, the title in your language and the recommendations anew. A description you edited is left alone; one Library wrote is replaced, for example after you change Obsidian's language. The note's modified time does not change;
 - a "Choose a cover" button at the top right: it shows covers from every source of the category and, for a book, from its other editions, each with its size in pixels; click one, or paste an image link.
 - the title in your language under the original title, from Wikidata, when Obsidian is not in English and a translated title exists.
 

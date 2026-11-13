@@ -276,6 +276,7 @@ export default class LibraryPlugin extends Plugin {
 	private bannerTimer: number | null = null
 	private bannerRetries = 0
 	private coverActions = new WeakMap<MarkdownView, HTMLElement>()
+	private refreshActions = new WeakMap<MarkdownView, HTMLElement>()
 	categorySyncing = false
 	private isRefreshing = false
 	private settingTab: LibrarySettingTab | null = null
@@ -793,7 +794,10 @@ export default class LibraryPlugin extends Plugin {
 				el.classList.remove('library-has-about', 'library-described', 'library-wide-text')
 				if (el.instanceOf(HTMLElement)) el.setCssProps({ '--library-header-width': '' })
 			})
-			if (leaf.view instanceof MarkdownView) this.coverActions.get(leaf.view)?.remove()
+			if (leaf.view instanceof MarkdownView) {
+				this.coverActions.get(leaf.view)?.remove()
+				this.refreshActions.get(leaf.view)?.remove()
+			}
 		}
 	}
 
@@ -1028,7 +1032,7 @@ export default class LibraryPlugin extends Plugin {
 			this.applyMetaFields(record, meta)
 		})
 		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
-		if (about) await this.describe(file, sourceId, category.contentType, meta.fields)
+		if (about && await this.describe(file, sourceId, category.contentType, meta.fields)) void this.persistSettings()
 		return file
 	}
 
@@ -2040,21 +2044,34 @@ export default class LibraryPlugin extends Plugin {
 
 	// What a title is about, as a folded callout in the note's body. In the reader's language when it can be
 	// found: the source's own translation, else Wikipedia's opening; the source's English text otherwise.
-	// Written once: a note that has one, edited or not, keeps it. true when the note changed.
-	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>, name = ''): Promise<boolean> {
-		if (this.skipped('Description') || hasDescription(await this.app.vault.read(file))) return false
+	// Written once, unless renewed: then a description the plugin wrote itself is replaced (the reader changed
+	// Obsidian's language, a better source came back), and one edited since is left alone. A hash of what was
+	// written tells the two apart. The note's modified time is kept: this is not the reader's edit.
+	// true when the note changed.
+	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>, name = '', renew = false): Promise<boolean> {
+		if (this.skipped('Description')) return false
+		const current = descriptionOf(await this.app.vault.read(file))
+		if (current) {
+			if (!renew) return false
+			// no mark: written before marks were kept, so the plugin's own
+			const mark = this.settings.aboutMarks[sourceId]
+			if (mark !== undefined && mark !== urlHash(current)) return false
+		} else if (hasDescription(await this.app.vault.read(file))) return false
 		const own = plainText(fields.Description)
 		const about = (fields['Description Local'] === true ? own : plainText(await within(steamBlurb(sourceId), SEARCH_BUDGET_MS, '')))
 			|| plainText(await within(aboutTitle(sourceId, kind, !own, name), SEARCH_BUDGET_MS * 2, ''))
 			|| own
 		if (!about) return false
+		if (sourceId) this.settings.aboutMarks[sourceId] = urlHash(about)
+		if (about === current) return false
 		const callout = descriptionCallout(about)
-		let added = false
+		let changed = false
 		await this.app.vault.process(file, text => {
-			added = !hasDescription(text)
-			return added ? withDescription(text, callout) : text
-		})
-		return added
+			const next = withDescription(text, callout)
+			changed = next !== text
+			return next
+		}, { mtime: file.stat.mtime })
+		return changed
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
@@ -5609,9 +5626,10 @@ export default class LibraryPlugin extends Plugin {
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
 			const changed = this.applyMetaPatch(testCurrent, meta)
 			if (changed) {
+				// fields a source added are not the reader's edit: the note keeps its modified time
 				await this.app.fileManager.processFrontMatter(file, (current) => {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
-				})
+				}, { mtime: file.stat.mtime })
 			}
 			const described = await this.describe(file, sourceId, contentType, meta.fields)
 			return { ok: true, changed: changed || described }
@@ -5697,6 +5715,13 @@ export default class LibraryPlugin extends Plugin {
 			if (sourceId && provider.refreshable?.(sourceId) === false) return
 		}
 		this.refreshCooldowns.set(file.path, Date.now())
+		// asked for by hand: what is kept for the session about this title is looked up again too
+		if (force) {
+			this.recommendations.delete(`${toStr(fm.Source)}:${sourceId}`)
+			this.localTitles.delete(sourceId)
+			this.albumAwards.delete(sourceId)
+			this.albumAwards.delete(`${toStr(fm.Name) || file.basename}\u0000${linkLabel(toStrArray(fm.Creator)[0] ?? '')}`)
+		}
 
 		this.isRefreshing = true
 		try {
@@ -5705,9 +5730,16 @@ export default class LibraryPlugin extends Plugin {
 				return
 			}
 
+			const name = toStr(fm.Name) || file.basename
 			const meta = await provider.fetch(sourceId, category.contentType)
 			if (!meta) {
-				if (force) new Notice(tr('notice.notFound'))
+				// nothing to refetch (an Open Library book) or the source is out of reach: the description still can be
+				const about = force && sourceId.startsWith('/works/') ? { Description: await workDescription(sourceId) } : {}
+				const described = force && await this.describe(file, sourceId, category.contentType, about, name, true)
+				if (force) {
+					new Notice(tr(described ? 'notice.refreshed' : 'notice.notFound', { name }))
+					this.refreshBanner()
+				}
 				return
 			}
 
@@ -5716,9 +5748,13 @@ export default class LibraryPlugin extends Plugin {
 			if (changed) {
 				await this.app.fileManager.processFrontMatter(file, (current) => {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
-				})
+				}, { mtime: file.stat.mtime })
 			}
-			if (await this.describe(file, sourceId, category.contentType, meta.fields)) changed = true
+			if (await this.describe(file, sourceId, category.contentType, meta.fields, name, force)) changed = true
+			if (force) {
+				void this.persistSettings()
+				this.refreshBanner()
+			}
 
 			if (force) {
 				new Notice(tr(changed ? 'notice.refreshed' : 'notice.notFound', { name: toStr(meta.fields.Name) || file.basename }))
@@ -5851,6 +5887,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.unloaded) return
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView)
 		if (!view || !view.file) return
+		this.refreshAction(view, view.file)
 		this.coverAction(view, view.file)
 		const sizer = view.containerEl.querySelector('.markdown-preview-sizer')
 		if (!sizer?.instanceOf(HTMLElement)) return
@@ -5883,6 +5920,20 @@ export default class LibraryPlugin extends Plugin {
 			new CoverModal(this.app, () => this.coverChoices(current, name, kind), (url: string) => { void this.setCover(file, url) }).open()
 		})
 		this.coverActions.set(view, action)
+	}
+
+	// "Refresh" beside it: the source's fields, the description, the awards and the recommendations, looked up again
+	private refreshAction(view: MarkdownView, file: TFile): void {
+		this.refreshActions.get(view)?.remove()
+		this.refreshActions.delete(view)
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const kind = fm ? this.kindOf(fm) : undefined
+		if (!fm || !kind || isTemplateFile(file.path) || !this.registry.forType(kind)) return
+		if (toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT' || toStr(fm.Source) === YOUTUBE_SOURCE) return
+		this.refreshActions.set(view, view.addAction('refresh-cw', tr('cmd.refresh'), () => {
+			this.app.workspace.setActiveLeaf(view.leaf, { focus: true })
+			void this.tryRefresh(true)
+		}))
 	}
 
 	// anchors in `mod-header` (survives section re-renders); false when it fell back to a sizer child
@@ -7651,6 +7702,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.skipFields !== 'string') this.settings.skipFields = ''
 		if (!this.settings.psnTokens || typeof this.settings.psnTokens !== 'object') this.settings.psnTokens = null
 		if (!this.settings.enrichMarks || typeof this.settings.enrichMarks !== 'object') this.settings.enrichMarks = {}
+		if (!this.settings.aboutMarks || typeof this.settings.aboutMarks !== 'object') this.settings.aboutMarks = {}
 		// categories earlier builds kept out of statistics: showTop, stats.rating, showRated
 		const unrated = new Set<string>()
 		for (const cat of this.settings.categories) {
