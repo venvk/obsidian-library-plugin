@@ -638,8 +638,12 @@ sort trigger, the chosen one in the accent colour. */
 /* The note header lays itself out by the width of the note, not of the window: a split pane or
    "readable line length" narrows it like a phone does. Three shapes: a column (phone), the cover
    beside the info (the default width), and the cover, the trailer and the info in a row (wide). */
+/* --library-header-width is the pane's width, set as the pane is resized; the wrap grows past a
+   narrower text column and stays centred on it */
 .note-header-wrap {
 	container: note-header / inline-size;
+	width: var(--library-header-width, 100%);
+	margin-left: calc((100% - var(--library-header-width, 100%)) / 2);
 }
 
 .note-header-wrap .note-header {
@@ -745,6 +749,11 @@ sort trigger, the chosen one in the accent colour. */
 			"player player"
 			"gallery gallery"
 			"about about";
+	}
+
+	/* the scores sit on the title's last line, also when a translated title adds a second one */
+	.note-header-wrap .note-header-top {
+		align-items: flex-end;
 	}
 
 	.note-header-wrap .note-header-title {

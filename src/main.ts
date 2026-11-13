@@ -226,6 +226,8 @@ interface FolderMove {
 	to: string
 }
 const ENRICH_STEP_DELAY = 700
+// the widest a note header grows, in px
+const HEADER_MAX_WIDTH = 1500
 
 // an anime note: its id on each site, one resolved through AniList
 type RemoteSite = 'anilist' | 'mal' | 'kitsu' | 'trakt' | 'imdb' | 'netflix'
@@ -346,6 +348,7 @@ export default class LibraryPlugin extends Plugin {
 	private syncingLinks = new Set<string>()
 	private linkTimers = new Map<string, number>()
 	private fillingCanvases = new Set<string>()
+	private headerObserver: ResizeObserver | null = null
 	private malPushTimers = new Map<string, number>()
 	private imdbPushTimers = new Map<string, number>()
 	private traktPushTimers = new Map<string, number>()
@@ -729,6 +732,8 @@ export default class LibraryPlugin extends Plugin {
 
 	onunload(): void {
 		this.unloaded = true
+		this.headerObserver?.disconnect()
+		this.headerObserver = null
 		if (this.nftImportTimer !== null) {
 			window.clearTimeout(this.nftImportTimer)
 			this.nftImportTimer = null
@@ -5874,7 +5879,31 @@ export default class LibraryPlugin extends Plugin {
 		} else {
 			return false
 		}
+		this.widenHeader(header)
 		return true
+	}
+
+	// The header is as wide as the pane, not as the text: with "Readable line length" on, the text column
+	// stays narrow and the header still uses the room beside it. Followed while the pane is resized.
+	private widenHeader(wrap: HTMLElement): void {
+		const pane = wrap.closest('.markdown-preview-view')
+		if (!pane?.instanceOf(HTMLElement) || typeof ResizeObserver === 'undefined') return
+		if (!this.headerObserver) {
+			this.headerObserver = new ResizeObserver((entries) => {
+				for (const entry of entries) if (entry.target.instanceOf(HTMLElement)) this.fitHeaders(entry.target)
+			})
+		}
+		this.headerObserver.observe(pane)
+		this.fitHeaders(pane)
+	}
+
+	private fitHeaders(pane: HTMLElement): void {
+		const style = getComputedStyle(pane)
+		const room = pane.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+		if (room <= 0) return
+		// past this a poster and a trailer outgrow the screen's height
+		const width = `${String(Math.min(Math.floor(room), HEADER_MAX_WIDTH))}px`
+		pane.querySelectorAll<HTMLElement>('.note-header-wrap').forEach(wrap => wrap.setCssProps({ '--library-header-width': width }))
 	}
 
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {
