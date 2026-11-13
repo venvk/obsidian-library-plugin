@@ -59,7 +59,9 @@ The header arranges itself by the width of the note's pane, not of the window, s
 - a medium pane: the cover on the left, the title, ratings and details on the right, the trailer below at full width;
 - narrow, such as a phone: one column in the order cover, title and ratings, details, description, trailer, stills.
 
-The description is the first lines of the note's Description callout; click it to read it whole. The callout itself stays in the note.
+The description is the first lines of the note's Description callout; click it to read it whole. In reading view the callout is then not shown a second time; it stays in the note and in the editor. A video keeps its callout, with its links.
+
+The source ratings are plates in the source's colour (IMDb, Rotten Tomatoes, RAWG, Metacritic), next to your stars, the platform badges and the trophy counts. A title in your language follows the original one on the same line.
 
 Your score is set with five stars in the header. Each half star is one point out of 10, written to `My Rating`; click your current score again to clear it.
 

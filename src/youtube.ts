@@ -348,6 +348,11 @@ function descriptionTitles(): Set<string> {
 	return new Set(Object.values(I18N).map(block => block['header.description']).filter((title): title is string => !!title))
 }
 
+// true for the title of a description callout, in any language
+export function isDescriptionTitle(title: string): boolean {
+	return descriptionTitles().has(title.trim())
+}
+
 // true when the note already holds a description callout, yours or an edited one
 export function hasDescription(text: string): boolean {
 	const titles = descriptionTitles()

@@ -46,7 +46,7 @@ import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } f
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat, viaPinata } from './nft'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, descriptionOf, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, descriptionOf, isDescriptionTitle, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -412,6 +412,19 @@ export default class LibraryPlugin extends Plugin {
 		this.addSettingTab(this.settingTab)
 
 		this.registerView(LIBRARY_VIEW_TYPE, (leaf) => new LibraryView(leaf, this))
+		// The header shows a library note's description, so its callout is not shown a second time in reading
+		// view. The text stays in the note and in the editor.
+		this.registerMarkdownPostProcessor((el, ctx) => {
+			const callouts = el.querySelectorAll('.callout[data-callout="quote"]')
+			if (callouts.length === 0) return
+			const fm = ctx.frontmatter as Record<string, unknown> | undefined
+			// a video's description has links and timestamps to click: it stays a callout
+			if (!fm || toStr(fm.Source) === YOUTUBE_SOURCE || !this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
+			callouts.forEach((callout) => {
+				if (isDescriptionTitle(callout.querySelector('.callout-title-inner')?.textContent ?? '')) callout.addClass('library-described')
+			})
+		})
+
 		this.registerMarkdownCodeBlockProcessor('library', (source, el, ctx) => {
 			ctx.addChild(new LibraryBlock(el, this, source))
 		})
@@ -777,6 +790,7 @@ export default class LibraryPlugin extends Plugin {
 		this.lightbox = null
 		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
 			leaf.view.containerEl.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
+			leaf.view.containerEl.querySelectorAll('.library-has-about, .library-described').forEach(el => el.removeClasses(['library-has-about', 'library-described']))
 			if (leaf.view instanceof MarkdownView) this.coverActions.get(leaf.view)?.remove()
 		}
 	}
@@ -5831,6 +5845,7 @@ export default class LibraryPlugin extends Plugin {
 		const sizer = view.containerEl.querySelector('.markdown-preview-sizer')
 		if (!sizer?.instanceOf(HTMLElement)) return
 		sizer.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
+		sizer.parentElement?.removeClass('library-has-about')
 
 		const fm = this.app.metadataCache.getFileCache(view.file)?.frontmatter
 		if (!fm) return
@@ -6092,11 +6107,10 @@ export default class LibraryPlugin extends Plugin {
 		const top = createDiv({ cls: 'note-header-top' })
 		top.appendChild(titleEl)
 		const scores = top.createDiv({ cls: 'note-header-scores' })
-		const addScore = (label: string, value: string): void => {
+		const addScore = (label: string, value: string, cls: string): void => {
 			if (!value) return
-			const score = scores.createSpan({ cls: 'note-header-score' })
-			score.createEl('b', { text: label })
-			score.appendText(' ' + value)
+			// the source's name and its score on one plate, in the source's colour
+			scores.createSpan({ cls: `note-header-score ${cls}`, text: `${label} ${value}` })
 		}
 		this.addLocalTitle(titleEl, toStr(fm['Source ID']), name)
 		const badges = createDiv({ cls: 'note-header-badges' })
@@ -6130,7 +6144,6 @@ export default class LibraryPlugin extends Plugin {
 				else setIcon(link, 'globe')
 			}
 		}
-		if (badges.childElementCount > 0) infoSide.appendChild(badges)
 
 		const addRow = (label: string, value: string, separator = ': ', title = ''): void => {
 			if (!value) return
@@ -6289,10 +6302,12 @@ export default class LibraryPlugin extends Plugin {
 
 		// a token is a favorite or not, a video liked or disliked on YouTube: neither is scored
 		if (!video && toStr(fm.Source) !== NFT_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
-		addScore('IMDb', ratingIMDB)
-		addScore(RATING_RT_ICON, ratingRT)
-		addScore('RAWG', ratingRawg)
-		addScore('MC', ratingMc)
+		addScore('IMDb', ratingIMDB, 'is-imdb')
+		addScore(RATING_RT_ICON, ratingRT, 'is-rt')
+		addScore('RAWG', ratingRawg, 'is-rawg')
+		addScore('Metacritic', ratingMc, 'is-mc')
+		// platforms with their playtime and the trophy counts close the bar
+		if (badges.childElementCount > 0) scores.appendChild(badges)
 
 		if (progressPercent !== null) {
 			const progRow = createDiv()
@@ -6330,7 +6345,7 @@ export default class LibraryPlugin extends Plugin {
 		header.appendChild(infoSide)
 		// the trailer, the stills and the description are the header's own cells: their place depends on its width (styles.css)
 		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(header, fm, name)
-		this.buildAbout(header, file)
+		if (toStr(fm.Source) !== YOUTUBE_SOURCE) this.buildAbout(header, file)
 
 		const wrap = createDiv()
 		wrap.classList.add('note-header-wrap')
@@ -6563,8 +6578,9 @@ export default class LibraryPlugin extends Plugin {
 			pending = localTitle(sourceId).catch(() => null)
 			this.localTitles.set(sourceId, pending)
 		}
-		const line = createDiv({ cls: 'note-header-local-title' })
-		titleEl.insertAdjacentElement('afterend', line)
+		// on the title's own line, after the name and before its buttons
+		const line = createSpan({ cls: 'note-header-local-title' })
+		titleEl.insertBefore(line, titleEl.querySelector('button'))
 		void pending.then(local => {
 			if (!local || this.unloaded || sameTitle(local, name)) line.remove()
 			else line.setText(local)
@@ -7064,6 +7080,8 @@ export default class LibraryPlugin extends Plugin {
 		void this.app.vault.cachedRead(file).then((text) => {
 			const about = descriptionOf(text)
 			if (!about || !header.isConnected) return
+			// the pane then hides the callout it repeats (styles.css)
+			header.closest('.markdown-preview-view')?.addClass('library-has-about')
 			const box = header.createDiv({ cls: 'note-header-about', attr: { role: 'button', tabindex: '0', 'aria-expanded': 'false' } })
 			box.createEl('b', { text: tr('header.description') + ': ' })
 			box.appendText(about)
@@ -7384,7 +7402,6 @@ export default class LibraryPlugin extends Plugin {
 	// My Rating out of 10 as five stars: each half is a point. The same rating again clears it.
 	private ratingStars(file: TFile, value: number): HTMLElement {
 		const row = createDiv({ cls: 'note-header-stars', attr: { role: 'group', 'aria-label': tr('header.myRating') } })
-		row.createSpan({ cls: 'note-header-stars-label', text: tr('header.myRating') })
 		const stars = row.createSpan({ cls: 'note-header-stars-row' })
 		const text = row.createSpan({ cls: 'note-header-stars-value' })
 		const show = (points: number): void => {

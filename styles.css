@@ -712,12 +712,41 @@ sort trigger, the chosen one in the accent colour. */
 	gap: 6px 14px;
 }
 
+/* a source's score: its name and the number on one plate in the source's own colour */
 .note-header-wrap .note-header-score {
+	padding: 1px 8px;
+	border-radius: 4px;
+	font-size: 0.9em;
+	font-weight: 800;
 	white-space: nowrap;
+	background: var(--background-modifier-hover);
+	color: var(--text-normal);
 }
 
-.note-header-wrap .note-header-score b {
-	color: var(--text-muted);
+.note-header-wrap .note-header-score.is-imdb {
+	background: #f5c518;
+	color: #000;
+}
+
+/* pale, so the tomato stays visible on it */
+.note-header-wrap .note-header-score.is-rt {
+	background: #fde4de;
+	color: #a51d04;
+}
+
+.note-header-wrap .note-header-score.is-rawg {
+	background: #202020;
+	color: #fff;
+	border: 1px solid var(--background-modifier-border);
+}
+
+.note-header-wrap .note-header-score.is-mc {
+	background: #66cc33;
+	color: #000;
+}
+
+.note-header-wrap .note-header-scores .note-header-badges {
+	margin: 0;
 }
 
 @container note-header (max-width: 520px) {
@@ -2718,10 +2747,6 @@ sort trigger, the chosen one in the accent colour. */
 	gap: 8px;
 }
 
-.note-header-wrap .note-header-stars-label {
-	font-weight: bold;
-}
-
 .note-header-wrap .note-header-stars-row {
 	display: inline-flex;
 	gap: 2px;
@@ -3166,10 +3191,20 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .note-header-wrap .note-header-local-title {
-	margin-top: calc(-1 * var(--size-4-2));
-	margin-bottom: var(--size-4-2);
+	margin-left: var(--size-4-2);
 	color: var(--text-muted);
-	font-size: var(--font-ui-medium);
+	font-size: 0.7em;
+}
+
+.note-header-wrap .note-header-local-title::before {
+	content: "·";
+	margin-right: var(--size-4-2);
+}
+
+/* a library note's description is read in its header; where no header is drawn (an embed, a hover
+   preview) the callout stays */
+.markdown-preview-view.library-has-about > .markdown-preview-sizer > div > .callout.library-described {
+	display: none;
 }
 
 .note-header-wrap .note-header-local-title:empty {
