@@ -5329,8 +5329,11 @@ export default class LibraryPlugin extends Plugin {
 			await this.ensureFolder(dir)
 			const base = shared || sanitizeFilename(file.basename) || 'Cover'
 			let path = `${dir}/${base}.${ext}`
-			if (!shared || !this.app.vault.getAbstractFileByPath(path)) {
-				for (let n = 2; !shared && this.app.vault.getAbstractFileByPath(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
+			// asked of the disk too: where names ignore case (macOS, Windows), "SUPERMAN.jpg" is taken by "Superman.jpg",
+			// which the vault's own index, exact about case, does not show
+			const taken = async (candidate: string): Promise<boolean> => !!this.app.vault.getAbstractFileByPath(candidate) || this.app.vault.adapter.exists(candidate)
+			if (!shared || !(await taken(path))) {
+				for (let n = 2; !shared && await taken(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
 				await this.app.vault.createBinary(path, resp.arrayBuffer)
 			}
 			await link(path)
@@ -5345,7 +5348,8 @@ export default class LibraryPlugin extends Plugin {
 					this.queueCover(file)
 				}
 			}
-			console.error('Library: cover download error', file.path, e)
+			// a host that is gone or a network that is down: expected, so a warning, not an error
+			console.warn('Library: cover download failed', file.path, e)
 		}
 	}
 
@@ -5917,8 +5921,13 @@ export default class LibraryPlugin extends Plugin {
 		const pane = wrap.closest('.markdown-preview-view')
 		if (!pane?.instanceOf(HTMLElement) || typeof ResizeObserver === 'undefined') return
 		if (!this.headerObserver) {
+			// in the next frame: a size written while sizes are being reported is a "ResizeObserver loop" error
 			this.headerObserver = new ResizeObserver((entries) => {
-				for (const entry of entries) if (entry.target.instanceOf(HTMLElement)) this.fitHeaders(entry.target)
+				const panes = entries.map(entry => entry.target)
+				window.requestAnimationFrame(() => {
+					if (this.unloaded) return
+					for (const pane of panes) if (pane.instanceOf(HTMLElement) && pane.isConnected) this.fitHeaders(pane)
+				})
 			})
 		}
 		this.headerObserver.observe(pane)
@@ -5932,7 +5941,7 @@ export default class LibraryPlugin extends Plugin {
 		// past this a poster and a trailer outgrow the screen's height
 		const width = `${String(Math.min(Math.floor(room), HEADER_MAX_WIDTH))}px`
 		// on the pane: the header reads it, and a book's text column too (styles.css)
-		pane.setCssProps({ '--library-header-width': width })
+		if (pane.style.getPropertyValue('--library-header-width') !== width) pane.setCssProps({ '--library-header-width': width })
 	}
 
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {
