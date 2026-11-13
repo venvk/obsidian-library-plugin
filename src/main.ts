@@ -788,8 +788,11 @@ export default class LibraryPlugin extends Plugin {
 		this.lightbox?.close()
 		this.lightbox = null
 		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
-			leaf.view.containerEl.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
-			leaf.view.containerEl.querySelectorAll('.library-has-about, .library-described').forEach(el => el.removeClasses(['library-has-about', 'library-described']))
+			leaf.view.containerEl.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
+			leaf.view.containerEl.querySelectorAll('.library-has-about, .library-described, .library-wide-text').forEach(el => {
+				el.classList.remove('library-has-about', 'library-described', 'library-wide-text')
+				if (el.instanceOf(HTMLElement)) el.setCssProps({ '--library-header-width': '' })
+			})
 			if (leaf.view instanceof MarkdownView) this.coverActions.get(leaf.view)?.remove()
 		}
 	}
@@ -2038,11 +2041,11 @@ export default class LibraryPlugin extends Plugin {
 	// What a title is about, as a folded callout in the note's body. In the reader's language when it can be
 	// found: the source's own translation, else Wikipedia's opening; the source's English text otherwise.
 	// Written once: a note that has one, edited or not, keeps it. true when the note changed.
-	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>): Promise<boolean> {
+	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>, name = ''): Promise<boolean> {
 		if (this.skipped('Description') || hasDescription(await this.app.vault.read(file))) return false
 		const own = plainText(fields.Description)
 		const about = (fields['Description Local'] === true ? own : plainText(await within(steamBlurb(sourceId), SEARCH_BUDGET_MS, '')))
-			|| plainText(await within(aboutTitle(sourceId, kind, !own), SEARCH_BUDGET_MS * 2, ''))
+			|| plainText(await within(aboutTitle(sourceId, kind, !own, name), SEARCH_BUDGET_MS * 2, ''))
 			|| own
 		if (!about) return false
 		const callout = descriptionCallout(about)
@@ -5549,6 +5552,10 @@ export default class LibraryPlugin extends Plugin {
 				} else if (work) {
 					changed = await this.describe(file, sourceId, 'book', { Description: await workDescription(sourceId) })
 				}
+				// a game no source describes right now (a console's own id, RAWG out of reach): Wikipedia by its name
+				if (!changed && category.contentType === 'game' && navigator.onLine) {
+					changed = await this.describe(file, sourceId, 'game', {}, toStr(fm.Name) || file.basename)
+				}
 				if (ok) {
 					if (changed) updated++
 					this.settings.enrichMarks[file.path] = this.manifest.version
@@ -5843,8 +5850,8 @@ export default class LibraryPlugin extends Plugin {
 		this.coverAction(view, view.file)
 		const sizer = view.containerEl.querySelector('.markdown-preview-sizer')
 		if (!sizer?.instanceOf(HTMLElement)) return
-		sizer.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
-		sizer.parentElement?.removeClass('library-has-about')
+		sizer.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
+		sizer.parentElement?.classList.remove('library-has-about', 'library-wide-text')
 
 		const fm = this.app.metadataCache.getFileCache(view.file)?.frontmatter
 		if (!fm) return
@@ -5876,7 +5883,7 @@ export default class LibraryPlugin extends Plugin {
 
 	// anchors in `mod-header` (survives section re-renders); false when it fell back to a sizer child
 	private insertNoteHeader(file: TFile, root: HTMLElement, fm: Record<string, unknown>): boolean {
-		root.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
+		root.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
 		const header = this.buildNoteHeader(file, fm)
 		const props = root.querySelector('.metadata-container')
 		const title = root.querySelector('.mod-header .inline-title')
@@ -5894,6 +5901,13 @@ export default class LibraryPlugin extends Plugin {
 			return false
 		}
 		this.widenHeader(header)
+		// a book is read with its notes: they take the header's width, and what to read next comes after them
+		if (this.kindOf(fm) === 'book') {
+			header.closest('.markdown-preview-view')?.addClass('library-wide-text')
+			const recs = header.querySelector('.library-recs')
+			const footer = root.querySelector('.mod-footer')
+			if (recs && footer) footer.prepend(createDiv({ cls: 'library-note-footer' }, foot => { foot.appendChild(recs) }))
+		}
 		return true
 	}
 
@@ -5917,7 +5931,8 @@ export default class LibraryPlugin extends Plugin {
 		if (room <= 0) return
 		// past this a poster and a trailer outgrow the screen's height
 		const width = `${String(Math.min(Math.floor(room), HEADER_MAX_WIDTH))}px`
-		pane.querySelectorAll<HTMLElement>('.note-header-wrap').forEach(wrap => wrap.setCssProps({ '--library-header-width': width }))
+		// on the pane: the header reads it, and a book's text column too (styles.css)
+		pane.setCssProps({ '--library-header-width': width })
 	}
 
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {

@@ -1,3 +1,4 @@
+import { sameTitle } from './util'
 import { articleIntro, entities, languages, searchItems, textIn, type WikidataEntity } from './providers/wikidata'
 
 // A note's awards, looked up on Wikidata when the note is opened.
@@ -83,11 +84,27 @@ export async function localTitle(sourceId: string): Promise<string | null> {
 
 // What a title is about, from Wikipedia in the reader's language; in English too when asked,
 // for a title whose source says nothing. '' for an English reader otherwise, with no request made.
-export async function aboutTitle(sourceId: string, kind: string, english: boolean): Promise<string> {
+// A game whose id leads nowhere (a console's own, RAWG's) is looked up by its name.
+export async function aboutTitle(sourceId: string, kind: string, english: boolean, name = ''): Promise<string> {
 	const langs = languages().filter(lang => lang !== 'mul' && (english || lang !== 'en'))
 	if (langs.length === 0) return ''
-	const item = await itemOf(sourceId, kind)
+	const item = await itemOf(sourceId, kind) ?? (kind === 'game' && name ? await gameNamed(name) : undefined)
 	return item ? articleIntro(item, langs) : ''
+}
+
+// The Wikidata video game of this name: an edition's words and a year in brackets aside, under any
+// label or alias it has ("Ведьмак 3: Дикая Охота" is an alias of The Witcher 3: Wild Hunt).
+async function gameNamed(name: string): Promise<string | undefined> {
+	const plain = name.replace(/\([^)]*\)/g, ' ').replace(/\s*[-–—:]?\s*(?:\S+\s+)?(?:edition|version|издание|версия)\b.*$/i, '').trim() || name
+	const ids = await searchItems(plain, 'haswbstatement:P31=Q7889', 5)
+	if (ids.length === 0) return undefined
+	const found = await entities(ids, 'labels|aliases', [...languages(), 'en'])
+	const names = (entity: WikidataEntity | undefined): string[] => {
+		const all = labels(entity)
+		for (const list of Object.values(entity?.aliases ?? {})) for (const alias of list) if (alias.value) all.push(alias.value)
+		return all
+	}
+	return ids.find(id => names(found[id]).some(known => sameTitle(known, plain)))
 }
 
 // "Award received" (P166) with its year (P585), named in the note's language.

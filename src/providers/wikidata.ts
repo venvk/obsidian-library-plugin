@@ -18,6 +18,7 @@ export interface WikidataEntity {
 	descriptions?: Record<string, { value?: string }>
 	claims?: Record<string, WikidataClaim[]>
 	sitelinks?: Record<string, { title?: string }>
+	aliases?: Record<string, { value?: string }[]>
 }
 
 // Wikimedia asks clients to identify themselves.

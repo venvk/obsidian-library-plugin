@@ -745,8 +745,31 @@ sort trigger, the chosen one in the accent colour. */
 	margin: 0;
 }
 
+/* no trailer (a book, most anime and games): the description sits under the details, beside the cover */
+.note-header-wrap .note-header:not(.has-trailer) {
+	grid-template-rows: auto auto 1fr;
+	grid-template-areas:
+		"cover top"
+		"cover info"
+		"cover about"
+		"gallery gallery";
+}
+
+.note-header-wrap .note-header:not(.has-trailer) .note-header-about {
+	-webkit-line-clamp: 10;
+	line-clamp: 10;
+}
+
+/* a book's own notes are read at the header's width. The note's title and properties stay in the
+   text column, as in every other note: only what follows them grows, centred like the header */
+.markdown-preview-view.library-wide-text > .markdown-preview-sizer > div:not(.mod-header):not(.markdown-preview-pusher) {
+	width: var(--library-header-width, 100%);
+	margin-left: calc((100% - var(--library-header-width, 100%)) / 2);
+}
+
 @container note-header (max-width: 520px) {
-	.note-header-wrap .note-header {
+	.note-header-wrap .note-header,
+	.note-header-wrap .note-header:not(.has-trailer) {
 		grid-template-columns: minmax(0, 1fr);
 		grid-template-rows: none;
 		grid-template-areas:
@@ -788,6 +811,15 @@ sort trigger, the chosen one in the accent colour. */
 
 	.note-header-wrap .note-header-top .note-header-complete {
 		margin-left: auto;
+	}
+
+	.note-header-wrap .note-header:not(.has-trailer) {
+		grid-template-rows: auto auto 1fr;
+		grid-template-areas:
+			"top top"
+			"cover info"
+			"cover about"
+			"gallery gallery";
 	}
 
 	/* a 2:3 poster three parts wide is as tall as a 16:9 trailer eight parts wide */
@@ -958,6 +990,7 @@ sort trigger, the chosen one in the accent colour. */
 .note-header-wrap .note-header-gallery {
 	grid-area: gallery;
 	display: flex;
+	justify-content: safe center;
 	gap: 8px;
 	overflow-x: auto;
 	padding-bottom: 6px;
@@ -1835,13 +1868,16 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-recs-title {
+	text-align: center;
 	margin-bottom: 8px;
 	font-size: 0.8em;
 	color: var(--text-muted);
 }
 
+/* the row is rarely as wide as the header: it sits in the middle; "safe" keeps a longer one scrollable from its start */
 .library-recs-row {
 	display: flex;
+	justify-content: safe center;
 	gap: 10px;
 	overflow-x: auto;
 	padding-bottom: 6px;

@@ -14,7 +14,7 @@ Anime results come from all three sites at once, MyAnimeList's first. A title tw
 
 ## Descriptions
 
-A note gets what its title is about as a folded **Description** callout at the end of its text. It comes from the source the note came from: Cinemeta or TMDB for movies and series, MyAnimeList or AniList for anime and manga, Steam or RAWG for games, Open Library or Google Books for books, Comic Vine for comics. Titles found only in Wikidata, music and collectibles have none.
+A note gets what its title is about as a folded **Description** callout at the end of its text. It comes from the source the note came from: Cinemeta or TMDB for movies and series, MyAnimeList or AniList for anime and manga, Steam or RAWG for games, Open Library or Google Books for books, Comic Vine for comics. A game no source describes (one known only by a console's id, or while RAWG is out of reach) is looked up on Wikipedia by its name. Music and collectibles have none.
 
 With Obsidian in a language other than English, Library looks for the text in that language first: Steam's and TMDB's own translations, then the opening of the title's Wikipedia article. When neither has it, the source's English text is used. A title whose source has no description gets the Wikipedia opening too.
 
