@@ -418,8 +418,7 @@ export default class LibraryPlugin extends Plugin {
 			const callouts = el.querySelectorAll('.callout[data-callout="quote"]')
 			if (callouts.length === 0) return
 			const fm = ctx.frontmatter as Record<string, unknown> | undefined
-			// a video's description has links and timestamps to click: it stays a callout
-			if (!fm || toStr(fm.Source) === YOUTUBE_SOURCE || !this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
+			if (!fm || !this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
 			callouts.forEach((callout) => {
 				if (isDescriptionTitle(callout.querySelector('.callout-title-inner')?.textContent ?? '')) callout.addClass('library-described')
 			})
@@ -6345,7 +6344,7 @@ export default class LibraryPlugin extends Plugin {
 		header.appendChild(infoSide)
 		// the trailer, the stills and the description are the header's own cells: their place depends on its width (styles.css)
 		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(header, fm, name)
-		if (toStr(fm.Source) !== YOUTUBE_SOURCE) this.buildAbout(header, file)
+		this.buildAbout(header, file)
 
 		const wrap = createDiv()
 		wrap.classList.add('note-header-wrap')
@@ -7084,9 +7083,15 @@ export default class LibraryPlugin extends Plugin {
 			header.closest('.markdown-preview-view')?.addClass('library-has-about')
 			const box = header.createDiv({ cls: 'note-header-about', attr: { role: 'button', tabindex: '0', 'aria-expanded': 'false' } })
 			box.createEl('b', { text: tr('header.description') + ': ' })
-			box.appendText(about)
-			const toggle = (): void => {
-				// a selection being made is not a click
+			// a video's description is full of links: they stay links
+			about.split(/(https?:\/\/[^\s<>"]+)/).forEach((part, i) => {
+				const href = i % 2 === 1 ? safeUrl(part) : null
+				if (href) box.createEl('a', { cls: 'external-link', href, text: part, attr: { target: '_blank', rel: 'noopener noreferrer' } })
+				else box.appendText(part)
+			})
+			const toggle = (event: Event): void => {
+				// a link is followed, a selection being made is not a click
+				if (event.target instanceof HTMLElement && event.target.closest('a')) return
 				if (!activeWindow.getSelection()?.isCollapsed) return
 				const open = !box.hasClass('is-open')
 				box.toggleClass('is-open', open)
@@ -7096,7 +7101,7 @@ export default class LibraryPlugin extends Plugin {
 			box.addEventListener('keydown', (event) => {
 				if (event.key !== 'Enter' && event.key !== ' ') return
 				event.preventDefault()
-				toggle()
+				toggle(event)
 			})
 		}, () => undefined)
 	}
