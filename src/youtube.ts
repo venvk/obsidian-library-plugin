@@ -354,6 +354,17 @@ export function hasDescription(text: string): boolean {
 	return text.split('\n').some(line => isDescriptionHead(line, titles))
 }
 
+// The text of the note's description callout, without the quote marks; '' when there is none.
+export function descriptionOf(text: string): string {
+	const titles = descriptionTitles()
+	const lines = text.split('\n')
+	const at = lines.findIndex(line => isDescriptionHead(line, titles))
+	if (at < 0) return ''
+	const body: string[] = []
+	for (let i = at + 1; i < lines.length && (lines[i] ?? '').startsWith('>'); i++) body.push((lines[i] ?? '').replace(/^> ?/, ''))
+	return body.join('\n').trim()
+}
+
 // The note's text with the description callout in place of any it had: one written under
 // another language's title counts too, so switching languages never adds a second one.
 export function withDescription(text: string, callout: string): string {

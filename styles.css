@@ -635,18 +635,147 @@ sort trigger, the chosen one in the accent colour. */
 	scroll-snap-align: start;
 }
 
+/* The note header lays itself out by the width of the note, not of the window: a split pane or
+   "readable line length" narrows it like a phone does. Three shapes: a column (phone), the cover
+   beside the info (the default width), and the cover, the trailer and the info in a row (wide). */
+.note-header-wrap {
+	container: note-header / inline-size;
+}
+
 .note-header-wrap .note-header {
-	display: flex;
-	gap: 10%;
-	align-items: flex-start;
-	margin-bottom: 24px;
+	display: grid;
+	grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+	grid-template-rows: auto 1fr;
+	grid-template-areas:
+		"cover top"
+		"cover info"
+		"player player"
+		"gallery gallery"
+		"about about";
+	column-gap: 28px;
+	align-items: start;
+	margin-bottom: 8px;
 	line-height: 1.4;
 }
 
+/* cells are spaced by their own margin: a row gap would stay open under a cell the note lacks */
+.note-header-wrap .note-header > * {
+	margin-bottom: 16px;
+	min-width: 0;
+}
+
+.note-header-wrap .note-header-top {
+	grid-area: top;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px 16px;
+}
+
 .note-header-wrap .note-header-cover {
-	flex: 0 0 40%;
-	max-width: 40%;
+	grid-area: cover;
 	position: relative;
+}
+
+.note-header-wrap .note-header > .note-header-player,
+.note-header-wrap .note-header-trailer-link {
+	grid-area: player;
+}
+
+.note-header-wrap .note-header-about {
+	grid-area: about;
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 4;
+	line-clamp: 4;
+	overflow: hidden;
+	white-space: pre-line;
+	cursor: pointer;
+}
+
+.note-header-wrap .note-header-about.is-open {
+	display: block;
+}
+
+.note-header-wrap .note-header-about b {
+	color: var(--text-muted);
+}
+
+.note-header-wrap .note-header-scores {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px 14px;
+}
+
+.note-header-wrap .note-header-score {
+	white-space: nowrap;
+}
+
+.note-header-wrap .note-header-score b {
+	color: var(--text-muted);
+}
+
+@container note-header (max-width: 520px) {
+	.note-header-wrap .note-header {
+		grid-template-columns: minmax(0, 1fr);
+		grid-template-rows: none;
+		grid-template-areas:
+			"cover"
+			"top"
+			"info"
+			"about"
+			"player"
+			"gallery";
+	}
+
+	.note-header-wrap .note-header-cover {
+		justify-self: center;
+		width: min(100%, 280px);
+	}
+}
+
+@container note-header (min-width: 1000px) {
+	.note-header-wrap .note-header {
+		grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+		grid-template-rows: none;
+		grid-template-areas:
+			"top top"
+			"cover info"
+			"player player"
+			"gallery gallery"
+			"about about";
+	}
+
+	.note-header-wrap .note-header-title {
+		flex: 0 1 auto;
+		margin-right: 12px;
+	}
+
+	.note-header-wrap .note-header-top .note-header-complete {
+		margin-left: auto;
+	}
+
+	/* a 2:3 poster three parts wide is as tall as a 16:9 trailer eight parts wide */
+	.note-header-wrap .note-header.has-trailer {
+		grid-template-columns: minmax(0, 3fr) minmax(0, 8fr) minmax(240px, 4fr);
+		grid-template-areas:
+			"top top top"
+			"cover player info"
+			"gallery gallery gallery"
+			"about about about";
+	}
+
+	/* a square or wide cover keeps its shape, so it gets more room beside a smaller trailer */
+	.note-header-wrap .note-header.has-trailer.is-wide-cover {
+		grid-template-columns: minmax(0, 4fr) minmax(0, 7fr) minmax(240px, 4fr);
+	}
+
+	.note-header-wrap .note-header.has-trailer:not(.is-wide-cover) .note-header-cover img,
+	.note-header-wrap .note-header.has-trailer:not(.is-wide-cover) .note-header-cover video {
+		aspect-ratio: 2 / 3;
+		object-fit: cover;
+	}
 }
 
 .card-badge-spam,
@@ -695,14 +824,15 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .note-header-wrap .note-header-info {
-	flex: 1;
+	grid-area: info;
 	display: flex;
 	flex-direction: column;
 	gap: 4px;
 }
 
 .note-header-wrap .note-header-title {
-	margin: 8% 0 6% 0;
+	flex: 1 1 100%;
+	margin: 0;
 	font-size: 1.6em;
 	line-height: 1.2;
 }
@@ -730,7 +860,6 @@ sort trigger, the chosen one in the accent colour. */
 	align-self: flex-start;
 	align-items: center;
 	gap: 6px;
-	margin-top: 8px;
 	padding: 4px 12px;
 	border-radius: 999px;
 	font-weight: bold;
@@ -768,12 +897,6 @@ sort trigger, the chosen one in the accent colour. */
 	border-radius: 3px;
 }
 
-.note-header-wrap .note-header-media {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-
 .note-header-player {
 	width: 100%;
 	aspect-ratio: 16 / 9;
@@ -799,12 +922,15 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .note-header-wrap .note-header-gallery {
+	grid-area: gallery;
 	display: flex;
-	flex-wrap: wrap;
 	gap: 8px;
+	overflow-x: auto;
+	padding-bottom: 6px;
 }
 
 .note-header-wrap .note-header-gallery a {
+	flex: 0 0 auto;
 	line-height: 0;
 }
 
@@ -2581,7 +2707,6 @@ sort trigger, the chosen one in the accent colour. */
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	margin-top: 6px;
 }
 
 .note-header-wrap .note-header-stars-label {

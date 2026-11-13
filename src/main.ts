@@ -46,7 +46,7 @@ import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } f
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat, viaPinata } from './nft'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, descriptionOf, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -5900,6 +5900,14 @@ export default class LibraryPlugin extends Plugin {
 
 		const imgSide = createDiv()
 		imgSide.classList.add('note-header-cover')
+		// a poster stands beside the trailer; a wide or square cover (an album, a video, a token) keeps its own shape
+		const shape = (width: number, height: number): void => { if (width > 0 && height > 0) header.toggleClass('is-wide-cover', width >= height) }
+		imgSide.addEventListener('load', (event) => {
+			if (event.target instanceof HTMLImageElement) shape(event.target.naturalWidth, event.target.naturalHeight)
+		}, true)
+		imgSide.addEventListener('loadedmetadata', (event) => {
+			if (event.target instanceof HTMLVideoElement) shape(event.target.videoWidth, event.target.videoHeight)
+		}, true)
 		const isNft = toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT'
 		const nftCandidates: string[] = []
 		if (isNft) {
@@ -6051,7 +6059,16 @@ export default class LibraryPlugin extends Plugin {
 			})
 		}
 		titleEl.appendChild(shareBtn)
-		infoSide.appendChild(titleEl)
+		// the title and every score in one bar across the top
+		const top = createDiv({ cls: 'note-header-top' })
+		top.appendChild(titleEl)
+		const scores = top.createDiv({ cls: 'note-header-scores' })
+		const addScore = (label: string, value: string): void => {
+			if (!value) return
+			const score = scores.createSpan({ cls: 'note-header-score' })
+			score.createEl('b', { text: label })
+			score.appendText(' ' + value)
+		}
 		this.addLocalTitle(titleEl, toStr(fm['Source ID']), name)
 		const badges = createDiv({ cls: 'note-header-badges' })
 		renderPlatformLabels(badges, fm)
@@ -6241,12 +6258,12 @@ export default class LibraryPlugin extends Plugin {
 		}
 		if (fm['Last Played']) addRow(tr('header.lastPlayed'), toStr(fm['Last Played']))
 
-		if (ratingIMDB) addRow('IMDb', ratingIMDB)
-		if (ratingRT) addRow(RATING_RT_ICON, ratingRT, ' ')
-		if (ratingRawg) addRow('RAWG', ratingRawg)
-		if (ratingMc) addRow('MC', ratingMc)
 		// a token is a favorite or not, a video liked or disliked on YouTube: neither is scored
-		if (!video && toStr(fm.Source) !== NFT_SOURCE) infoSide.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		if (!video && toStr(fm.Source) !== NFT_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		addScore('IMDb', ratingIMDB)
+		addScore(RATING_RT_ICON, ratingRT)
+		addScore('RAWG', ratingRawg)
+		addScore('MC', ratingMc)
 
 		if (progressPercent !== null) {
 			const progRow = createDiv()
@@ -6270,7 +6287,7 @@ export default class LibraryPlugin extends Plugin {
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
 		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
-			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
+			const toggle = top.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
 			toggle.addEventListener('click', (e) => {
@@ -6280,12 +6297,15 @@ export default class LibraryPlugin extends Plugin {
 			})
 		}
 
+		header.prepend(top)
 		header.appendChild(infoSide)
+		// the trailer, the stills and the description are the header's own cells: their place depends on its width (styles.css)
+		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(header, fm, name)
+		this.buildAbout(header, file)
 
 		const wrap = createDiv()
 		wrap.classList.add('note-header-wrap')
 		wrap.appendChild(header)
-		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(wrap, fm, name)
 		this.buildNftTokensBlock(wrap, fm, file, (resolvedMedia) => {
 			const currentMedia = imgSide.querySelector('img, video')
 			if (!currentMedia) {
@@ -7010,7 +7030,31 @@ export default class LibraryPlugin extends Plugin {
 		wrap.appendChild(container)
 	}
 
-	private buildMediaBlock(wrap: HTMLElement, fm: Record<string, unknown>, name: string): void {
+	// The description from the note's own callout, a few lines of it; a click shows it whole.
+	private buildAbout(header: HTMLElement, file: TFile): void {
+		void this.app.vault.cachedRead(file).then((text) => {
+			const about = descriptionOf(text)
+			if (!about || !header.isConnected) return
+			const box = header.createDiv({ cls: 'note-header-about', attr: { role: 'button', tabindex: '0', 'aria-expanded': 'false' } })
+			box.createEl('b', { text: tr('header.description') + ': ' })
+			box.appendText(about)
+			const toggle = (): void => {
+				// a selection being made is not a click
+				if (!activeWindow.getSelection()?.isCollapsed) return
+				const open = !box.hasClass('is-open')
+				box.toggleClass('is-open', open)
+				box.setAttr('aria-expanded', open ? 'true' : 'false')
+			}
+			box.addEventListener('click', toggle)
+			box.addEventListener('keydown', (event) => {
+				if (event.key !== 'Enter' && event.key !== ' ') return
+				event.preventDefault()
+				toggle()
+			})
+		}, () => undefined)
+	}
+
+	private buildMediaBlock(header: HTMLElement, fm: Record<string, unknown>, name: string): void {
 		// a video note plays the video itself
 		const trailer = toStr(fm.Trailer).trim() || (toStr(fm.Source) === YOUTUBE_SOURCE ? toStr(fm.URL).trim() : '')
 		const gallery = toStrArray(fm.Gallery)
@@ -7018,17 +7062,15 @@ export default class LibraryPlugin extends Plugin {
 			.filter((value): value is string => value !== null)
 		if (!trailer && gallery.length === 0) return
 
-		const media = createDiv()
-		media.classList.add('note-header-media')
-
 		if (trailer) {
 			const embed = toEmbed(trailer)
 			const href = safeUrl(trailer)
 			if (embed) {
-				media.appendChild(createEmbedPlayer(embed, tr('header.trailer')))
+				header.appendChild(createEmbedPlayer(embed, tr('header.trailer')))
+				header.addClass('has-trailer')
 			} else if (href) {
 				const row = createDiv()
-				row.classList.add('note-header-row')
+				row.classList.add('note-header-row', 'note-header-trailer-link')
 				const link = createEl('a')
 				link.href = href
 				link.setText(tr('header.watchTrailer'))
@@ -7036,7 +7078,7 @@ export default class LibraryPlugin extends Plugin {
 				link.setAttribute('target', '_blank')
 				link.setAttribute('rel', 'noopener noreferrer')
 				row.appendChild(link)
-				media.appendChild(row)
+				header.appendChild(row)
 			}
 		}
 
@@ -7067,10 +7109,8 @@ export default class LibraryPlugin extends Plugin {
 				})
 				strip.appendChild(link)
 			}
-			media.appendChild(strip)
+			header.appendChild(strip)
 		}
-
-		wrap.appendChild(media)
 	}
 
 	// which list a note tracks: seasons of episodes, or a book's chapters
