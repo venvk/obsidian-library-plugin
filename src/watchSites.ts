@@ -1,11 +1,11 @@
-// IMDb, Netflix, YouTube and Apple Music have no open API for a member's own history: the sign-in window
+// IMDb, Netflix and YouTube have no API for a member's own history: the sign-in window
 // keeps the session, and a hidden webview on its partition reads the site as
 // the user did. Settings keep the connected flag, last-import time and score echoes.
 const PARTITION = 'persist:library-auth'
 
-export type WatchSite = 'imdb' | 'netflix' | 'youtube' | 'applemusic'
+export type WatchSite = 'imdb' | 'netflix' | 'youtube'
 
-export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube', applemusic: 'Apple Music' }
+export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube' }
 
 export interface ImdbEcho {
 	r: number
@@ -17,12 +17,7 @@ export const SITE_SIGN_IN: Record<WatchSite, string> = {
 	imdb: 'https://www.imdb.com/registration/signin',
 	netflix: 'https://www.netflix.com/login',
 	youtube: 'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fhistory',
-	// the web player's own Sign In button opens Apple's form; the page says when it is done (APPLE_MUSIC_SIGNED_IN)
-	applemusic: 'https://music.apple.com/us/browse',
 }
-
-// Apple Music signs in inside the page, so the URL never changes: the player's MusicKit says when
-export const APPLE_MUSIC_SIGNED_IN = "(() => { try { return window.MusicKit && MusicKit.getInstance().isAuthorized ? 'ok' : '' } catch (e) { return '' } })()"
 
 // Signed in once the window lands on the site's home: the sign-in pages live on
 // the same hosts, so the path decides.
@@ -37,7 +32,6 @@ export function signedInAt(site: WatchSite, url: string): string | null {
 	if (site === 'imdb') return parsed.hostname === 'www.imdb.com' && (parsed.pathname === '/' || parsed.pathname === '') ? 'ok' : null
 	// Google signs in on its own host, then hands the window to YouTube
 	if (site === 'youtube') return parsed.hostname === 'www.youtube.com' ? 'ok' : null
-	if (site === 'applemusic') return null
 	return parsed.hostname === 'www.netflix.com' && /^\/(browse|[a-z]{2}(-[a-z]{2})?\/browse)(\/|$)/.test(parsed.pathname) ? 'ok' : null
 }
 
@@ -230,55 +224,6 @@ export interface WatchHistory {
 }
 
 // Rated titles, rated episodes and the watchlist; null when the site does not answer.
-export interface AppleAlbum {
-	name: string
-	artist: string
-	year: string
-	// the album in Apple's catalogue: its id, page and barcode; empty for an upload of your own
-	catalogId: string
-	url: string
-	upc: string
-	artwork: string
-	// when it went into your library, ISO
-	added: string
-}
-
-// The albums in your Apple Music library, read by the web player's MusicKit on its own token: the
-// page asks Apple's API as you, and only the list comes back.
-export async function appleMusicLibrary(): Promise<AppleAlbum[] | 'signed-out' | null> {
-	const code = `(async () => {
-		const m = MusicKit.getInstance()
-		for (let i = 0; i < 20 && !m.isAuthorized; i++) await new Promise(r => setTimeout(r, 500))
-		if (!m.isAuthorized) return 'signed-out'
-		const out = []
-		let path = '/v1/me/library/albums?limit=100&include=catalog'
-		while (path && out.length < 5000) {
-			const page = (await m.api.music(path)).data
-			for (const album of page.data || []) {
-				const a = album.attributes || {}
-				const c = ((((album.relationships || {}).catalog || {}).data || [])[0] || {}).attributes || {}
-				const art = (c.artwork || a.artwork || {}).url || ''
-				out.push({
-					name: a.name || '', artist: a.artistName || '', year: (a.releaseDate || c.releaseDate || '').slice(0, 4),
-					catalogId: (a.playParams || {}).catalogId || '', url: c.url || '', upc: c.upc || '',
-					artwork: art.replace('{w}', '600').replace('{h}', '600'), added: a.dateAdded || ''
-				})
-			}
-			path = page.next || ''
-		}
-		return JSON.stringify(out)
-	})()`
-	const ready = '!!(window.MusicKit && MusicKit.getInstance && MusicKit.getInstance())'
-	const answer = await readPage('https://music.apple.com/us/library/albums', code, 120000, ready)
-	if (answer === 'signed-out') return 'signed-out'
-	try {
-		const list = JSON.parse(answer) as unknown
-		return Array.isArray(list) ? list as AppleAlbum[] : null
-	} catch {
-		return null
-	}
-}
-
 export async function imdbHistory(): Promise<WatchHistory | 'signed-out' | null> {
 	const answer = await readPage('https://www.imdb.com/', IMDB_READ, 120000, "!!document.getElementById('__NEXT_DATA__')")
 	if (answer === 'signed-out') return answer

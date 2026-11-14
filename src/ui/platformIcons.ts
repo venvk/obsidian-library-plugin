@@ -205,8 +205,7 @@ export const PLATFORM_COLORS: Record<string, { bg: string; text: string }> = {
 }
 
 export function platformMark(family: string): SVGSVGElement {
-	// Apple Music wears the same note as iTunes
-	const mark = MARKS[family === 'applemusic' ? 'itunes' : family]
+	const mark = MARKS[family]
 	const svg = createSvg('svg', { attr: { viewBox: mark?.viewBox ?? '0 0 24 24', 'aria-hidden': 'true' } })
 	if (mark) svg.createSvg('path', { attr: { d: mark.path, fill: 'currentColor' } })
 	return svg

@@ -56,7 +56,7 @@ import { ShareModal, shareTargetFromFile } from './ui/shareModal'
 import { CoverModal } from './ui/coverModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
-import { SITE_NAME, SITE_SIGN_IN, APPLE_MUSIC_SIGNED_IN, appleMusicLibrary, type AppleAlbum, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
+import { SITE_NAME, SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
 import { earnedAchievements, gameAchievements, ownedGames, playtimeHours, steamAuthUrl, steamIdFromRedirect, steamLanguage, steamSession, type SteamSession } from './steamLibrary'
 import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRedirect, deleteMalEntry, exchangeCode, fetchMalList, isExpired, makeVerifier, mangaIds, malAuthUrl, malClientPair, malIdsFor, malMangaIdsFor, malStatus, pushMalEntry, refreshTokens, type MalEntry } from './malSync'
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
@@ -64,7 +64,7 @@ import { LibraryView, LIBRARY_VIEW_TYPE } from './view'
 import { LibraryBlock } from './libraryBlock'
 import { addLog, addReadRange, logRating, tickLabel, todayIso } from './diary'
 import { categoryCanvas, libraryMap, linkCanvas, personCardText, PERSON_CARD_WIDTH, type MapTitle, type PersonCard } from './libraryMap'
-import { aboutTitle, albumAwards, albumTitle, localTitle, sameName, titleAwards, type Award } from './music'
+import { aboutTitle, albumAwards, localTitle, titleAwards, type Award } from './music'
 import { personCard, personInfo, type Person } from './person'
 import { TraktLoginModal } from './ui/traktLoginModal'
 import { RemoteDeleteModal } from './ui/remoteDeleteModal'
@@ -1760,7 +1760,7 @@ export default class LibraryPlugin extends Plugin {
 					resolve(answer !== null)
 					if (answer) void this.watchImport(site, true)
 				})()
-			}, { title: tr(`site.${site}.loginTitle`), extract: (url) => signedInAt(site, url), pageProbe: site === 'applemusic' ? APPLE_MUSIC_SIGNED_IN : undefined }).open()
+			}, { title: tr(`site.${site}.loginTitle`), extract: (url) => signedInAt(site, url) }).open()
 		})
 	}
 
@@ -1774,7 +1774,6 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		if (site === 'youtube') return this.youtubeImport(loud)
-		if (site === 'applemusic') return this.appleMusicImport(loud)
 		this.watchImporting = true
 		const name = SITE_NAME[site]
 		try {
@@ -1847,80 +1846,6 @@ export default class LibraryPlugin extends Plugin {
 	// YouTube: a note per video, Shorts left out, in the Video category made on first use. The first import brings
 	// the last 7 days, later ones every day since the last; a video seen again on a later day counts a rewatch.
 	// Then one older month a day, back to the start of the history, so years of it never land at once.
-	// The albums in your Apple Music library into Music. Each is matched to Deezer, the category's source, by its
-	// barcode, else by title and artist; one Deezer does not know becomes a note from Apple's own data.
-	private async appleMusicImport(loud: boolean): Promise<void> {
-		this.watchImporting = true
-		const site = 'Apple Music'
-		try {
-			if (loud) new Notice(tr('notice.site.importing', { site }))
-			const albums = await appleMusicLibrary()
-			if (albums === 'signed-out') {
-				this.settings.watchSites.applemusic.connected = false
-				await this.saveSettings()
-				new Notice(tr('notice.site.signedOut', { site }))
-				return
-			}
-			if (!albums) { if (loud) new Notice(tr('notice.site.failed', { site })); return }
-			const provider = this.registry.forType('music')
-			let category = this.settings.categories.find(c => c.contentType === 'music')
-			const typeValue = category?.typeValue ?? TYPE_DEFAULTS.music ?? 'Music'
-			// what is already here: by Apple's id, by Deezer's, or by title and artist
-			const byApple = new Set<string>(), byId = new Set<string>(), byName: Array<[string, string]> = []
-			for (const file of this.app.vault.getMarkdownFiles()) {
-				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
-				if (!fm || toStr(fm.Type) !== typeValue || isTemplateFile(file.path)) continue
-				if (toStr(fm['Apple Music ID'])) byApple.add(toStr(fm['Apple Music ID']))
-				if (toStr(fm['Source ID'])) byId.add(toStr(fm['Source ID']))
-				byName.push([toStr(fm.Name) || file.basename, linkLabel(toStrArray(fm.Creator)[0] ?? '')])
-			}
-			const known = (album: AppleAlbum): boolean => (!!album.catalogId && byApple.has(album.catalogId))
-				|| byName.some(([name, artist]) => sameName(albumTitle(name), albumTitle(album.name)) && sameName(artist, album.artist))
-			let created = 0
-			for (const album of albums) {
-				if (this.unloaded) return
-				if (!album.name || known(album)) continue
-				try {
-					const deezerId = provider ? await this.deezerAlbumFor(album) : ''
-					if (deezerId && byId.has(deezerId)) continue
-					const meta = deezerId && provider ? await provider.fetch(deezerId, 'music') : null
-					const fields = meta ?? {
-						fields: { Name: album.name, Creator: [album.artist], Year: Number(album.year) || null, Cover: album.artwork || null, URL: album.url || null },
-						progressTotal: null,
-						imdbId: null
-					}
-					if (!category) category = await this.categoryFor('music')
-					const extra: Record<string, unknown> = { Date: album.added ? dmyOf(album.added) : todayDmy() }
-					if (album.catalogId) extra['Apple Music ID'] = album.catalogId
-					await this.newNote(category, provider?.id ?? 'deezer', deezerId, toStr(fields.fields.Name) || album.name, fields, extra)
-					if (album.catalogId) byApple.add(album.catalogId)
-					if (deezerId) byId.add(deezerId)
-					created++
-					await this.pause(300)
-				} catch (e) {
-					console.error('Library: Apple Music import error', album.name, e)
-				}
-			}
-			this.settings.watchSites.applemusic.lastImport = Date.now()
-			await this.saveSettings()
-			if (loud || created > 0) new Notice(tr('notice.site.imported', { site, created, updated: 0 }))
-		} finally {
-			this.watchImporting = false
-		}
-	}
-
-	// Deezer's id for an album: its barcode first, which names one edition exactly, then a search by title and artist
-	private async deezerAlbumFor(album: AppleAlbum): Promise<string> {
-		if (/^\d{8,14}$/.test(album.upc)) {
-			const resp = await requestUrl({ url: `https://api.deezer.com/album/upc:${album.upc}`, throw: false }).catch(() => null)
-			const id = (resp?.status === 200 ? (resp.json as { id?: number }).id : undefined)
-			if (typeof id === 'number') return String(id)
-		}
-		const found = await this.registry.forType('music')?.search(`${album.artist} ${albumTitle(album.name)}`, 'music').catch(() => []) ?? []
-		const match = found.find(r => sameName(albumTitle(r.title), albumTitle(album.name)) && sameName(r.subtitle ?? '', album.artist))
-		return match?.sourceId ?? ''
-	}
-
 	private async youtubeImport(loud: boolean): Promise<void> {
 		this.watchImporting = true
 		try {
@@ -3997,7 +3922,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.watchSyncIfDue('applemusic')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first: a third-party signing service carries the requests
@@ -5116,7 +5041,6 @@ export default class LibraryPlugin extends Plugin {
 				if (s.eaTokens) await this.eaImport(true)
 			}
 			if (kind === 'manual' && category.typeValue === VIDEO_CATEGORY && s.watchSites.youtube.connected) await this.watchImport('youtube', true)
-			if (kind === 'music' && s.watchSites.applemusic.connected) await this.watchImport('applemusic', true)
 			if (isNftCategory(category) && walletPairs(s.nftWallets).length > 0) await this.nftImport(true)
 			if (!isNftCategory(category)) {
 				// a background pass already walking would turn this one away: it waits its turn
@@ -5139,7 +5063,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
 		if (this.settings.epicTokens) await this.epicImport(true)
 		if (this.settings.eaTokens) await this.eaImport(true)
-		for (const site of ['imdb', 'netflix', 'youtube', 'applemusic'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
+		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
 		if (walletPairs(this.settings.nftWallets).length > 0) await this.nftImport(true)
 	}
 
@@ -7770,8 +7694,8 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
 		if (!this.settings.netflixEcho || typeof this.settings.netflixEcho !== 'object') this.settings.netflixEcho = {}
 		const sites = (this.settings.watchSites && typeof this.settings.watchSites === 'object' ? this.settings.watchSites : {}) as Partial<ILibrarySettings['watchSites']>
-		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 }, applemusic: { connected: false, lastImport: 0 } }
-		for (const site of ['imdb', 'netflix', 'youtube', 'applemusic'] as const) {
+		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 } }
+		for (const site of ['imdb', 'netflix', 'youtube'] as const) {
 			const saved = sites[site]
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}

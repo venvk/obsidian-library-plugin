@@ -501,11 +501,6 @@ export class LibrarySettingTab extends PluginSettingTab {
 			},
 			{
 				page: "connectors",
-				heading: tr("settings.default.music"),
-				rows: [{ name: "Apple Music", desc: tr("settings.applemusic.desc"), render: (row) => this.siteAccount(row, "applemusic") }],
-			},
-			{
-				page: "connectors",
 				heading: tr("settings.default.video"),
 				rows: [
 					{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") },
