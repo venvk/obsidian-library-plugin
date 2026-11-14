@@ -201,6 +201,11 @@ export class AuthModal extends Modal {
 		view.addEventListener('render-process-gone', () => trail.push('webview crashed'))
 		this.timerWin = win
 		this.poll = win.setInterval(() => {
+			// the window was taken off the page without closing: nothing left to ask
+			if (!view.isConnected) {
+				win.clearInterval(this.poll)
+				return
+			}
 			const guest = view as unknown as {
 				getURL?: () => string
 				executeJavaScript?: (code: string, userGesture: boolean) => unknown

@@ -10,11 +10,15 @@ export const CERTIFICATE_SOURCE = 'certificates'
 
 const CREDLY_BADGE = /^https:\/\/(?:www\.)?credly\.com\/badges\/([0-9a-f-]{36})/i
 const SKILLJAR = /^https:\/\/verify\.skilljar\.com\/c\/[a-z0-9]+/i
+// Exceed LMS, where Google for Education (Gemini Academy) and others issue theirs
+const EXCEED = /^https:\/\/[a-z0-9-]+\.exceedlms\.com\/student\/award\/([A-Za-z0-9]+)/i
 const ACADEMY = /^https:\/\/academy\.claude\.com\/verify\/([^/?#]+)/i
 const ACADEMY_VERIFY = 'https://academy.claude.com/api/anthropic.academy_public.api.v1alpha.AcademyPublicService/VerifyCertificate'
 
 export interface Certificate {
 	name: string
+	// where it was earned, when that has a mark of its own on the card (Claude Academy)
+	platform?: string
 	issuer: string
 	issued: string
 	expires: string
@@ -24,9 +28,9 @@ export interface Certificate {
 	url: string
 }
 
-async function getText(url: string): Promise<string> {
+async function getText(url: string, headers: Record<string, string> = {}): Promise<string> {
 	try {
-		const resp = await requestUrl({ url, throw: false })
+		const resp = await requestUrl({ url, throw: false, headers })
 		return resp.status === 200 ? resp.text : ''
 	} catch {
 		return ''
@@ -107,15 +111,59 @@ async function academyBadge(code: string, url: string): Promise<Certificate | nu
 		const found = resp.status === 200 ? resp.json as { valid?: boolean; certificateName?: string; courseTitle?: string; issuedAt?: string } : null
 		const name = found?.valid ? found.courseTitle || found.certificateName : ''
 		if (!name) return null
-		return { name, issuer: 'Claude Academy', issued: dateOf(found?.issuedAt ?? ''), expires: '', image: '', skills: [], description: '', url }
+		return { name, platform: 'Claude Academy', issuer: 'Claude Academy', issued: dateOf(found?.issuedAt ?? ''), expires: '', image: '', skills: [], description: '', url }
 	} catch {
 		return null
 	}
 }
 
+// Claude Academy's verify code, Credly's badge id, Skilljar's certificate code
+export function credentialId(url: string): string {
+	const m = /^https:\/\/(?:academy\.claude\.com\/verify|(?:www\.)?credly\.com\/badges|verify\.skilljar\.com\/c|[a-z0-9-]+\.exceedlms\.com\/student\/award)\/([^/?#]+)/i.exec(url)
+	return m ? decodeURIComponent(m[1] ?? '') : ''
+}
+
+// The award page draws the certificate as an SVG: the activity's name heads the page, the issue and expiry
+// dates are its texts, the program its title
+function exceed(html: string, url: string): Certificate | null {
+	const name = decode((/<h1[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i.exec(html)?.[1] ?? '').trim())
+	if (!name) return null
+	const program = decode(/<svg[\s\S]*?<title>([^<]+)<\/title>/i.exec(html)?.[1] ?? '')
+	const site = decode(/<title>([^<]+)<\/title>/i.exec(html.replace(/<svg[\s\S]*?<\/svg>/gi, ''))?.[1] ?? '')
+	const dates: string[] = []
+	for (const m of html.match(/<tspan[^>]*>\s*\d{2}\/\d{2}\/\d{4}\s*<\/tspan>/g) ?? []) {
+		const [mm, dd, yyyy] = (/\d{2}\/\d{2}\/\d{4}/.exec(m)?.[0] ?? '').split('/')
+		const dmy = `${dd ?? ''}.${mm ?? ''}.${yyyy ?? ''}`
+		if (dates.indexOf(dmy) < 0) dates.push(dmy)
+	}
+	const ymd = (dmy: string): string => dmy.split('.').reverse().join('')
+	dates.sort((a, b) => ymd(a).localeCompare(ymd(b)))
+	return {
+		name,
+		platform: /google/i.test(site) ? 'Google' : undefined,
+		issuer: program || site,
+		issued: dates[0] ?? '',
+		expires: dates.length > 1 ? dates[dates.length - 1] ?? '' : '',
+		image: '',
+		skills: [],
+		description: '',
+		url,
+	}
+}
+
+// A certificate the page draws rather than links: the element to photograph for the note's picture
+export function drawnCertificate(url: string): string | null {
+	return EXCEED.test(url) ? '.award__customsvg svg' : null
+}
+
 export async function readCertificate(url: string): Promise<Certificate | null> {
 	const academy = ACADEMY.exec(url)
 	if (academy) return academyBadge(academy[1] ?? '', url)
+	if (EXCEED.test(url)) {
+		// in English the dates come as MM/DD/YYYY; another language writes them its own way
+		const html = await getText(url, { 'Accept-Language': 'en-US,en;q=0.9' })
+		return html ? exceed(html, url) : null
+	}
 	const credly = CREDLY_BADGE.exec(url)
 	if (credly) return openBadge(`https://www.credly.com/api/v1/obi/v2/badge_assertions/${credly[1] ?? ''}`, url)
 	const html = await getText(url)
@@ -157,8 +205,11 @@ export class CertificateProvider implements ContentProvider {
 				Creator: found.issuer ? [found.issuer] : [],
 				Year: Number(found.issued.slice(-4)) || null,
 				Issued: found.issued || null,
+				// the code the issuer's own check takes: the last part of the link
+				'Credential ID': credentialId(found.url) || null,
 				Expires: found.expires || null,
 				Genre: found.skills,
+				Platforms: found.platform ? [found.platform] : null,
 				Cover: found.image || null,
 				URL: found.url,
 				Description: found.description || null,

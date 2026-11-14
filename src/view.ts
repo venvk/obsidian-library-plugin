@@ -836,7 +836,7 @@ export class LibraryRenderer {
 		const { file, fm } = card
 		// album covers and NFTs are square, video thumbnails wide
 		const cardEl = grid.createDiv({
-			cls: card.kind === 'music' || toStr(fm.Source) === 'nft' ? 'library-card is-square' : toStr(fm.Source) === 'youtube' ? 'library-card is-wide' : 'library-card',
+			cls: card.kind === 'music' || toStr(fm.Source) === 'nft' ? 'library-card is-square' : toStr(fm.Source) === 'youtube' ? 'library-card is-wide' : toStr(fm.Source) === 'certificates' ? 'library-card is-landscape' : 'library-card',
 			attr: {
 				'role': 'button',
 				'tabindex': '0',
@@ -1372,7 +1372,9 @@ export class LibraryView extends ItemView {
 		})
 		const sortMenu = sortDropdown.createDiv({ cls: 'library-sort-menu' })
 
-		const grid = section.createDiv({ cls: 'library-grid' })
+		// certificates and badges are landscape pictures: wider columns, so a card shows the whole of one
+		const badges = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
+		const grid = section.createDiv({ cls: badges ? 'library-grid is-landscape' : 'library-grid' })
 
 		// tokens have no year, rating or progress: their own keys instead
 		const collectibles = cards.length > 0 && cards.every(card => isCollectible(card.fm))

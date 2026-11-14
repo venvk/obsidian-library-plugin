@@ -29,7 +29,7 @@ import { AnimeAggregatorProvider } from './providers/animeAggregator'
 import { GameTrailerFinder } from './providers/gameTrailer'
 import { DeezerProvider } from './providers/deezer'
 import { COLLECTIBLE_SOURCE, CollectibleProvider, setCards, type SetCard } from './providers/collectibles'
-import { CERTIFICATE_SOURCE, CertificateProvider } from './providers/certificates'
+import { CERTIFICATE_SOURCE, CertificateProvider, drawnCertificate } from './providers/certificates'
 import { MissingModal } from './ui/missingModal'
 import { AnimeProvider } from './providers/anime'
 import { MalProvider } from './providers/mal'
@@ -57,7 +57,7 @@ import { ShareModal, shareTargetFromFile } from './ui/shareModal'
 import { CoverModal } from './ui/coverModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
-import { SITE_NAME, SITE_SIGN_IN, ACADEMY_SIGNED_IN, academyBadges, academyVerifyUrl, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
+import { SITE_NAME, SITE_SIGN_IN, ACADEMY_SIGNED_IN, academyBadge, academyBadges, certificatePicture, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
 import { earnedAchievements, gameAchievements, ownedGames, playtimeHours, steamAuthUrl, steamIdFromRedirect, steamLanguage, steamSession, type SteamSession } from './steamLibrary'
 import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRedirect, deleteMalEntry, exchangeCode, fetchMalList, isExpired, makeVerifier, mangaIds, malAuthUrl, malClientPair, malIdsFor, malMangaIdsFor, malStatus, pushMalEntry, refreshTokens, type MalEntry } from './malSync'
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
@@ -1037,8 +1037,14 @@ export default class LibraryPlugin extends Plugin {
 		})
 		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
 		if (about && await this.describe(file, sourceId, category.contentType, meta.fields)) void this.persistSettings()
-		// a certificate's picture can be a signed link that soon expires (Skilljar): kept in the vault at once
-		if (source === CERTIFICATE_SOURCE) await this.localizeCover(file)
+		// a certificate's picture can be a signed link that soon expires (Skilljar): kept in the vault at once;
+		// one the page only draws (Exceed LMS) is photographed there
+		if (source === CERTIFICATE_SOURCE) {
+			const drawn = Platform.isDesktopApp ? drawnCertificate(sourceId) : null
+			const picture = drawn ? await certificatePicture(sourceId, drawn) : null
+			if (picture) await this.saveCover(file, picture, 'png')
+			else await this.localizeCover(file)
+		}
 		return file
 	}
 
@@ -1871,23 +1877,35 @@ export default class LibraryPlugin extends Plugin {
 			const provider = this.registry.forType('certificate')
 			if (!provider) return
 			const known = new Set<string>()
+			// notes made before badges had pictures get theirs
+			const bare = new Map<string, TFile>()
 			for (const file of this.app.vault.getMarkdownFiles()) {
 				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 				if (!fm || toStr(fm.Source) !== CERTIFICATE_SOURCE) continue
-				if (toStr(fm['Academy Badge ID'])) known.add(toStr(fm['Academy Badge ID']))
+				const badgeId = toStr(fm['Academy Badge ID'])
+				if (badgeId) known.add(badgeId)
+				if (badgeId && !coverValue(fm, this.coverProperty())) bare.set(badgeId, file)
 				known.add(toStr(fm['Source ID']))
 			}
 			let category: ICategory | undefined
 			let created = 0
 			for (const id of badges) {
 				if (this.unloaded) return
+				const bareFile = bare.get(id)
+				if (bareFile) {
+					const picture = (await academyBadge(id))?.picture
+					if (picture) await this.saveCover(bareFile, picture, 'png')
+					continue
+				}
 				if (known.has(id)) continue
 				try {
-					const url = await academyVerifyUrl(id)
+					const badge = await academyBadge(id)
+					const url = badge?.verifyUrl ?? ''
 					const meta = url && !known.has(url) ? await provider.fetch(url, 'certificate') : null
-					if (!meta) continue
+					if (!badge || !meta) continue
 					category = category ?? await this.categoryFor('certificate')
-					await this.newNote(category, CERTIFICATE_SOURCE, url, toStr(meta.fields.Name) || id, meta, { 'Academy Badge ID': id })
+					const file = await this.newNote(category, CERTIFICATE_SOURCE, url, toStr(meta.fields.Name) || id, meta, { 'Academy Badge ID': id })
+					if (badge.picture) await this.saveCover(file, badge.picture, 'png')
 					known.add(id)
 					known.add(url)
 					created++
@@ -5358,6 +5376,18 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// A picture made here rather than downloaded (a Claude Academy badge) into <library>/Covers, linked from the note
+	private async saveCover(file: TFile, data: ArrayBuffer, ext: string): Promise<void> {
+		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
+		await this.ensureFolder(dir)
+		const base = sanitizeFilename(file.basename) || 'Cover'
+		let path = `${dir}/${base}.${ext}`
+		for (let n = 2; this.app.vault.getAbstractFileByPath(path) || await this.app.vault.adapter.exists(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
+		await this.app.vault.createBinary(path, data)
+		const key = this.coverProperty()
+		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current[key] = `[[${path}]]` })
+	}
+
 	private async localizeCover(file: TFile): Promise<void> {
 		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 		if (!fm || isTemplateFile(file.path) || !this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
@@ -5971,7 +6001,8 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
 
 		// the properties panel can appear a beat late: retry until the header anchors in mod-header
-		if (!this.insertNoteHeader(view.file, sizer, fm) && this.bannerRetries < 5) {
+		// a note with nothing in it renders an empty sizer for good: after the retries the header goes in anyway
+		if (!this.insertNoteHeader(view.file, sizer, fm, this.bannerRetries >= 5) && this.bannerRetries < 5) {
 			this.bannerRetries += 1
 			if (this.bannerTimer) window.clearTimeout(this.bannerTimer)
 			this.bannerTimer = window.setTimeout(() => this.refreshBanner(), 80)
@@ -6009,7 +6040,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// anchors in `mod-header` (survives section re-renders); false when it fell back to a sizer child
-	private insertNoteHeader(file: TFile, root: HTMLElement, fm: Record<string, unknown>): boolean {
+	private insertNoteHeader(file: TFile, root: HTMLElement, fm: Record<string, unknown>, empty = false): boolean {
 		root.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
 		const header = this.buildNoteHeader(file, fm)
 		const props = root.querySelector('.metadata-container')
@@ -6021,7 +6052,7 @@ export default class LibraryPlugin extends Plugin {
 			title.insertAdjacentElement('afterend', header)
 		} else if (modHeader) {
 			modHeader.appendChild(header)
-		} else if (root.childElementCount > 0) {
+		} else if (root.childElementCount > 0 || empty) {
 			// pre-1.13 renderers take a plain sizer child; an empty sizer has not rendered yet
 			root.insertBefore(header, root.firstChild)
 		} else {
@@ -6431,6 +6462,7 @@ export default class LibraryPlugin extends Plugin {
 		if (kind === 'certificate') {
 			addRow(tr('header.issued'), toStr(fm.Issued))
 			addRow(tr('header.expires'), toStr(fm.Expires))
+			addRow(tr('header.credentialId'), toStr(fm['Credential ID']))
 		}
 		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)

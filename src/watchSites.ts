@@ -251,15 +251,92 @@ export async function academyBadges(): Promise<string[] | 'signed-out' | null> {
 	}
 }
 
-// A badge's public check, read from its "Add to LinkedIn" link: '' when the page does not give it
-export async function academyVerifyUrl(badgeId: string): Promise<string> {
-	const code = `(() => {
-		const link = document.querySelector('a[href*="linkedin.com/profile/add"]')
-		return link ? new URL(link.href).searchParams.get('certUrl') || '' : ''
-	})()`
-	const ready = `!!document.querySelector('a[href*="linkedin.com/profile/add"]') || !!document.querySelector('a[href*="/login"]')`
-	const url = await readPage(`https://academy.claude.com/badges/${encodeURIComponent(badgeId)}`, code, 30000, ready)
-	return /^https:\/\/academy\.claude\.com\/verify\/[^/?#]+$/.test(url) ? url : ''
+interface Capturable {
+	capturePage: () => Promise<{ getSize: () => { width: number }; crop: (rect: { x: number; y: number; width: number; height: number }) => { toPNG: () => Uint8Array } }>
+}
+
+export interface AcademyBadge {
+	// the badge's public check, read from its "Add to LinkedIn" link
+	verifyUrl: string
+	// the badge as the page draws it (the same picture its PDF holds), PNG; null when the page would not paint
+	picture: ArrayBuffer | null
+}
+
+// Opens `url` in a webview laid out on screen, nearly transparent and behind the workspace (a webview off
+// screen paints nothing), runs `code`, which answers JSON with the box of what to photograph ({x, y, w, h, iw})
+// and anything else, and photographs that box. null when the page gives no box in time.
+async function photograph(url: string, code: string): Promise<{ answer: Record<string, unknown>; picture: ArrayBuffer | null } | null> {
+	const doc = activeDocument
+	const win = doc.win as Window & { createEl: typeof createEl; require?: (mod: string) => { remote?: { webContents?: { fromId?: (id: number) => Capturable | undefined } } } }
+	const view = win.createEl('webview' as keyof HTMLElementTagNameMap, { cls: 'library-badge-probe', attr: { partition: PARTITION, src: url } })
+	doc.body.appendChild(view)
+	const guest = view as unknown as { executeJavaScript: (code: string) => Promise<unknown>; getWebContentsId?: () => number }
+	const wait = async <T>(work: Promise<T>, ms: number): Promise<T | null> => {
+		let timer = 0
+		try {
+			return await Promise.race([work, new Promise<null>(resolve => { timer = window.setTimeout(() => resolve(null), ms) })])
+		} finally {
+			window.clearTimeout(timer)
+		}
+	}
+	try {
+		await wait(new Promise<void>(resolve => view.addEventListener('dom-ready', () => resolve(), { once: true })), 30000)
+		const raw = await wait(guest.executeJavaScript(code).catch(() => ''), 30000)
+		const answer = typeof raw === 'string' && raw ? JSON.parse(raw) as Record<string, unknown> : null
+		if (!answer) return null
+		const box = answer as { x?: number; y?: number; w?: number; h?: number; iw?: number }
+		let picture: ArrayBuffer | null = null
+		const id = guest.getWebContentsId?.()
+		const contents = id !== undefined ? win.require?.('electron').remote?.webContents?.fromId?.(id) : undefined
+		const shot = contents ? await wait(contents.capturePage(), 10000).catch(() => null) : null
+		if (shot && box.w && box.h && box.iw) {
+			const k = shot.getSize().width / box.iw
+			const png = shot.crop({ x: Math.round((box.x ?? 0) * k), y: Math.round((box.y ?? 0) * k), width: Math.round(box.w * k), height: Math.round(box.h * k) }).toPNG()
+			picture = png.byteLength > 0 ? png.slice().buffer : null
+		}
+		return { answer, picture }
+	} catch {
+		return null
+	} finally {
+		view.remove()
+	}
+}
+
+// the box of `selector` once it and its fonts are in, as `photograph` reads it
+const boxOf = (selector: string, extra = "{}"): string => `(async () => {
+	for (let i = 0; i < 60; i++) {
+		if (document.querySelector('a[href*="/login"]') && !document.querySelector(${JSON.stringify(selector)})) return ''
+		const el = document.querySelector(${JSON.stringify(selector)})
+		if (el) {
+			await document.fonts.ready
+			// pictures inside it (an SVG certificate's background) load on their own time
+			const srcs = [...el.querySelectorAll('img, image')].map(i => i.getAttribute('src') || i.getAttribute('href') || i.getAttribute('xlink:href') || '').filter(Boolean)
+			await Promise.race([
+				Promise.all(srcs.map(src => new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = src }))),
+				new Promise(r => setTimeout(r, 10000)),
+			])
+			await new Promise(r => setTimeout(r, 1200))
+			const box = el.getBoundingClientRect()
+			return JSON.stringify(Object.assign(${extra}, { x: box.x, y: box.y, w: box.width, h: box.height, iw: innerWidth }))
+		}
+		await new Promise(r => setTimeout(r, 250))
+	}
+	return ''
+})()`
+
+// One badge page, read and photographed: the page draws the badge itself and serves no file of it
+export async function academyBadge(badgeId: string): Promise<AcademyBadge | null> {
+	const extra = "{ url: (() => { const a = document.querySelector('a[href*=\"linkedin.com/profile/add\"]'); return a ? new URL(a.href).searchParams.get('certUrl') || '' : '' })() }"
+	const ready = `(async () => { for (let i = 0; i < 60 && !document.querySelector('a[href*="linkedin.com/profile/add"]'); i++) await new Promise(r => setTimeout(r, 250)); return ${boxOf('svg.absolute.inset-0', extra)} })()`
+	const shot = await photograph(`https://academy.claude.com/badges/${encodeURIComponent(badgeId)}`, ready)
+	const url = typeof shot?.answer.url === 'string' ? shot.answer.url : ''
+	if (!shot || !/^https:\/\/academy\.claude\.com\/verify\/[^/?#]+$/.test(url)) return null
+	return { verifyUrl: url, picture: shot.picture }
+}
+
+// A certificate page that draws its certificate (Exceed LMS), photographed
+export async function certificatePicture(url: string, selector: string): Promise<ArrayBuffer | null> {
+	return (await photograph(url, boxOf(selector)))?.picture ?? null
 }
 
 export async function imdbHistory(): Promise<WatchHistory | 'signed-out' | null> {

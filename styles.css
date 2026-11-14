@@ -34,6 +34,24 @@
 	aspect-ratio: 16 / 9;
 }
 
+/* a certificate or badge: shown whole, at the 3:2 most of them are drawn in */
+.library-card.is-landscape .card-image {
+	aspect-ratio: 3 / 2;
+}
+
+.library-card.is-landscape .card-image img {
+	object-fit: contain;
+}
+
+.library-view .library-grid.is-landscape {
+	grid-template-columns: repeat(auto-fill, 280px);
+}
+
+.library-view .library-grid.is-landscape.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 280px;
+}
+
 .card-vote.is-like .card-vote-icon svg,
 .note-header-reaction.is-like.is-on svg {
 	color: #2ea043;
@@ -1994,6 +2012,19 @@ sort trigger, the chosen one in the accent colour. */
 	pointer-events: none;
 }
 
+/* A Claude Academy badge page, photographed for the note's cover: laid out at a desktop size so the badge
+   paints, behind everything and never clicked. */
+.library-badge-probe {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 1200px;
+	height: 900px;
+	opacity: 0.01;
+	z-index: -1;
+	pointer-events: none;
+}
+
 .library-psn-webview, .library-auth-webview {
 	display: flex;
 	width: 100%;
@@ -2230,6 +2261,16 @@ sort trigger, the chosen one in the accent colour. */
 	background-color: #ff0000;
 }
 
+.library-platform-label.is-google {
+	background-color: #ffffff;
+	color: #4285f4;
+}
+
+.library-platform-label.is-claude {
+	background-color: #d97757;
+	color: #ffffff;
+}
+
 .library-platform-label.is-netflix {
 	background-color: #000000;
 	color: #e50914;
@@ -2297,6 +2338,11 @@ sort trigger, the chosen one in the accent colour. */
 .library-platform-row-icon.is-imdb {
 	background-color: #f5c518;
 	color: #000000;
+}
+
+.library-platform-row-icon.is-claudeacademy {
+	background-color: #d97757;
+	color: #ffffff;
 }
 
 .library-platform-row-icon.is-netflix {
