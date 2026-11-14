@@ -46,7 +46,7 @@ import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } f
 import { PickTypeModal, type AddChoice } from './ui/pickTypeModal'
 import { ConfirmModal } from './ui/confirmModal'
 import { NFT_SOURCE, NFT_TYPE, EVM_NETWORKS, lazyMinted, tokenTransfers, contractCreator, explorerAddressUrl, openseaLinks, WALLET_FIELD, historyDates, nftHoldings, nftIsHidden, txBlock, txHashOf, explorerTxUrl, type KnownToken, parseWallets, walletPairs, groupHeldByContract, fetchNftTokenImage, cleanCollectionName, explorerContractUrl, explorerTokenUrl, explorerBlockUrl, isInvalidNftMedia, looksLikeSpam, isOat, viaPinata } from './nft'
-import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
+import { YOUTUBE_SOURCE, YOUTUBE_TYPE, daysSince, youtubeAct, type YoutubeAction, descriptionCallout, withDescription, hasDescription, descriptionOf, isDescriptionTitle, isoDay, pageVideos, videoCover, videoDetails, videoUrl, youtubePage, type VideoDetails, type WatchedVideo } from './youtube'
 import { MEDIA, TYPE_DEFAULTS, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory, addCategoryTop, addCreatorTop, categoryLabel, isBuiltInCategory, cleanFolder, inferLibraryFolder, isInside, joinFolder, newCategory, parentFolder } from './categories'
 import { AddContentModal, SearchEverythingModal } from './ui/addContentModal'
 import { LibrarySearchModal } from './ui/librarySearchModal'
@@ -226,6 +226,8 @@ interface FolderMove {
 	to: string
 }
 const ENRICH_STEP_DELAY = 700
+// the widest a note header grows, in px
+const HEADER_MAX_WIDTH = 1500
 
 // an anime note: its id on each site, one resolved through AniList
 type RemoteSite = 'anilist' | 'mal' | 'kitsu' | 'trakt' | 'imdb' | 'netflix'
@@ -274,6 +276,7 @@ export default class LibraryPlugin extends Plugin {
 	private bannerTimer: number | null = null
 	private bannerRetries = 0
 	private coverActions = new WeakMap<MarkdownView, HTMLElement>()
+	private refreshActions = new WeakMap<MarkdownView, HTMLElement>()
 	categorySyncing = false
 	private isRefreshing = false
 	private settingTab: LibrarySettingTab | null = null
@@ -346,6 +349,7 @@ export default class LibraryPlugin extends Plugin {
 	private syncingLinks = new Set<string>()
 	private linkTimers = new Map<string, number>()
 	private fillingCanvases = new Set<string>()
+	private headerObserver: ResizeObserver | null = null
 	private malPushTimers = new Map<string, number>()
 	private imdbPushTimers = new Map<string, number>()
 	private traktPushTimers = new Map<string, number>()
@@ -409,6 +413,18 @@ export default class LibraryPlugin extends Plugin {
 		this.addSettingTab(this.settingTab)
 
 		this.registerView(LIBRARY_VIEW_TYPE, (leaf) => new LibraryView(leaf, this))
+		// The header shows a library note's description, so its callout is not shown a second time in reading
+		// view. The text stays in the note and in the editor.
+		this.registerMarkdownPostProcessor((el, ctx) => {
+			const callouts = el.querySelectorAll('.callout[data-callout="quote"]')
+			if (callouts.length === 0) return
+			const fm = ctx.frontmatter as Record<string, unknown> | undefined
+			if (!fm || !this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
+			callouts.forEach((callout) => {
+				if (isDescriptionTitle(callout.querySelector('.callout-title-inner')?.textContent ?? '')) callout.addClass('library-described')
+			})
+		})
+
 		this.registerMarkdownCodeBlockProcessor('library', (source, el, ctx) => {
 			ctx.addChild(new LibraryBlock(el, this, source))
 		})
@@ -729,6 +745,8 @@ export default class LibraryPlugin extends Plugin {
 
 	onunload(): void {
 		this.unloaded = true
+		this.headerObserver?.disconnect()
+		this.headerObserver = null
 		if (this.nftImportTimer !== null) {
 			window.clearTimeout(this.nftImportTimer)
 			this.nftImportTimer = null
@@ -771,8 +789,15 @@ export default class LibraryPlugin extends Plugin {
 		this.lightbox?.close()
 		this.lightbox = null
 		for (const leaf of this.app.workspace.getLeavesOfType('markdown')) {
-			leaf.view.containerEl.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
-			if (leaf.view instanceof MarkdownView) this.coverActions.get(leaf.view)?.remove()
+			leaf.view.containerEl.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
+			leaf.view.containerEl.querySelectorAll('.library-has-about, .library-described, .library-wide-text').forEach(el => {
+				el.classList.remove('library-has-about', 'library-described', 'library-wide-text')
+				if (el.instanceOf(HTMLElement)) el.setCssProps({ '--library-header-width': '' })
+			})
+			if (leaf.view instanceof MarkdownView) {
+				this.coverActions.get(leaf.view)?.remove()
+				this.refreshActions.get(leaf.view)?.remove()
+			}
 		}
 	}
 
@@ -826,15 +851,27 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// The library's notes by category, in the settings' order; a category with no notes has no group.
 	openLibrarySearch(): void {
-		const types = new Set(this.settings.categories.map(c => c.typeValue))
-		const files = this.app.vault.getMarkdownFiles().filter(f => {
-			if (isTemplateFile(f.path)) return false
-			const type: unknown = this.app.metadataCache.getFileCache(f)?.frontmatter?.Type
-			return typeof type === 'string' && types.has(type)
-		})
-		new LibrarySearchModal(this.app, files, (file) => {
-			void this.app.workspace.getLeaf(false).openFile(file)
+		const byType = new Map<string, TFile[]>()
+		for (const category of this.settings.categories) byType.set(category.typeValue, [])
+		for (const file of this.app.vault.getMarkdownFiles()) {
+			if (isTemplateFile(file.path)) continue
+			const type: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.Type
+			if (typeof type === 'string') byType.get(type)?.push(file)
+		}
+		const groups = this.settings.categories
+			.map(category => ({ key: `library:${category.typeValue}`, label: categoryLabel(category), files: byType.get(category.typeValue) ?? [], square: category.contentType === 'music' || category.contentType === 'manual' }))
+			.filter(group => group.files.length > 0)
+		new LibrarySearchModal(this.app, groups, {
+			folded: (key) => this.settings.searchFolded.indexOf(key) >= 0,
+			toggle: (key) => {
+				const folded = this.settings.searchFolded
+				this.settings.searchFolded = folded.indexOf(key) >= 0 ? folded.filter(k => k !== key) : [...folded, key]
+				void this.persistSettings()
+			},
+			coverOf: (file) => coverSrc(this.app, coverValue(this.app.metadataCache.getFileCache(file)?.frontmatter ?? {}, this.coverProperty())),
+			onPick: (file) => { void this.app.workspace.getLeaf(false).openFile(file) }
 		}).open()
 	}
 
@@ -995,7 +1032,7 @@ export default class LibraryPlugin extends Plugin {
 			this.applyMetaFields(record, meta)
 		})
 		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
-		if (about) await this.describe(file, sourceId, category.contentType, meta.fields)
+		if (about && await this.describe(file, sourceId, category.contentType, meta.fields)) void this.persistSettings()
 		return file
 	}
 
@@ -2007,21 +2044,34 @@ export default class LibraryPlugin extends Plugin {
 
 	// What a title is about, as a folded callout in the note's body. In the reader's language when it can be
 	// found: the source's own translation, else Wikipedia's opening; the source's English text otherwise.
-	// Written once: a note that has one, edited or not, keeps it. true when the note changed.
-	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>): Promise<boolean> {
-		if (this.skipped('Description') || hasDescription(await this.app.vault.read(file))) return false
+	// Written once, unless renewed: then a description the plugin wrote itself is replaced (the reader changed
+	// Obsidian's language, a better source came back), and one edited since is left alone. A hash of what was
+	// written tells the two apart. The note's modified time is kept: this is not the reader's edit.
+	// true when the note changed.
+	private async describe(file: TFile, sourceId: string, kind: string, fields: Record<string, unknown>, name = '', renew = false): Promise<boolean> {
+		if (this.skipped('Description')) return false
+		const current = descriptionOf(await this.app.vault.read(file))
+		if (current) {
+			if (!renew) return false
+			// no mark: written before marks were kept, so the plugin's own
+			const mark = this.settings.aboutMarks[sourceId]
+			if (mark !== undefined && mark !== urlHash(current)) return false
+		} else if (hasDescription(await this.app.vault.read(file))) return false
 		const own = plainText(fields.Description)
 		const about = (fields['Description Local'] === true ? own : plainText(await within(steamBlurb(sourceId), SEARCH_BUDGET_MS, '')))
-			|| plainText(await within(aboutTitle(sourceId, kind, !own), SEARCH_BUDGET_MS * 2, ''))
+			|| plainText(await within(aboutTitle(sourceId, kind, !own, name), SEARCH_BUDGET_MS * 2, ''))
 			|| own
 		if (!about) return false
+		if (sourceId) this.settings.aboutMarks[sourceId] = urlHash(about)
+		if (about === current) return false
 		const callout = descriptionCallout(about)
-		let added = false
+		let changed = false
 		await this.app.vault.process(file, text => {
-			added = !hasDescription(text)
-			return added ? withDescription(text, callout) : text
-		})
-		return added
+			const next = withDescription(text, callout)
+			changed = next !== text
+			return next
+		}, { mtime: file.stat.mtime })
+		return changed
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
@@ -5296,8 +5346,11 @@ export default class LibraryPlugin extends Plugin {
 			await this.ensureFolder(dir)
 			const base = shared || sanitizeFilename(file.basename) || 'Cover'
 			let path = `${dir}/${base}.${ext}`
-			if (!shared || !this.app.vault.getAbstractFileByPath(path)) {
-				for (let n = 2; !shared && this.app.vault.getAbstractFileByPath(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
+			// asked of the disk too: where names ignore case (macOS, Windows), "SUPERMAN.jpg" is taken by "Superman.jpg",
+			// which the vault's own index, exact about case, does not show
+			const taken = async (candidate: string): Promise<boolean> => !!this.app.vault.getAbstractFileByPath(candidate) || this.app.vault.adapter.exists(candidate)
+			if (!shared || !(await taken(path))) {
+				for (let n = 2; !shared && await taken(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
 				await this.app.vault.createBinary(path, resp.arrayBuffer)
 			}
 			await link(path)
@@ -5312,7 +5365,8 @@ export default class LibraryPlugin extends Plugin {
 					this.queueCover(file)
 				}
 			}
-			console.error('Library: cover download error', file.path, e)
+			// a host that is gone or a network that is down: expected, so a warning, not an error
+			console.warn('Library: cover download failed', file.path, e)
 		}
 	}
 
@@ -5519,6 +5573,10 @@ export default class LibraryPlugin extends Plugin {
 				} else if (work) {
 					changed = await this.describe(file, sourceId, 'book', { Description: await workDescription(sourceId) })
 				}
+				// a game no source describes right now (a console's own id, RAWG out of reach): Wikipedia by its name
+				if (!changed && category.contentType === 'game' && navigator.onLine) {
+					changed = await this.describe(file, sourceId, 'game', {}, toStr(fm.Name) || file.basename)
+				}
 				if (ok) {
 					if (changed) updated++
 					this.settings.enrichMarks[file.path] = this.manifest.version
@@ -5568,9 +5626,10 @@ export default class LibraryPlugin extends Plugin {
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
 			const changed = this.applyMetaPatch(testCurrent, meta)
 			if (changed) {
+				// fields a source added are not the reader's edit: the note keeps its modified time
 				await this.app.fileManager.processFrontMatter(file, (current) => {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
-				})
+				}, { mtime: file.stat.mtime })
 			}
 			const described = await this.describe(file, sourceId, contentType, meta.fields)
 			return { ok: true, changed: changed || described }
@@ -5656,6 +5715,13 @@ export default class LibraryPlugin extends Plugin {
 			if (sourceId && provider.refreshable?.(sourceId) === false) return
 		}
 		this.refreshCooldowns.set(file.path, Date.now())
+		// asked for by hand: what is kept for the session about this title is looked up again too
+		if (force) {
+			this.recommendations.delete(`${toStr(fm.Source)}:${sourceId}`)
+			this.localTitles.delete(sourceId)
+			this.albumAwards.delete(sourceId)
+			this.albumAwards.delete(`${toStr(fm.Name) || file.basename}\u0000${linkLabel(toStrArray(fm.Creator)[0] ?? '')}`)
+		}
 
 		this.isRefreshing = true
 		try {
@@ -5664,9 +5730,16 @@ export default class LibraryPlugin extends Plugin {
 				return
 			}
 
+			const name = toStr(fm.Name) || file.basename
 			const meta = await provider.fetch(sourceId, category.contentType)
 			if (!meta) {
-				if (force) new Notice(tr('notice.notFound'))
+				// nothing to refetch (an Open Library book) or the source is out of reach: the description still can be
+				const about = force && sourceId.startsWith('/works/') ? { Description: await workDescription(sourceId) } : {}
+				const described = force && await this.describe(file, sourceId, category.contentType, about, name, true)
+				if (force) {
+					new Notice(tr(described ? 'notice.refreshed' : 'notice.notFound', { name }))
+					this.refreshBanner()
+				}
 				return
 			}
 
@@ -5675,9 +5748,13 @@ export default class LibraryPlugin extends Plugin {
 			if (changed) {
 				await this.app.fileManager.processFrontMatter(file, (current) => {
 					this.applyMetaPatch(current as Record<string, unknown>, meta)
-				})
+				}, { mtime: file.stat.mtime })
 			}
-			if (await this.describe(file, sourceId, category.contentType, meta.fields)) changed = true
+			if (await this.describe(file, sourceId, category.contentType, meta.fields, name, force)) changed = true
+			if (force) {
+				void this.persistSettings()
+				this.refreshBanner()
+			}
 
 			if (force) {
 				new Notice(tr(changed ? 'notice.refreshed' : 'notice.notFound', { name: toStr(meta.fields.Name) || file.basename }))
@@ -5810,10 +5887,12 @@ export default class LibraryPlugin extends Plugin {
 		if (this.unloaded) return
 		const view = this.app.workspace.getActiveViewOfType(MarkdownView)
 		if (!view || !view.file) return
+		this.refreshAction(view, view.file)
 		this.coverAction(view, view.file)
 		const sizer = view.containerEl.querySelector('.markdown-preview-sizer')
 		if (!sizer?.instanceOf(HTMLElement)) return
-		sizer.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
+		sizer.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
+		sizer.parentElement?.classList.remove('library-has-about', 'library-wide-text')
 
 		const fm = this.app.metadataCache.getFileCache(view.file)?.frontmatter
 		if (!fm) return
@@ -5843,9 +5922,23 @@ export default class LibraryPlugin extends Plugin {
 		this.coverActions.set(view, action)
 	}
 
+	// "Refresh" beside it: the source's fields, the description, the awards and the recommendations, looked up again
+	private refreshAction(view: MarkdownView, file: TFile): void {
+		this.refreshActions.get(view)?.remove()
+		this.refreshActions.delete(view)
+		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+		const kind = fm ? this.kindOf(fm) : undefined
+		if (!fm || !kind || isTemplateFile(file.path) || !this.registry.forType(kind)) return
+		if (toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT' || toStr(fm.Source) === YOUTUBE_SOURCE) return
+		this.refreshActions.set(view, view.addAction('refresh-cw', tr('cmd.refresh'), () => {
+			this.app.workspace.setActiveLeaf(view.leaf, { focus: true })
+			void this.tryRefresh(true)
+		}))
+	}
+
 	// anchors in `mod-header` (survives section re-renders); false when it fell back to a sizer child
 	private insertNoteHeader(file: TFile, root: HTMLElement, fm: Record<string, unknown>): boolean {
-		root.querySelectorAll('.note-header-wrap').forEach(h => h.remove())
+		root.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
 		const header = this.buildNoteHeader(file, fm)
 		const props = root.querySelector('.metadata-container')
 		const title = root.querySelector('.mod-header .inline-title')
@@ -5862,7 +5955,44 @@ export default class LibraryPlugin extends Plugin {
 		} else {
 			return false
 		}
+		this.widenHeader(header)
+		// a book is read with its notes: they take the header's width, and what to read next comes after them
+		if (this.kindOf(fm) === 'book') {
+			header.closest('.markdown-preview-view')?.addClass('library-wide-text')
+			const recs = header.querySelector('.library-recs')
+			const footer = root.querySelector('.mod-footer')
+			if (recs && footer) footer.prepend(createDiv({ cls: 'library-note-footer' }, foot => { foot.appendChild(recs) }))
+		}
 		return true
+	}
+
+	// The header is as wide as the pane, not as the text: with "Readable line length" on, the text column
+	// stays narrow and the header still uses the room beside it. Followed while the pane is resized.
+	private widenHeader(wrap: HTMLElement): void {
+		const pane = wrap.closest('.markdown-preview-view')
+		if (!pane?.instanceOf(HTMLElement) || typeof ResizeObserver === 'undefined') return
+		if (!this.headerObserver) {
+			// in the next frame: a size written while sizes are being reported is a "ResizeObserver loop" error
+			this.headerObserver = new ResizeObserver((entries) => {
+				const panes = entries.map(entry => entry.target)
+				window.requestAnimationFrame(() => {
+					if (this.unloaded) return
+					for (const pane of panes) if (pane.instanceOf(HTMLElement) && pane.isConnected) this.fitHeaders(pane)
+				})
+			})
+		}
+		this.headerObserver.observe(pane)
+		this.fitHeaders(pane)
+	}
+
+	private fitHeaders(pane: HTMLElement): void {
+		const style = getComputedStyle(pane)
+		const room = pane.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0)
+		if (room <= 0) return
+		// past this a poster and a trailer outgrow the screen's height
+		const width = `${String(Math.min(Math.floor(room), HEADER_MAX_WIDTH))}px`
+		// on the pane: the header reads it, and a book's text column too (styles.css)
+		if (pane.style.getPropertyValue('--library-header-width') !== width) pane.setCssProps({ '--library-header-width': width })
 	}
 
 	private buildNoteHeader(file: TFile, fm: Record<string, unknown>): HTMLElement {
@@ -5888,6 +6018,17 @@ export default class LibraryPlugin extends Plugin {
 
 		const imgSide = createDiv()
 		imgSide.classList.add('note-header-cover')
+		// a poster stands beside the trailer; a wide or square cover (an album, a video, a token) keeps its own shape
+		const shape = (width: number, height: number): void => { if (width > 0 && height > 0) header.toggleClass('is-wide-cover', width >= height) }
+		// by tag name: in a pop-out window an element is not an instance of this window's classes
+		imgSide.addEventListener('load', (event) => {
+			const img = event.target as HTMLImageElement
+			if (img.tagName === 'IMG') shape(img.naturalWidth, img.naturalHeight)
+		}, true)
+		imgSide.addEventListener('loadedmetadata', (event) => {
+			const video = event.target as HTMLVideoElement
+			if (video.tagName === 'VIDEO') shape(video.videoWidth, video.videoHeight)
+		}, true)
 		const isNft = toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT'
 		const nftCandidates: string[] = []
 		if (isNft) {
@@ -6039,7 +6180,15 @@ export default class LibraryPlugin extends Plugin {
 			})
 		}
 		titleEl.appendChild(shareBtn)
-		infoSide.appendChild(titleEl)
+		// the title and every score in one bar across the top
+		const top = createDiv({ cls: 'note-header-top' })
+		top.appendChild(titleEl)
+		const scores = top.createDiv({ cls: 'note-header-scores' })
+		const addScore = (label: string, value: string, cls: string): void => {
+			if (!value) return
+			// the source's name and its score on one plate, in the source's colour
+			scores.createSpan({ cls: `note-header-score ${cls}`, text: `${label} ${value}` })
+		}
 		this.addLocalTitle(titleEl, toStr(fm['Source ID']), name)
 		const badges = createDiv({ cls: 'note-header-badges' })
 		renderPlatformLabels(badges, fm)
@@ -6072,7 +6221,6 @@ export default class LibraryPlugin extends Plugin {
 				else setIcon(link, 'globe')
 			}
 		}
-		if (badges.childElementCount > 0) infoSide.appendChild(badges)
 
 		const addRow = (label: string, value: string, separator = ': ', title = ''): void => {
 			if (!value) return
@@ -6229,12 +6377,14 @@ export default class LibraryPlugin extends Plugin {
 		}
 		if (fm['Last Played']) addRow(tr('header.lastPlayed'), toStr(fm['Last Played']))
 
-		if (ratingIMDB) addRow('IMDb', ratingIMDB)
-		if (ratingRT) addRow(RATING_RT_ICON, ratingRT, ' ')
-		if (ratingRawg) addRow('RAWG', ratingRawg)
-		if (ratingMc) addRow('MC', ratingMc)
 		// a token is a favorite or not, a video liked or disliked on YouTube: neither is scored
-		if (!video && toStr(fm.Source) !== NFT_SOURCE) infoSide.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		if (!video && toStr(fm.Source) !== NFT_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		addScore('IMDb', ratingIMDB, 'is-imdb')
+		addScore(RATING_RT_ICON, ratingRT, 'is-rt')
+		addScore('RAWG', ratingRawg, 'is-rawg')
+		addScore('Metacritic', ratingMc, 'is-mc')
+		// platforms with their playtime and the trophy counts close the bar
+		if (badges.childElementCount > 0) scores.appendChild(badges)
 
 		if (progressPercent !== null) {
 			const progRow = createDiv()
@@ -6258,7 +6408,7 @@ export default class LibraryPlugin extends Plugin {
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
 		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
-			const toggle = infoSide.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
+			const toggle = top.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
 			toggle.addEventListener('click', (e) => {
@@ -6268,12 +6418,15 @@ export default class LibraryPlugin extends Plugin {
 			})
 		}
 
+		header.prepend(top)
 		header.appendChild(infoSide)
+		// the trailer, the stills and the description are the header's own cells: their place depends on its width (styles.css)
+		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(header, fm, name)
+		this.buildAbout(header, file)
 
 		const wrap = createDiv()
 		wrap.classList.add('note-header-wrap')
 		wrap.appendChild(header)
-		if (toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) this.buildMediaBlock(wrap, fm, name)
 		this.buildNftTokensBlock(wrap, fm, file, (resolvedMedia) => {
 			const currentMedia = imgSide.querySelector('img, video')
 			if (!currentMedia) {
@@ -6502,8 +6655,9 @@ export default class LibraryPlugin extends Plugin {
 			pending = localTitle(sourceId).catch(() => null)
 			this.localTitles.set(sourceId, pending)
 		}
-		const line = createDiv({ cls: 'note-header-local-title' })
-		titleEl.insertAdjacentElement('afterend', line)
+		// on the title's own line, after the name and before its buttons
+		const line = createSpan({ cls: 'note-header-local-title' })
+		titleEl.insertBefore(line, titleEl.querySelector('button'))
 		void pending.then(local => {
 			if (!local || this.unloaded || sameTitle(local, name)) line.remove()
 			else line.setText(local)
@@ -6998,7 +7152,38 @@ export default class LibraryPlugin extends Plugin {
 		wrap.appendChild(container)
 	}
 
-	private buildMediaBlock(wrap: HTMLElement, fm: Record<string, unknown>, name: string): void {
+	// The description from the note's own callout, a few lines of it; a click shows it whole.
+	private buildAbout(header: HTMLElement, file: TFile): void {
+		void this.app.vault.cachedRead(file).then((text) => {
+			const about = descriptionOf(text)
+			if (!about || !header.isConnected) return
+			// the pane then hides the callout it repeats (styles.css)
+			header.closest('.markdown-preview-view')?.addClass('library-has-about')
+			const box = header.createDiv({ cls: 'note-header-about', attr: { role: 'button', tabindex: '0', 'aria-expanded': 'false' } })
+			// a video's description is full of links: they stay links
+			about.split(/(https?:\/\/[^\s<>"]+)/).forEach((part, i) => {
+				const href = i % 2 === 1 ? safeUrl(part) : null
+				if (href) box.createEl('a', { cls: 'external-link', href, text: part, attr: { target: '_blank', rel: 'noopener noreferrer' } })
+				else box.appendText(part)
+			})
+			const toggle = (event: Event): void => {
+				// a link is followed, a selection being made is not a click
+				if ((event.target as HTMLElement).closest('a')) return
+				if (!activeWindow.getSelection()?.isCollapsed) return
+				const open = !box.hasClass('is-open')
+				box.toggleClass('is-open', open)
+				box.setAttr('aria-expanded', open ? 'true' : 'false')
+			}
+			box.addEventListener('click', toggle)
+			box.addEventListener('keydown', (event) => {
+				if (event.key !== 'Enter' && event.key !== ' ') return
+				event.preventDefault()
+				toggle(event)
+			})
+		}, () => undefined)
+	}
+
+	private buildMediaBlock(header: HTMLElement, fm: Record<string, unknown>, name: string): void {
 		// a video note plays the video itself
 		const trailer = toStr(fm.Trailer).trim() || (toStr(fm.Source) === YOUTUBE_SOURCE ? toStr(fm.URL).trim() : '')
 		const gallery = toStrArray(fm.Gallery)
@@ -7006,17 +7191,15 @@ export default class LibraryPlugin extends Plugin {
 			.filter((value): value is string => value !== null)
 		if (!trailer && gallery.length === 0) return
 
-		const media = createDiv()
-		media.classList.add('note-header-media')
-
 		if (trailer) {
 			const embed = toEmbed(trailer)
 			const href = safeUrl(trailer)
 			if (embed) {
-				media.appendChild(createEmbedPlayer(embed, tr('header.trailer')))
+				header.appendChild(createEmbedPlayer(embed, tr('header.trailer')))
+				header.addClass('has-trailer')
 			} else if (href) {
 				const row = createDiv()
-				row.classList.add('note-header-row')
+				row.classList.add('note-header-row', 'note-header-trailer-link')
 				const link = createEl('a')
 				link.href = href
 				link.setText(tr('header.watchTrailer'))
@@ -7024,7 +7207,7 @@ export default class LibraryPlugin extends Plugin {
 				link.setAttribute('target', '_blank')
 				link.setAttribute('rel', 'noopener noreferrer')
 				row.appendChild(link)
-				media.appendChild(row)
+				header.appendChild(row)
 			}
 		}
 
@@ -7055,10 +7238,8 @@ export default class LibraryPlugin extends Plugin {
 				})
 				strip.appendChild(link)
 			}
-			media.appendChild(strip)
+			header.appendChild(strip)
 		}
-
-		wrap.appendChild(media)
 	}
 
 	// which list a note tracks: seasons of episodes, or a book's chapters
@@ -7303,7 +7484,6 @@ export default class LibraryPlugin extends Plugin {
 	// My Rating out of 10 as five stars: each half is a point. The same rating again clears it.
 	private ratingStars(file: TFile, value: number): HTMLElement {
 		const row = createDiv({ cls: 'note-header-stars', attr: { role: 'group', 'aria-label': tr('header.myRating') } })
-		row.createSpan({ cls: 'note-header-stars-label', text: tr('header.myRating') })
 		const stars = row.createSpan({ cls: 'note-header-stars-row' })
 		const text = row.createSpan({ cls: 'note-header-stars-value' })
 		const show = (points: number): void => {
@@ -7525,6 +7705,7 @@ export default class LibraryPlugin extends Plugin {
 		if (typeof this.settings.skipFields !== 'string') this.settings.skipFields = ''
 		if (!this.settings.psnTokens || typeof this.settings.psnTokens !== 'object') this.settings.psnTokens = null
 		if (!this.settings.enrichMarks || typeof this.settings.enrichMarks !== 'object') this.settings.enrichMarks = {}
+		if (!this.settings.aboutMarks || typeof this.settings.aboutMarks !== 'object') this.settings.aboutMarks = {}
 		// categories earlier builds kept out of statistics: showTop, stats.rating, showRated
 		const unrated = new Set<string>()
 		for (const cat of this.settings.categories) {

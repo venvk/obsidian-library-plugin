@@ -14,11 +14,11 @@ Anime results come from all three sites at once, MyAnimeList's first. A title tw
 
 ## Descriptions
 
-A note gets what its title is about as a folded **Description** callout at the end of its text. It comes from the source the note came from: Cinemeta or TMDB for movies and series, MyAnimeList or AniList for anime and manga, Steam or RAWG for games, Open Library or Google Books for books, Comic Vine for comics. Titles found only in Wikidata, music and collectibles have none.
+A note gets what its title is about as a folded **Description** callout at the end of its text. It comes from the source the note came from: Cinemeta or TMDB for movies and series, MyAnimeList or AniList for anime and manga, Steam or RAWG for games, Open Library or Google Books for books, Comic Vine for comics. A game no source describes (one known only by a console's id, or while RAWG is out of reach) is looked up on Wikipedia by its name. Music and collectibles have none.
 
 With Obsidian in a language other than English, Library looks for the text in that language first: Steam's and TMDB's own translations, then the opening of the title's Wikipedia article. When neither has it, the source's English text is used. A title whose source has no description gets the Wikipedia opening too.
 
-It is written once: edit it or fold it open, and Library leaves it alone. Delete it and the next refresh brings it back; to keep it out for good, add `Description` to [[Skip properties|Templates-and-skipped-properties]]. Notes made before 2.6.5 get theirs in the background after the update.
+The note's Refresh button fetches it again in Obsidian's current language, unless you edited it. Otherwise it is written once: edit it or fold it open, and Library leaves it alone. Delete it and the next refresh brings it back; to keep it out for good, add `Description` to [[Skip properties|Templates-and-skipped-properties]]. Notes made before 2.6.5 get theirs in the background after the update.
 
 ## Collections
 

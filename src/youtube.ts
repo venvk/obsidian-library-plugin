@@ -348,10 +348,26 @@ function descriptionTitles(): Set<string> {
 	return new Set(Object.values(I18N).map(block => block['header.description']).filter((title): title is string => !!title))
 }
 
+// true for the title of a description callout, in any language
+export function isDescriptionTitle(title: string): boolean {
+	return descriptionTitles().has(title.trim())
+}
+
 // true when the note already holds a description callout, yours or an edited one
 export function hasDescription(text: string): boolean {
 	const titles = descriptionTitles()
 	return text.split('\n').some(line => isDescriptionHead(line, titles))
+}
+
+// The text of the note's description callout, without the quote marks; '' when there is none.
+export function descriptionOf(text: string): string {
+	const titles = descriptionTitles()
+	const lines = text.split('\n')
+	const at = lines.findIndex(line => isDescriptionHead(line, titles))
+	if (at < 0) return ''
+	const body: string[] = []
+	for (let i = at + 1; i < lines.length && (lines[i] ?? '').startsWith('>'); i++) body.push((lines[i] ?? '').replace(/^> ?/, ''))
+	return body.join('\n').trim()
 }
 
 // The note's text with the description callout in place of any it had: one written under

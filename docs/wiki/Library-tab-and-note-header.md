@@ -2,6 +2,8 @@
 
 Open it with the library icon in the ribbon or the `Open Library` command. From top to bottom it shows the statistics panel, then the sections in the order you set in Settings > Library > Categories: one per category, with Soon and Up next among them. While they are on, Soon and Up next are listed there like categories, and you can drag them anywhere in the list, or move them with arrows on a phone. By default Soon comes first and Up next last.
 
+The search button in the tab's header, or the `Search your library` command, finds a note by its title, creator, source id or NFT contract. It searches a second after you stop typing, as soon as you finish a word with a space, or on Enter. Results come in groups by category, ten notes each with the count of all matches in the heading; a click on a heading folds its group, and the folds are remembered.
+
 The buttons in the tab's header add a title (+), search your whole library, run every import now (Update), build the [[library map|Library-blocks-and-map]], and open the plugin's settings.
 
 ### A section
@@ -51,6 +53,18 @@ Soon lists the next episodes of the series and anime you are watching, with thei
 
 A library note shows a header above its text: the cover, creator, cast, years, seasons, the next episode's air date, genres, awards from Wikidata, runtime, last played, ratings, your score, and your progress. The header is drawn on screen; the text of the note stays as you wrote it.
 
+The header arranges itself by the width of the note's pane, not of the window, so a split pane narrows it. With Readable line length on, the text stays a narrow column and the header still takes the pane's width, up to 1500 px:
+
+- wide, from about 1000 px: the title, your score and the source ratings in a bar across the top, then the cover, the trailer and the details side by side, then the stills, the description and the rest;
+- a medium pane: the cover on the left, the title, ratings and details on the right, the trailer below at full width;
+- narrow, such as a phone: one column in the order cover, title and ratings, details, description, trailer, stills.
+
+The description is the first lines of the note's Description callout; click it to read it whole. In reading view the callout is then not shown a second time; it stays in the note and in the editor. Links in it stay links.
+
+A note without a trailer (a book, most games and anime) has its description and its stills under the details, beside the cover. A book's own text is read at the header's width, and its recommendations come after that text. The stills and the recommendations sit in the middle when they are shorter than the header.
+
+The source ratings are plates in the source's colour (IMDb, Rotten Tomatoes, RAWG, Metacritic), next to your stars, the platform badges and the trophy counts. A title in your language follows the original one on the same line.
+
 Your score is set with five stars in the header. Each half star is one point out of 10, written to `My Rating`; click your current score again to clear it.
 
 Awards come from Wikidata for albums, movies, series, anime and games. Library finds the title by the IMDb, Wikidata or Steam id in its note, or an album by its title and artist. A long list shows the first six; point at it to see the rest.
@@ -64,6 +78,7 @@ Depending on the note it also has:
 - the seasons and episodes, the chapters, or an album's tracks, to tick and rate; episodes that haven't aired yet show their air date; see [[Progress and statistics|Progress-and-statistics]];
 - for a PlayStation game, the trophies you earned, and for a Steam game, the achievements you unlocked, each with the date and the share of players who have it. They load when you open the note, once per session, while the account is connected;
 - for a YouTube video, the video itself, the like and dislike buttons, the channel's link and Subscribe button, the publish date, the views, and the rewatches; see [[YouTube]].
+- a Refresh button at the top right, the same as the `Refresh metadata for current note` command: it asks the source again for the fields the note lacks, and looks up the description, the awards, the title in your language and the recommendations anew. A description you edited is left alone; one Library wrote is replaced, for example after you change Obsidian's language. The note's modified time does not change;
 - a "Choose a cover" button at the top right: it shows covers from every source of the category and, for a book, from its other editions, each with its size in pixels; click one, or paste an image link.
 - the title in your language under the original title, from Wikidata, when Obsidian is not in English and a translated title exists.
 

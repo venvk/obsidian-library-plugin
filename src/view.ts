@@ -1009,7 +1009,8 @@ export class LibraryView extends ItemView {
 	private plugin: LibraryPlugin
 	private renderTimer: number | null = null
 	// Paths shown last render: a note ceasing to be one must still trigger the render that drops it.
-	private shown = new Set<string>()
+	// each shown note with its properties as drawn: a change to the note's text alone redraws nothing
+	private shown = new Map<string, string>()
 
 	private r: LibraryRenderer
 
@@ -1034,9 +1035,9 @@ export class LibraryView extends ItemView {
 	async onOpen(): Promise<void> {
 		// Only library notes redraw: any other note fires `changed` every few seconds.
 		this.registerEvent(this.app.metadataCache.on('changed', (file) => {
-			if (this.shown.has(file.path) || this.isLibraryNote(this.app.metadataCache.getFileCache(file)?.frontmatter)) {
-				this.scheduleRender()
-			}
+			const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+			const drawn = this.shown.get(file.path)
+			if (drawn !== undefined ? drawn !== JSON.stringify(fm ?? null) : this.isLibraryNote(fm)) this.scheduleRender()
 		}))
 		this.registerEvent(this.app.vault.on('delete', (file) => {
 			if (this.shown.has(file.path)) this.scheduleRender()
@@ -1068,7 +1069,11 @@ export class LibraryView extends ItemView {
 
 	private scheduleRender(): void {
 		if (this.renderTimer) window.clearTimeout(this.renderTimer)
-		this.renderTimer = window.setTimeout(() => this.render(), 300)
+		this.renderTimer = window.setTimeout(() => {
+			// an open menu is not redrawn from under the cursor: the redraw waits until a choice closes it
+			if (this.contentEl.querySelector('.library-sort-menu.open')) this.scheduleRender()
+			else this.render()
+		}, 300)
 	}
 
 	private isLibraryNote(fm: Record<string, unknown> | undefined): boolean {
@@ -1099,7 +1104,7 @@ export class LibraryView extends ItemView {
 		}))
 		this.shown.clear()
 		for (const { cards } of sections) {
-			for (const card of cards) this.shown.add(card.file.path)
+			for (const card of cards) this.shown.set(card.file.path, JSON.stringify(card.fm))
 		}
 
 		if (sections.length === 0) {

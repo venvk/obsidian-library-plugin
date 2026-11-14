@@ -44577,6 +44577,8 @@ export interface ILibrarySettings {
 	statsCollapsed: boolean
 	stats: IStatsSettings
 	enrichMarks: Record<string, string>
+	// a hash of each description the plugin wrote, by Source ID: one edited since is left alone
+	aboutMarks: Record<string, string>
 }
 
 export const DEFAULT_SETTINGS: ILibrarySettings = {
@@ -44673,5 +44675,6 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 			{ kind: 'property', key: 'Cast' }
 		]
 	},
-	enrichMarks: {}
+	enrichMarks: {},
+	aboutMarks: {}
 }

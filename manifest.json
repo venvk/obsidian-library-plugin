@@ -1,7 +1,7 @@
 {
 	"id": "library",
 	"name": "Library",
-	"version": "2.6.5",
+	"version": "2.7.0",
 	"minAppVersion": "1.8.7",
 	"description": "Keep movies, series, anime, books and audiobooks, games, comics, music and NFTs as notes in a gallery of covers. Search fills in the details, and AniList, MyAnimeList, Kitsu, IMDb, Trakt, Netflix, PlayStation, Steam and Nintendo sync your lists.",
 	"author": "venvk",
