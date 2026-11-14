@@ -58,6 +58,7 @@ Connect an account in the plugin settings. Your lists arrive as notes, and anime
 - <img src="assets/connectors/imdb.svg" width="18" height="18" alt=""> **IMDb**: ratings, episode ratings and watchlist; scores and new watchlist titles go back
 - <img src="assets/connectors/netflix.svg" width="18" height="18" alt=""> **Netflix**: viewing history and thumbs, anime into the anime category; scores go back as thumbs, unticked episodes leave the history, and series you haven't started go to My List
 - <img src="assets/connectors/youtube.svg" width="18" height="18" alt=""> **YouTube**: one note per video, in the Video category, with the time you spent, rewatches, publish date, views, likes and estimated dislikes, and the description; like, dislike and subscribe from the note; the last 7 days first, then one older month a day back to the start of the history; Shorts are left out
+- **Apple Music**: the albums in your library arrive in the Music category, matched to Deezer by their barcode. Sign in on Apple's page once; desktop only.
 - <img src="assets/connectors/trakt.svg" width="18" height="18" alt=""> **Trakt**: watch history, ratings and watchlist; scores, ticked and unticked episodes and new watchlist titles go back
 - <img src="assets/connectors/playstation.svg" width="18" height="18" alt=""> **PlayStation**: played games, playtime and trophies
 - <img src="assets/connectors/steam.svg" width="18" height="18" alt=""> **Steam**: library, playtime and achievements
@@ -142,6 +143,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `www.imdb.com`, `api.graphql.imdb.com` | IMDb connector | Sign-in; ratings and watchlist are read, scores and new titles are sent, removals of deleted notes |
 | `www.netflix.com` | Netflix connector | Sign-in; viewing activity and thumbs are read, scores are sent as thumbs; unticked or deleted titles are hidden from the history, unstarted series go to My List |
 | `accounts.google.com`, `www.youtube.com` | YouTube connector | Sign-in; the watch history is read (the last 7 days, then one older month a day) with each video's length and watched share; per video, its description, publish date, your like and whether you're subscribed; the like and subscribe buttons in a note send them back |
+| `music.apple.com`, `amp-api.music.apple.com`, `idmsa.apple.com`, `is1-ssl.mzstatic.com` | Apple Music connector | Sign-in on Apple's page; the albums in your library are read in a hidden window by Apple's own web player |
 | `returnyoutubedislikeapi.com` | YouTube connector: like and estimated dislike counts, as YouTube shows no dislikes | Video id |
 | `eth.blockscout.com`, `optimism.blockscout.com`, `base.blockscout.com`, `arbitrum.blockscout.com`, `polygon.blockscout.com`, `gnosis.blockscout.com`, `celo.blockscout.com`, `zksync.blockscout.com`, `scroll.blockscout.com`, `explorer.inkonchain.com`, `soneium.blockscout.com`, `unichain.blockscout.com`, `explorer.mode.network`, `arbitrum-nova.blockscout.com`, `shapescan.xyz`, `robinhoodchain.blockscout.com`, `tonapi.io`, `api-mainnet.magiceden.dev`, `api.nearblocks.io`, `api.fastnear.com`, `rpc.mainnet.near.org` | NFT connector | Your wallet addresses |
 | `api.etherscan.io`, `bsc-dataseed.binance.org`, `rpc.mainnet.taiko.xyz` | NFT connector on BNB Chain, Polygon and Taiko, with an Etherscan key | Wallet address, key; token contract and id |
@@ -155,7 +157,7 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `tonviewer.com`, `solscan.io`, `bscscan.com`, `taikoscan.io`, `nearblocks.io`, `tzkt.io`, `www.audible.com`, `snowtrace.io`, `blastexplorer.io`, `mantlescan.xyz`, `bobascan.com`, `explorer.hemi.xyz`, `chiliscan.com` | Links in NFT notes, opened only when you click them | Nothing until you click |
 | `api.trakt.tv`, `auth.trakt.tv` | Trakt connector | Sign-in code; history, ratings and watchlist are read, scores, watched and unwatched episodes, watchlist titles and removals of deleted notes are sent |
 | `id.twitch.tv`, `api.igdb.com` | Game trailers, with Twitch keys | Twitch id and secret, game |
-| `api.deezer.com`, `cdn-images.dzcdn.net` | Music search, covers, tracks, similar albums | Album or artist |
+| `api.deezer.com`, `cdn-images.dzcdn.net` | Music search, covers, tracks, similar albums; an Apple Music album by its barcode | Album or artist, barcode |
 | `graphql.anilist.co`, `anilist.co`, `s4.anilist.co`, streaming services' image hosts | Anime, manga, air dates, sync | Title or ids; token, progress, status, score |
 | `myanimelist.net`, `api.myanimelist.net`, `api-cdn.myanimelist.net` | Anime and manga search, sign-in, import, sync | Search text; token, progress, status, score |
 | `kitsu.io`, `kitsu.app` | Anime search, sign-in, import, sync | Search text; token, progress, status, score |

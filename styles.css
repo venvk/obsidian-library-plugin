@@ -2309,7 +2309,8 @@ sort trigger, the chosen one in the accent colour. */
 	color: #ffffff;
 }
 
-.library-platform-row-icon.is-itunes {
+.library-platform-row-icon.is-itunes,
+.library-platform-row-icon.is-applemusic {
 	background-color: #fa233b;
 	color: #ffffff;
 }
