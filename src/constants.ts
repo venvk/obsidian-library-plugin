@@ -44579,6 +44579,8 @@ export interface ILibrarySettings {
 	enrichMarks: Record<string, string>
 	// a hash of each description the plugin wrote, by Source ID: one edited since is left alone
 	aboutMarks: Record<string, string>
+	// Obsidian's language when marks did not yet carry one (`hash|lang`)
+	aboutLang: string
 }
 
 export const DEFAULT_SETTINGS: ILibrarySettings = {
@@ -44676,5 +44678,6 @@ export const DEFAULT_SETTINGS: ILibrarySettings = {
 		]
 	},
 	enrichMarks: {},
-	aboutMarks: {}
+	aboutMarks: {},
+	aboutLang: ''
 }

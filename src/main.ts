@@ -2055,14 +2055,14 @@ export default class LibraryPlugin extends Plugin {
 			if (!renew) return false
 			// no mark: written before marks were kept, so the plugin's own
 			const mark = this.settings.aboutMarks[sourceId]
-			if (mark !== undefined && mark !== urlHash(current)) return false
+			if (mark !== undefined && mark.split('|')[0] !== urlHash(current)) return false
 		} else if (hasDescription(await this.app.vault.read(file))) return false
 		const own = plainText(fields.Description)
 		const about = (fields['Description Local'] === true ? own : plainText(await within(steamBlurb(sourceId), SEARCH_BUDGET_MS, '')))
 			|| plainText(await within(aboutTitle(sourceId, kind, !own, name), SEARCH_BUDGET_MS * 2, ''))
 			|| own
 		if (!about) return false
-		if (sourceId) this.settings.aboutMarks[sourceId] = urlHash(about)
+		if (sourceId) this.settings.aboutMarks[sourceId] = `${urlHash(about)}|${getLanguage()}`
 		if (about === current) return false
 		const callout = descriptionCallout(about)
 		let changed = false
@@ -2072,6 +2072,12 @@ export default class LibraryPlugin extends Plugin {
 			return next
 		}, { mtime: file.stat.mtime })
 		return changed
+	}
+
+	// written in another language than Obsidian's now: an opened note writes it again, one note at a time
+	private aboutStale(sourceId: string): boolean {
+		const mark = this.settings.aboutMarks[sourceId]
+		return mark !== undefined && (mark.split('|')[1] || this.settings.aboutLang) !== getLanguage()
 	}
 
 	private youtubeDetails(fm: Record<string, unknown>, found: VideoDetails): void {
@@ -5694,6 +5700,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async tryRefresh(force: boolean): Promise<void> {
+		// a pressed Refresh waits out the one opening the note started, instead of doing nothing
+		for (let i = 0; force && this.isRefreshing && i < 40 && !this.unloaded; i++) await this.pause(250)
 		if (this.isRefreshing) return
 		const file = this.app.workspace.getActiveFile()
 		if (!(file instanceof TFile)) return
@@ -5744,13 +5752,13 @@ export default class LibraryPlugin extends Plugin {
 			}
 
 			const testCurrent: Record<string, unknown> = Object.assign({}, fm)
-			let changed = this.applyMetaPatch(testCurrent, meta)
+			let changed = this.applyMetaPatch(testCurrent, meta, force)
 			if (changed) {
 				await this.app.fileManager.processFrontMatter(file, (current) => {
-					this.applyMetaPatch(current as Record<string, unknown>, meta)
+					this.applyMetaPatch(current as Record<string, unknown>, meta, force)
 				}, { mtime: file.stat.mtime })
 			}
-			if (await this.describe(file, sourceId, category.contentType, meta.fields, name, force)) changed = true
+			if (await this.describe(file, sourceId, category.contentType, meta.fields, name, force || this.aboutStale(sourceId))) changed = true
 			if (force) {
 				void this.persistSettings()
 				this.refreshBanner()
@@ -5821,8 +5829,9 @@ export default class LibraryPlugin extends Plugin {
 		new Notice(tr('notice.refreshed', { name: toStr(meta.fields.Name) || file.basename }))
 	}
 
-	// refresh never overwrites a value already in the note: hand edits win
-	private applyMetaPatch(current: Record<string, unknown>, meta: NormalizedMetadata): boolean {
+	// refresh never overwrites a value already in the note: hand edits win. A pressed Refresh (fresh) is the
+	// exception for the gallery and trailer, which the source keeps current.
+	private applyMetaPatch(current: Record<string, unknown>, meta: NormalizedMetadata, fresh = false): boolean {
 		let changed = false
 		const fields: Record<string, unknown> = meta.fields
 		for (const [key, value] of Object.entries(fields)) {
@@ -5834,6 +5843,12 @@ export default class LibraryPlugin extends Plugin {
 				const merged = mergeSeasons(present, value)
 				if (areSeasonsChanged(present, merged)) {
 					current[target] = merged
+					changed = true
+				}
+			}
+			else if (fresh && (key === 'Gallery' || key === 'Trailer')) {
+				if (JSON.stringify(current[target]) !== JSON.stringify(value)) {
+					current[target] = value
 					changed = true
 				}
 			}
@@ -7706,6 +7721,7 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.psnTokens || typeof this.settings.psnTokens !== 'object') this.settings.psnTokens = null
 		if (!this.settings.enrichMarks || typeof this.settings.enrichMarks !== 'object') this.settings.enrichMarks = {}
 		if (!this.settings.aboutMarks || typeof this.settings.aboutMarks !== 'object') this.settings.aboutMarks = {}
+		if (typeof this.settings.aboutLang !== 'string' || !this.settings.aboutLang) this.settings.aboutLang = getLanguage()
 		// categories earlier builds kept out of statistics: showTop, stats.rating, showRated
 		const unrated = new Set<string>()
 		for (const cat of this.settings.categories) {

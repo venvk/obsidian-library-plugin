@@ -656,7 +656,8 @@ sort trigger, the chosen one in the accent colour. */
 		"player player"
 		"gallery gallery"
 		"about about";
-	column-gap: 28px;
+	/* row gaps stay 0: each cell keeps its own margin (below) */
+	gap: 0 28px;
 	align-items: start;
 	margin-bottom: 8px;
 	line-height: 1.4;
