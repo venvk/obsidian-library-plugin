@@ -29,6 +29,7 @@ import { AnimeAggregatorProvider } from './providers/animeAggregator'
 import { GameTrailerFinder } from './providers/gameTrailer'
 import { DeezerProvider } from './providers/deezer'
 import { COLLECTIBLE_SOURCE, CollectibleProvider, setCards, type SetCard } from './providers/collectibles'
+import { CERTIFICATE_SOURCE, CertificateProvider } from './providers/certificates'
 import { MissingModal } from './ui/missingModal'
 import { AnimeProvider } from './providers/anime'
 import { MalProvider } from './providers/mal'
@@ -403,6 +404,7 @@ export default class LibraryPlugin extends Plugin {
 		))
 		this.registry.register(new DeezerProvider())
 		this.registry.register(new CollectibleProvider(() => this.apiKey('numistaApiKey')))
+		this.registry.register(new CertificateProvider())
 		this.registry.register(new AnimeAggregatorProvider(new AnimeProvider(() => this.settings), new MalProvider(() => MAL_CLIENT_ID, () => this.settings), new KitsuProvider(() => this.settings)))
 		this.registry.register(new ComicsAggregatorProvider(
 			new ComicsProvider(() => this.apiKey('comicVineApiKey')),
@@ -948,14 +950,14 @@ export default class LibraryPlugin extends Plugin {
 			const category = await this.categoryFor(target)
 			const path = await this.uniqueNotePath(title, category.folder)
 			const file = await this.app.vault.create(path, await this.templateText(category))
-			const tracking = category.contentType === 'collectible' ? null : trackingOf(category.contentType)
+			const tracking = category.contentType === 'collectible' || category.contentType === 'certificate' ? null : trackingOf(category.contentType)
 			await this.app.fileManager.processFrontMatter(file, (fm) => {
 				Object.assign(fm, {
 					Type: category.typeValue,
 					Name: title,
-					'My Rating': null,
+					...(category.contentType === 'certificate' ? { Favorite: false } : { 'My Rating': null }),
 					...(tracking && tracking !== 'progress' ? { Complete: false } : {}),
-					...(tracking ? {} : { Count: 1 }),
+					...(category.contentType === 'collectible' ? { Count: 1 } : {}),
 					...(tracking && tracking !== 'watched' ? { Progress: '' } : {}),
 					Date: todayDmy(),
 				})
@@ -1015,16 +1017,18 @@ export default class LibraryPlugin extends Plugin {
 		const disambiguator = source === NFT_SOURCE ? (toStrArray(extra.Platforms)[0] || toStr(extra.Platforms) || undefined) : (toStr(meta.fields.Year) || undefined)
 		const path = await this.uniqueNotePath(title, category.folder, disambiguator)
 		const file = await this.app.vault.create(path, await this.templateText(category))
-		// series/anime/books track progress, movies a watched switch (Complete), others both
-		const tracking = category.contentType === 'collectible' ? null : trackingOf(category.contentType)
+		// series/anime/books track progress, movies a watched switch (Complete), others both; a card or a
+		// certificate is held, not watched
+		const tracking = category.contentType === 'collectible' || category.contentType === 'certificate' ? null : trackingOf(category.contentType)
 		await this.app.fileManager.processFrontMatter(file, (fm) => {
 			Object.assign(fm, {
 				Type: category.typeValue,
 				...(tracking && tracking !== 'watched' ? { Progress: meta.progressTotal ? `0/${String(meta.progressTotal)}` : '' } : {}),
-				'My Rating': null,
+				...(category.contentType === 'certificate' ? { Favorite: false } : { 'My Rating': null }),
 				...(tracking && tracking !== 'progress' ? { Complete: false } : {}),
-				...(tracking ? {} : { Count: 1 }),
-				Date: (source === NFT_SOURCE && (extra.Date || extra.Minted || extra.Acquired)) ? (extra.Date || extra.Minted || extra.Acquired) : (source === NFT_SOURCE ? '-' : todayDmy()),
+				...(category.contentType === 'collectible' ? { Count: 1 } : {}),
+				// a certificate's date is the day it was earned
+				Date: source === CERTIFICATE_SOURCE && meta.fields.Issued ? meta.fields.Issued : (source === NFT_SOURCE && (extra.Date || extra.Minted || extra.Acquired)) ? (extra.Date || extra.Minted || extra.Acquired) : (source === NFT_SOURCE ? '-' : todayDmy()),
 				Source: source,
 				'Source ID': sourceId,
 			}, extra)
@@ -1033,6 +1037,8 @@ export default class LibraryPlugin extends Plugin {
 		})
 		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
 		if (about && await this.describe(file, sourceId, category.contentType, meta.fields)) void this.persistSettings()
+		// a certificate's picture can be a signed link that soon expires (Skilljar): kept in the vault at once
+		if (source === CERTIFICATE_SOURCE) await this.localizeCover(file)
 		return file
 	}
 
@@ -6180,7 +6186,8 @@ export default class LibraryPlugin extends Plugin {
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
 		const video = toStr(fm.Source) === YOUTUBE_SOURCE
-		if (toStr(fm.Source) === NFT_SOURCE) {
+		// a token or a certificate is kept, not scored: a favorite star instead of a rating
+		if (toStr(fm.Source) === NFT_SOURCE || toStr(fm.Source) === CERTIFICATE_SOURCE) {
 			const on = fm.Favorite === true
 			const star = titleEl.createEl('button', { cls: `note-header-favorite${on ? ' is-on' : ''}`, attr: { 'aria-label': tr('header.favorite'), 'aria-pressed': on ? 'true' : 'false' } })
 			setIcon(star, 'star')
@@ -6261,7 +6268,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		const nft = toStr(fm.Source) === NFT_SOURCE
-		addNames(tr(nft ? 'header.collection' : kind === 'collectible' ? 'collection.illustrator' : 'header.creator'), creators)
+		addNames(tr(nft ? 'header.collection' : kind === 'collectible' ? 'collection.illustrator' : kind === 'certificate' ? 'header.issuer' : 'header.creator'), creators)
 		if (nft) {
 			const standard = toStr(fm.Standard)
 			if (standard) addRow(tr('header.standard'), standard)
@@ -6369,7 +6376,11 @@ export default class LibraryPlugin extends Plugin {
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
-		addNames(tr('header.genre'), toStrArray(fm.Genre))
+		addNames(tr(kind === 'certificate' ? 'header.skills' : 'header.genre'), toStrArray(fm.Genre))
+		if (kind === 'certificate') {
+			addRow(tr('header.issued'), toStr(fm.Issued))
+			addRow(tr('header.expires'), toStr(fm.Expires))
+		}
 		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
@@ -6393,7 +6404,7 @@ export default class LibraryPlugin extends Plugin {
 		if (fm['Last Played']) addRow(tr('header.lastPlayed'), toStr(fm['Last Played']))
 
 		// a token is a favorite or not, a video liked or disliked on YouTube: neither is scored
-		if (!video && toStr(fm.Source) !== NFT_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		if (!video && toStr(fm.Source) !== NFT_SOURCE && toStr(fm.Source) !== CERTIFICATE_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
 		addScore('IMDb', ratingIMDB, 'is-imdb')
 		addScore(RATING_RT_ICON, ratingRT, 'is-rt')
 		addScore('RAWG', ratingRawg, 'is-rawg')
@@ -6422,7 +6433,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
-		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
+		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && kind !== 'certificate' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
 			const toggle = top.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })

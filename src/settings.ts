@@ -1239,6 +1239,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 			["music", tr("settings.default.music") + " — Deezer"],
 			["anime", tr("settings.default.anime") + " — AniList, MyAnimeList"],
 			["collectible", tr("settings.default.collectible") + " — TCGdex, Scryfall, YGOPRODeck"],
+			["certificate", tr("settings.default.certificate") + " — Credly, Anthropic Academy, Open Badges"],
 			["manual", tr("settings.category.manual")],
 		];
 		for (const [value, label] of options) d.addOption(value, label);

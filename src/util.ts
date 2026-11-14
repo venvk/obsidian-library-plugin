@@ -346,7 +346,7 @@ export function shownProgress(fm: Record<string, unknown>, kind?: ContentType): 
 // A rated title counts as seen, ticked or not.
 // A collectible (an NFT, a card) is held, not watched or read: never started, never in progress.
 export function isCollectible(fm: Record<string, unknown>): boolean {
-	return fm.Source === 'nft' || fm.Type === 'NFT' || fm.Contract !== undefined || fm.Source === 'collectibles' || fm['Series ID'] !== undefined
+	return fm.Source === 'nft' || fm.Type === 'NFT' || fm.Contract !== undefined || fm.Source === 'collectibles' || fm.Source === 'certificates' || fm['Series ID'] !== undefined
 }
 
 // Detects raw public blockchain wallet addresses (EVM, Solana, TON, etc.)
@@ -608,6 +608,7 @@ export function inferContentType(typeValue: string): ContentType {
 		case 'Music': return 'music'
 		case 'Anime': return 'anime'
 		case 'Comic': return 'comic'
+		case 'Certificate': return 'certificate'
 		case 'Manual': return 'manual'
 		default: return 'movie'
 	}
