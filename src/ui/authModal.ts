@@ -23,6 +23,8 @@ export interface AuthModalOptions {
 	// Some sites keep the token in page storage instead of the redirect URL;
 	// poll this expression in the guest page and take a truthy result as the answer.
 	pageProbe?: string
+	// A sign-in that hops through another site's sign-in (Claude's) opens each popup in the sign-in window itself
+	popupsInPlace?: boolean
 }
 
 interface ElectronBrowserWindow {
@@ -110,6 +112,10 @@ export class AuthModal extends Modal {
 		// Popups for Google/Apple sign-ins share the partition so cookies carry over.
 		const openPopup = (targetUrl: string): void => {
 			if (!targetUrl) return
+			if (this.opts.popupsInPlace) {
+				navigateGuest(targetUrl)
+				return
+			}
 			if (this.activePopup && !this.activePopup.isDestroyed()) {
 				this.activePopup.loadURL(targetUrl)
 				return

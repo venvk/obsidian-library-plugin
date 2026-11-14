@@ -57,7 +57,7 @@ import { ShareModal, shareTargetFromFile } from './ui/shareModal'
 import { CoverModal } from './ui/coverModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
-import { SITE_NAME, SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
+import { SITE_NAME, SITE_SIGN_IN, ACADEMY_SIGNED_IN, academyBadges, academyVerifyUrl, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
 import { earnedAchievements, gameAchievements, ownedGames, playtimeHours, steamAuthUrl, steamIdFromRedirect, steamLanguage, steamSession, type SteamSession } from './steamLibrary'
 import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRedirect, deleteMalEntry, exchangeCode, fetchMalList, isExpired, makeVerifier, mangaIds, malAuthUrl, malClientPair, malIdsFor, malMangaIdsFor, malStatus, pushMalEntry, refreshTokens, type MalEntry } from './malSync'
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
@@ -1766,7 +1766,7 @@ export default class LibraryPlugin extends Plugin {
 					resolve(answer !== null)
 					if (answer) void this.watchImport(site, true)
 				})()
-			}, { title: tr(`site.${site}.loginTitle`), extract: (url) => signedInAt(site, url) }).open()
+			}, { title: tr(`site.${site}.loginTitle`), extract: (url) => signedInAt(site, url), pageProbe: site === 'claudeacademy' ? ACADEMY_SIGNED_IN : undefined, popupsInPlace: site === 'claudeacademy' }).open()
 		})
 	}
 
@@ -1780,6 +1780,7 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		if (site === 'youtube') return this.youtubeImport(loud)
+		if (site === 'claudeacademy') return this.academyImport(loud)
 		this.watchImporting = true
 		const name = SITE_NAME[site]
 		try {
@@ -1852,6 +1853,56 @@ export default class LibraryPlugin extends Plugin {
 	// YouTube: a note per video, Shorts left out, in the Video category made on first use. The first import brings
 	// the last 7 days, later ones every day since the last; a video seen again on a later day counts a rewatch.
 	// Then one older month a day, back to the start of the history, so years of it never land at once.
+	// Claude Academy's completion badges into Certificates: the list from "Your journey", then for each new
+	// badge its public check, which the note is made and later refreshed from without a sign-in
+	private async academyImport(loud: boolean): Promise<void> {
+		this.watchImporting = true
+		const site = SITE_NAME.claudeacademy
+		try {
+			if (loud) new Notice(tr('notice.site.importing', { site }))
+			const badges = await academyBadges()
+			if (badges === 'signed-out') {
+				this.settings.watchSites.claudeacademy.connected = false
+				await this.saveSettings()
+				new Notice(tr('notice.site.signedOut', { site }))
+				return
+			}
+			if (!badges) { if (loud) new Notice(tr('notice.site.failed', { site })); return }
+			const provider = this.registry.forType('certificate')
+			if (!provider) return
+			const known = new Set<string>()
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (!fm || toStr(fm.Source) !== CERTIFICATE_SOURCE) continue
+				if (toStr(fm['Academy Badge ID'])) known.add(toStr(fm['Academy Badge ID']))
+				known.add(toStr(fm['Source ID']))
+			}
+			let category: ICategory | undefined
+			let created = 0
+			for (const id of badges) {
+				if (this.unloaded) return
+				if (known.has(id)) continue
+				try {
+					const url = await academyVerifyUrl(id)
+					const meta = url && !known.has(url) ? await provider.fetch(url, 'certificate') : null
+					if (!meta) continue
+					category = category ?? await this.categoryFor('certificate')
+					await this.newNote(category, CERTIFICATE_SOURCE, url, toStr(meta.fields.Name) || id, meta, { 'Academy Badge ID': id })
+					known.add(id)
+					known.add(url)
+					created++
+				} catch (e) {
+					console.error('Library: Claude Academy import error', id, e)
+				}
+			}
+			this.settings.watchSites.claudeacademy.lastImport = Date.now()
+			await this.saveSettings()
+			if (loud || created > 0) new Notice(tr('notice.site.imported', { site, created, updated: 0 }))
+		} finally {
+			this.watchImporting = false
+		}
+	}
+
 	private async youtubeImport(loud: boolean): Promise<void> {
 		this.watchImporting = true
 		try {
@@ -3934,7 +3985,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.watchSyncIfDue('claudeacademy')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first: a third-party signing service carries the requests
@@ -5075,7 +5126,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
 		if (this.settings.epicTokens) await this.epicImport(true)
 		if (this.settings.eaTokens) await this.eaImport(true)
-		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
+		for (const site of ['imdb', 'netflix', 'youtube', 'claudeacademy'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
 		if (walletPairs(this.settings.nftWallets).length > 0) await this.nftImport(true)
 	}
 
@@ -7720,8 +7771,8 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
 		if (!this.settings.netflixEcho || typeof this.settings.netflixEcho !== 'object') this.settings.netflixEcho = {}
 		const sites = (this.settings.watchSites && typeof this.settings.watchSites === 'object' ? this.settings.watchSites : {}) as Partial<ILibrarySettings['watchSites']>
-		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 } }
-		for (const site of ['imdb', 'netflix', 'youtube'] as const) {
+		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 }, claudeacademy: { connected: false, lastImport: 0 } }
+		for (const site of ['imdb', 'netflix', 'youtube', 'claudeacademy'] as const) {
 			const saved = sites[site]
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}

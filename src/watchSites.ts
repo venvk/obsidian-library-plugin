@@ -1,11 +1,11 @@
-// IMDb, Netflix and YouTube have no API for a member's own history: the sign-in window
+// IMDb, Netflix, YouTube and Claude Academy have no open API for a member's own history: the sign-in window
 // keeps the session, and a hidden webview on its partition reads the site as
 // the user did. Settings keep the connected flag, last-import time and score echoes.
 const PARTITION = 'persist:library-auth'
 
-export type WatchSite = 'imdb' | 'netflix' | 'youtube'
+export type WatchSite = 'imdb' | 'netflix' | 'youtube' | 'claudeacademy'
 
-export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube' }
+export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube', claudeacademy: 'Claude Academy' }
 
 export interface ImdbEcho {
 	r: number
@@ -17,7 +17,12 @@ export const SITE_SIGN_IN: Record<WatchSite, string> = {
 	imdb: 'https://www.imdb.com/registration/signin',
 	netflix: 'https://www.netflix.com/login',
 	youtube: 'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fhistory',
+	// the page's own "Sign in with Claude" goes through claude.ai and back; ACADEMY_SIGNED_IN says when it is done
+	claudeacademy: 'https://academy.claude.com/login?returnTo=%2F',
 }
+
+// Claude Academy signs in inside the page: done once it is back on the academy with no Sign in link left
+export const ACADEMY_SIGNED_IN = "location.hostname === 'academy.claude.com' && !/^\\/(login|oauth)/.test(location.pathname) && document.readyState === 'complete' && !document.querySelector('a[href*=\"/login\"]') && !!document.querySelector('header, nav') ? 'ok' : ''"
 
 // Signed in once the window lands on the site's home: the sign-in pages live on
 // the same hosts, so the path decides.
@@ -32,6 +37,7 @@ export function signedInAt(site: WatchSite, url: string): string | null {
 	if (site === 'imdb') return parsed.hostname === 'www.imdb.com' && (parsed.pathname === '/' || parsed.pathname === '') ? 'ok' : null
 	// Google signs in on its own host, then hands the window to YouTube
 	if (site === 'youtube') return parsed.hostname === 'www.youtube.com' ? 'ok' : null
+	if (site === 'claudeacademy') return null
 	return parsed.hostname === 'www.netflix.com' && /^\/(browse|[a-z]{2}(-[a-z]{2})?\/browse)(\/|$)/.test(parsed.pathname) ? 'ok' : null
 }
 
@@ -224,6 +230,38 @@ export interface WatchHistory {
 }
 
 // Rated titles, rated episodes and the watchlist; null when the site does not answer.
+// The ids of the completion badges on the academy's "Your journey" page
+export async function academyBadges(): Promise<string[] | 'signed-out' | null> {
+	const code = `(async () => {
+		for (let i = 0; i < 40; i++) {
+			if (document.querySelector('a[href*="/login"]')) return 'signed-out'
+			if (document.querySelector('a[href^="/badges/"]')) break
+			await new Promise(r => setTimeout(r, 250))
+		}
+		await new Promise(r => setTimeout(r, 500))
+		return JSON.stringify([...new Set([...document.querySelectorAll('a[href^="/badges/"]')].map(a => a.getAttribute('href').split('/')[2]).filter(Boolean))])
+	})().catch(() => '')`
+	const answer = await readPage('https://academy.claude.com/dashboard', code, 60000, "document.readyState === 'complete' && !!document.querySelector('header, nav')")
+	if (answer === 'signed-out') return answer
+	try {
+		const ids = JSON.parse(answer) as unknown
+		return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : null
+	} catch {
+		return null
+	}
+}
+
+// A badge's public check, read from its "Add to LinkedIn" link: '' when the page does not give it
+export async function academyVerifyUrl(badgeId: string): Promise<string> {
+	const code = `(() => {
+		const link = document.querySelector('a[href*="linkedin.com/profile/add"]')
+		return link ? new URL(link.href).searchParams.get('certUrl') || '' : ''
+	})()`
+	const ready = `!!document.querySelector('a[href*="linkedin.com/profile/add"]') || !!document.querySelector('a[href*="/login"]')`
+	const url = await readPage(`https://academy.claude.com/badges/${encodeURIComponent(badgeId)}`, code, 30000, ready)
+	return /^https:\/\/academy\.claude\.com\/verify\/[^/?#]+$/.test(url) ? url : ''
+}
+
 export async function imdbHistory(): Promise<WatchHistory | 'signed-out' | null> {
 	const answer = await readPage('https://www.imdb.com/', IMDB_READ, 120000, "!!document.getElementById('__NEXT_DATA__')")
 	if (answer === 'signed-out') return answer

@@ -3,13 +3,15 @@ import { dmyOf } from '../util'
 import type { ContentProvider, ContentType, NormalizedMetadata, SearchResult } from './types'
 
 // Certificates and badges added by the link to their public page, no key: a Credly badge reads its Open
-// Badges record, an Anthropic Academy (Skilljar) certificate its verify page, any other page its own
-// Open Badges link or share tags. The Source ID is the page's URL.
+// Badges record, a Claude Academy badge the academy's public check, an Anthropic Academy (Skilljar)
+// certificate its verify page, any other page its own Open Badges link or share tags. The Source ID is the page's URL.
 
 export const CERTIFICATE_SOURCE = 'certificates'
 
 const CREDLY_BADGE = /^https:\/\/(?:www\.)?credly\.com\/badges\/([0-9a-f-]{36})/i
 const SKILLJAR = /^https:\/\/verify\.skilljar\.com\/c\/[a-z0-9]+/i
+const ACADEMY = /^https:\/\/academy\.claude\.com\/verify\/([^/?#]+)/i
+const ACADEMY_VERIFY = 'https://academy.claude.com/api/anthropic.academy_public.api.v1alpha.AcademyPublicService/VerifyCertificate'
 
 export interface Certificate {
 	name: string
@@ -98,7 +100,22 @@ function skilljar(html: string, url: string): Certificate | null {
 	}
 }
 
+// The academy's own check of a badge's code: an unknown code answers an empty object
+async function academyBadge(code: string, url: string): Promise<Certificate | null> {
+	try {
+		const resp = await requestUrl({ url: ACADEMY_VERIFY, method: 'POST', throw: false, contentType: 'application/json', headers: { 'Connect-Protocol-Version': '1' }, body: JSON.stringify({ verifyCode: decodeURIComponent(code) }) })
+		const found = resp.status === 200 ? resp.json as { valid?: boolean; certificateName?: string; courseTitle?: string; issuedAt?: string } : null
+		const name = found?.valid ? found.courseTitle || found.certificateName : ''
+		if (!name) return null
+		return { name, issuer: 'Claude Academy', issued: dateOf(found?.issuedAt ?? ''), expires: '', image: '', skills: [], description: '', url }
+	} catch {
+		return null
+	}
+}
+
 export async function readCertificate(url: string): Promise<Certificate | null> {
+	const academy = ACADEMY.exec(url)
+	if (academy) return academyBadge(academy[1] ?? '', url)
 	const credly = CREDLY_BADGE.exec(url)
 	if (credly) return openBadge(`https://www.credly.com/api/v1/obi/v2/badge_assertions/${credly[1] ?? ''}`, url)
 	const html = await getText(url)
