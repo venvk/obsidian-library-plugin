@@ -1182,7 +1182,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-view .library-section {
-	margin-bottom: 36px;
+	margin-bottom: 22px;
 }
 
 .library-view .library-section h2 {
@@ -1194,7 +1194,7 @@ sort trigger, the chosen one in the accent colour. */
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px;
-	margin-bottom: 14px;
+	margin-bottom: 8px;
 }
 
 .library-filter-trigger {
@@ -3416,4 +3416,456 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-activity-day.is-level-4 {
 	background: var(--interactive-accent);
+}
+
+/* Things instead of covers (the toggle in a category's header). Books stand as spines on a shelf; comics are
+   thin paperbacks with their page edges showing; films, series and anime sit in disc cases; albums in clear CD
+   cases; certificates hang framed. The shelf draws its own spines; the rest dress the usual cover. */
+.library-view .library-grid.is-shelf {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0 4px;
+	padding: 0 16px;
+	/* a board under every row, the same as under the disc shelves */
+	background-image: linear-gradient(to bottom, transparent 282px, color-mix(in srgb, var(--text-faint) 55%, transparent) 282px, color-mix(in srgb, var(--text-faint) 30%, transparent) 296px, transparent 296px);
+	background-size: 100% 300px;
+}
+
+.library-view .library-grid.is-shelf.collapsed {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+}
+
+.library-spine-slot {
+	height: 282px;
+	margin-bottom: 18px;
+	display: flex;
+	align-items: flex-end;
+	flex-shrink: 0;
+}
+
+.library-spine {
+	position: relative;
+	width: var(--spine-width, 34px);
+	height: var(--spine-height, 190px);
+	background: linear-gradient(to right, rgba(0, 0, 0, 0.35), rgba(255, 255, 255, 0.08) 30%, rgba(0, 0, 0, 0.12) 75%, rgba(0, 0, 0, 0.4)), var(--spine-color, #3b4252);
+	border-radius: 2px 2px 1px 1px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+	color: #f4efe6;
+	writing-mode: vertical-rl;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 0;
+	overflow: hidden;
+	cursor: pointer;
+	transition: transform 0.15s;
+}
+
+.library-spine:hover,
+.library-spine:focus-visible {
+	transform: translateY(-8px);
+}
+
+.library-spine-title {
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.15;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-height: 72%;
+}
+
+.library-spine-author {
+	font-size: 12px;
+	opacity: 0.75;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-height: 26%;
+}
+
+/* read to the end: a ribbon bookmark out of the top */
+.library-spine-ribbon {
+	position: absolute;
+	top: 0;
+	right: 22%;
+	width: 7px;
+	height: 26px;
+	background: var(--color-red);
+	clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+}
+
+.library-grid.is-paper .card-image {
+	border-radius: 2px 4px 4px 2px;
+	box-shadow: 2px 0 0 #e8e4da, 4px 1px 0 #d9d4c8, 6px 2px 0 #cbc5b7, 6px 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+.library-grid.is-paper .card-image img {
+	border-radius: 2px 4px 4px 2px;
+}
+
+/* the fold of a paperback's spine */
+.library-grid.is-paper .card-image::after {
+	content: "";
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 7%;
+	background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(255, 255, 255, 0.12) 60%, transparent);
+	pointer-events: none;
+}
+
+.library-grid.is-case .library-card,
+.library-grid.is-jewel .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.library-grid.is-case .card-info,
+.library-grid.is-jewel .card-info {
+	display: none;
+}
+
+/* Discs stand on shelves as big as the book shelf: a row of cases on a board */
+.library-view .library-grid.is-case,
+.library-view .library-grid.is-jewel {
+	grid-template-columns: repeat(auto-fill, 180px);
+	grid-auto-rows: 282px;
+	gap: 18px 18px;
+	align-items: end;
+	/* room under the last row for its board */
+	padding: 0 16px 18px;
+	background-image: linear-gradient(to bottom, transparent 282px, color-mix(in srgb, var(--text-faint) 55%, transparent) 282px, color-mix(in srgb, var(--text-faint) 30%, transparent) 296px, transparent 296px);
+	background-size: 100% 300px;
+}
+
+.library-view .library-grid.is-jewel {
+	grid-template-columns: repeat(auto-fill, 260px);
+}
+
+.library-view .library-grid.is-case.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 180px;
+}
+
+.library-view .library-grid.is-jewel.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 260px;
+}
+
+/* A disc case standing turned slightly toward you: the sleeve under clear film in a black plastic shell (a border,
+   so the marks on the picture stay on the picture), its spine turned back from the left edge with the title on it,
+   and its shadow on the shelf */
+.library-grid.is-case .library-card {
+	perspective: 1800px;
+}
+
+.library-grid.is-case .card-image {
+	flex-direction: column;
+	justify-content: flex-start;
+	border: 4px solid #111113;
+	border-left-width: 6px;
+	border-radius: 5px 7px 7px 5px;
+	background: #111113;
+	/* a slight turn about the bottom edge, so the case still stands on the shelf */
+	transform: rotateY(12deg);
+	transform-origin: center bottom;
+	transform-style: preserve-3d;
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.library-grid.is-case .card-image::before {
+	content: attr(data-title);
+	position: absolute;
+	top: -4px;
+	bottom: -4px;
+	left: -6px;
+	width: 44px;
+	box-sizing: border-box;
+	padding: 10px 0;
+	border-radius: 4px 0 0 4px;
+	transform-origin: left center;
+	transform: rotateY(90deg);
+	writing-mode: vertical-rl;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: #e9e9ec;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: 0.04em;
+	background:
+		repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+		linear-gradient(to right, #0b0b0d, #202125 30%, #2e2f35 55%, #17181b);
+	pointer-events: none;
+}
+
+.library-grid.is-case .card-image::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background:
+		linear-gradient(to right, rgba(0, 0, 0, 0.55) 0, rgba(0, 0, 0, 0.12) 3%, rgba(255, 255, 255, 0.16) 4.2%, rgba(255, 255, 255, 0) 8%),
+		linear-gradient(108deg, rgba(255, 255, 255, 0.28) 0, rgba(255, 255, 255, 0.08) 18%, rgba(255, 255, 255, 0) 34%, rgba(255, 255, 255, 0) 64%, rgba(255, 255, 255, 0.09) 76%, rgba(255, 255, 255, 0) 88%),
+		linear-gradient(to bottom, rgba(255, 255, 255, 0.16) 0, rgba(255, 255, 255, 0) 3%, rgba(0, 0, 0, 0) 92%, rgba(0, 0, 0, 0.35) 100%);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), inset 0 0 16px rgba(0, 0, 0, 0.4);
+	pointer-events: none;
+}
+
+/* the case's shadow on the shelf */
+.library-grid.is-case .library-card::after {
+	content: "";
+	position: absolute;
+	left: 4%;
+	right: 2%;
+	bottom: -3px;
+	height: 8px;
+	border-radius: 50%;
+	background: rgba(0, 0, 0, 0.55);
+	filter: blur(6px);
+	z-index: -1;
+}
+
+/* the case is as tall as its sleeve needs: the whole cover shows, nothing cut off its edges */
+.library-grid.is-case .card-image,
+.library-grid.is-jewel .card-image {
+	aspect-ratio: auto;
+}
+
+.library-grid.is-case .card-image img {
+	flex: none;
+	width: auto;
+	height: auto;
+	/* as wide as the shelf's slot, as tall as its row: a narrow poster makes a narrower case, never a cut one */
+	max-width: 161px;
+	max-height: 266px;
+	object-fit: fill;
+	border-radius: 0;
+}
+
+.library-grid.is-case .card-image {
+	width: auto;
+	align-self: center;
+	/* the picture keeps its own width instead of being stretched across the case */
+	align-items: flex-start;
+}
+
+.library-grid.is-jewel .card-image img {
+	width: 100%;
+	height: auto;
+	aspect-ratio: 1 / 1;
+}
+
+.library-grid.is-jewel .card-image img {
+	border-radius: 1px;
+}
+
+/* the sleeve behind the case's plastic catches the light */
+.library-grid.is-jewel .card-image::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(115deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04) 35%, transparent 55%);
+	pointer-events: none;
+}
+
+.library-grid.is-jewel .card-image {
+	border: 3px solid rgba(220, 225, 230, 0.55);
+	border-left-width: 12px;
+	border-radius: 3px;
+	background: #0e0f11;
+	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* the jewel case's hinge, ridged */
+.library-grid.is-jewel .card-image::before {
+	content: "";
+	position: absolute;
+	top: -3px;
+	bottom: -3px;
+	left: -12px;
+	width: 12px;
+	background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0 2px, rgba(160, 165, 170, 0.35) 2px 4px);
+	pointer-events: none;
+}
+
+/* a framed certificate hangs on its own: no card behind it, no text under it; its name shows on hover */
+.library-grid.is-frame .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.library-grid.is-frame .card-info {
+	display: none;
+}
+
+.library-grid.is-frame .card-image {
+	border: 6px solid #141414;
+	background: #f4f1ea;
+	padding: 9%;
+	box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+	border-radius: 1px;
+}
+
+.library-grid.is-frame .card-image img {
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.25);
+	border-radius: 0;
+	object-fit: contain;
+}
+
+/* Videos on 3.5" floppy disks: a drawn disk (grained plastic, the brushed shutter over the brown disk, the recessed
+   label well) with the video's picture on a paper label in the well; they stand on a shelf like the discs */
+.library-view .library-grid.is-floppy {
+	grid-template-columns: repeat(auto-fill, 180px);
+	grid-auto-rows: 190px;
+	gap: 18px 18px;
+	align-items: end;
+	/* room under the last row for its board */
+	padding: 0 16px 18px;
+	background-image: linear-gradient(to bottom, transparent 190px, color-mix(in srgb, var(--text-faint) 55%, transparent) 190px, color-mix(in srgb, var(--text-faint) 30%, transparent) 204px, transparent 204px);
+	background-size: 100% 208px;
+}
+
+.library-view .library-grid.is-floppy.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 180px;
+}
+
+.library-grid.is-floppy .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.library-grid.is-floppy .card-info {
+	display: none;
+}
+
+.library-grid.is-floppy .card-image {
+	aspect-ratio: 90 / 94;
+	background: url("data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 90 94%22%3E%3Cdefs%3E%3ClinearGradient id=%22body%22 x1=%220%22 y1=%220%22 x2=%220.35%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%233a3b40%22/%3E%3Cstop offset=%220.55%22 stop-color=%22%2326272b%22/%3E%3Cstop offset=%221%22 stop-color=%22%231b1c1f%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22metal%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E%3Cstop offset=%220%22 stop-color=%22%239aa0a8%22/%3E%3Cstop offset=%220.12%22 stop-color=%22%23d9dde2%22/%3E%3Cstop offset=%220.35%22 stop-color=%22%23b3b8bf%22/%3E%3Cstop offset=%220.55%22 stop-color=%22%23eceef1%22/%3E%3Cstop offset=%220.8%22 stop-color=%22%23aeb3ba%22/%3E%3Cstop offset=%221%22 stop-color=%22%238c929a%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22metalShade%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23fff%22 stop-opacity=%220.35%22/%3E%3Cstop offset=%220.5%22 stop-color=%22%23fff%22 stop-opacity=%220%22/%3E%3Cstop offset=%221%22 stop-color=%22%23000%22 stop-opacity=%220.25%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22disk%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%236b4a33%22/%3E%3Cstop offset=%220.5%22 stop-color=%22%233d2a1d%22/%3E%3Cstop offset=%221%22 stop-color=%22%232a1d14%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22recess%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22%23121214%22/%3E%3Cstop offset=%221%22 stop-color=%22%231e1f22%22/%3E%3C/linearGradient%3E%3Cpattern id=%22brush%22 width=%221.2%22 height=%2294%22 patternUnits=%22userSpaceOnUse%22%3E%3Crect width=%220.5%22 height=%2294%22 fill=%22%23fff%22 opacity=%220.12%22/%3E%3C/pattern%3E%3Cfilter id=%22grain%22 x=%220%22 y=%220%22 width=%22100%25%22 height=%22100%25%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%221.8%22 numOctaves=%222%22 seed=%224%22/%3E%3CfeColorMatrix values=%220 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.07 0%22/%3E%3CfeComposite in2=%22SourceGraphic%22 operator=%22in%22/%3E%3C/filter%3E%3C/defs%3E%3Cpath d=%22M3 0H84.5L90 5.5V91a3 3 0 0 1-3 3H3a3 3 0 0 1-3-3V3a3 3 0 0 1 3-3Z%22 fill=%22url(%23body)%22/%3E%3Cpath d=%22M3 0H84.5L90 5.5V91a3 3 0 0 1-3 3H3a3 3 0 0 1-3-3V3a3 3 0 0 1 3-3Z%22 fill=%22%23000%22 filter=%22url(%23grain)%22/%3E%3Cpath d=%22M3 0.5H84.3L89.5 5.7V91a2.5 2.5 0 0 1-2.5 2.5H3A2.5 2.5 0 0 1 0.5 91V3A2.5 2.5 0 0 1 3 0.5Z%22 fill=%22none%22 stroke=%22%23fff%22 stroke-opacity=%220.1%22 stroke-width=%220.6%22/%3E%3Crect x=%2217%22 y=%220%22 width=%2256%22 height=%2231%22 rx=%221%22 fill=%22%23141518%22/%3E%3Crect x=%2220%22 y=%220%22 width=%2250%22 height=%2229.5%22 rx=%220.8%22 fill=%22url(%23metal)%22/%3E%3Crect x=%2220%22 y=%220%22 width=%2250%22 height=%2229.5%22 rx=%220.8%22 fill=%22url(%23brush)%22/%3E%3Crect x=%2220%22 y=%220%22 width=%2250%22 height=%2229.5%22 rx=%220.8%22 fill=%22url(%23metalShade)%22/%3E%3Crect x=%2249%22 y=%224%22 width=%2212%22 height=%2220.5%22 rx=%220.8%22 fill=%22url(%23disk)%22/%3E%3Crect x=%2249%22 y=%224%22 width=%2212%22 height=%2220.5%22 rx=%220.8%22 fill=%22none%22 stroke=%22%23000%22 stroke-opacity=%220.45%22 stroke-width=%220.6%22/%3E%3Cpath d=%22M20 29.5H70%22 stroke=%22%23000%22 stroke-opacity=%220.35%22 stroke-width=%220.6%22/%3E%3Cpath d=%22M6 6.5l3 3 3-3z%22 fill=%22%23fff%22 fill-opacity=%220.14%22/%3E%3Crect x=%226%22 y=%2236.5%22 width=%2278%22 height=%2254.5%22 rx=%222.5%22 fill=%22url(%23recess)%22/%3E%3Crect x=%226%22 y=%2236.5%22 width=%2278%22 height=%2254.5%22 rx=%222.5%22 fill=%22none%22 stroke=%22%23000%22 stroke-opacity=%220.6%22 stroke-width=%220.8%22/%3E%3Cpath d=%22M8.5 91h73%22 stroke=%22%23fff%22 stroke-opacity=%220.08%22 stroke-width=%220.6%22/%3E%3Crect x=%223%22 y=%2285%22 width=%224%22 height=%225.5%22 rx=%220.6%22 fill=%22%230c0c0e%22/%3E%3C/svg%3E") center / 100% 100% no-repeat;
+	filter: drop-shadow(0 8px 9px rgba(0, 0, 0, 0.55)) drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+
+/* the paper label in the well: the picture, and two ruled lines to write on */
+.library-grid.is-floppy .card-surface {
+	position: absolute;
+	left: 8.6%;
+	right: 8.6%;
+	top: 40.6%;
+	padding: 3.5% 3.5% 18px;
+	border-radius: 2px;
+	background: #f1ede3 linear-gradient(to bottom, transparent calc(100% - 15px), #c9c3b4 calc(100% - 15px), #c9c3b4 calc(100% - 14px), transparent calc(100% - 14px), transparent calc(100% - 8px), #c9c3b4 calc(100% - 8px), #c9c3b4 calc(100% - 7px), transparent calc(100% - 7px));
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.45), inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+
+.library-grid.is-floppy .card-surface img {
+	display: block;
+	width: 100%;
+	height: auto;
+	aspect-ratio: 16 / 9;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.library-grid.is-floppy .card-surface .card-platforms {
+	left: calc(3.5% + 4px);
+	top: calc(3.5% + 4px);
+	bottom: auto;
+}
+
+.library-grid.is-frame .card-surface {
+	position: relative;
+	width: 100%;
+	height: 100%;
+}
+
+.library-grid.is-frame .card-platforms {
+	left: 4px;
+	bottom: 4px;
+}
+
+/* NFTs as holographic collectible cards: the whole picture in an iridescent rim, no text on it (the name shows on
+   hover); a foil glint crosses it on hover */
+.library-view .library-grid.is-holo {
+	grid-template-columns: repeat(auto-fill, 180px);
+	align-items: end;
+	gap: 18px 18px;
+	padding: 4px 16px 18px;
+}
+
+.library-view .library-grid.is-holo.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 180px;
+}
+
+.library-grid.is-holo .library-card {
+	position: relative;
+	padding: 7px;
+	border-radius: 14px;
+	overflow: hidden;
+	background: conic-gradient(from 200deg at 50% 50%, #ff6ec4, #7873f5, #38bdf8, #4ade80, #facc15, #fb923c, #ff6ec4);
+	box-shadow: 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.4);
+	transition: transform 0.2s ease-out;
+}
+
+.library-grid.is-holo .library-card:hover {
+	transform: translateY(-6px);
+}
+
+.library-grid.is-holo .card-image {
+	aspect-ratio: auto;
+	border-radius: 9px;
+	overflow: hidden;
+	background: #0d0d14;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.library-grid.is-holo .card-image img {
+	height: auto;
+	object-fit: fill;
+	border-radius: 0;
+}
+
+.library-grid.is-holo .card-info {
+	display: none;
+}
+
+.library-grid.is-holo .card-image.is-empty img {
+	position: absolute;
+	inset: 0;
+	height: 100%;
+	object-fit: contain;
+}
+
+.library-grid.is-holo .card-image.is-empty {
+	aspect-ratio: 1 / 1;
+	overflow: hidden;
+	align-items: center;
+	justify-content: center;
+	font-size: 40px;
+}
+
+/* the foil glint, moved with transform only */
+.library-grid.is-holo .library-card::after {
+	content: "";
+	position: absolute;
+	inset: -40% -60%;
+	background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.28) 48%, rgba(255, 255, 255, 0.06) 54%, transparent 62%);
+	transform: translateX(-35%);
+	opacity: 0;
+	transition: transform 0.7s ease-out, opacity 0.3s;
+	pointer-events: none;
+}
+
+.library-grid.is-holo .library-card:hover::after {
+	transform: translateX(35%);
+	opacity: 1;
 }

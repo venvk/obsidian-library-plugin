@@ -1,7 +1,7 @@
 import { App, ItemView, WorkspaceLeaf, TFile, getLanguage, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
-import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, isNftCategory } from './categories'
+import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory } from './categories'
 import { cleanCollectionName, looksLikeSpam, viaPinata } from './nft'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
@@ -131,6 +131,27 @@ function filterCards(cards: CardData[], chosen: Record<string, string>): CardDat
 	return cards.filter(card => active.every(f => facetValues(card, f.facet).indexOf(chosen[f.facet] as string) >= 0))
 }
 
+// How a kind looks shown as things: books as spines on a shelf, comics as thin paperbacks, films and series
+// and games in disc cases, albums in CD cases, certificates framed
+const OBJECT_LOOK: Partial<Record<ContentType, string>> = {
+	book: 'shelf', comic: 'paper', movie: 'case', series: 'case', anime: 'case', game: 'case', music: 'jewel', certificate: 'frame',
+}
+
+// the look a category takes shown as things; videos (a manual category of their own) go on floppy disks, NFTs
+// become holographic collectible cards
+function lookOf(category: ICategory): string | undefined {
+	if (isNftCategory(category)) return 'holo'
+	if (category.contentType === 'manual') return category.typeValue === VIDEO_CATEGORY ? 'floppy' : undefined
+	return OBJECT_LOOK[category.contentType]
+}
+
+// a colour of its own for a title with no cover to take one from, the same every time
+function spineColor(text: string): string {
+	let h = 0
+	for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0
+	return `hsl(${String(h % 360)}, ${String(28 + (h >> 9) % 20)}%, ${String(26 + (h >> 14) % 14)}%)`
+}
+
 interface SectionSpec {
 	title: string
 	sortId: string
@@ -147,6 +168,9 @@ const UP_NEXT_SORT = '@upNext'
 
 // Cards, statistics and the Soon list, shared by the library tab and the note blocks.
 export class LibraryRenderer {
+	// each cover's colour for its book's spine, worked out once: a redraw would otherwise flash every spine
+	private spineColors = new Map<string, string>()
+
 	constructor(private app: App, private plugin: LibraryPlugin) {}
 
 	collectCards(category: ICategory): CardData[] {
@@ -832,7 +856,63 @@ export class LibraryRenderer {
 		if (Number(fm.Views) > 0) part(info.createDiv({ cls: 'card-year card-votes' }), 'eye', 'Views')
 	}
 
+	// A book on the shelf: its spine, as wide as the book is long, with the title and author down it
+	private renderSpine(grid: HTMLElement, card: CardData): void {
+		const { file, fm } = card
+		const slot = grid.createDiv({ cls: 'library-spine-slot' })
+		const spine = slot.createDiv({ cls: 'library-spine', attr: { role: 'button', tabindex: '0', 'aria-label': card.name } })
+		const pages = Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1] ?? fm.Pages) || 0
+		const seed = spineColor(card.name)
+		spine.style.setProperty('--spine-width', `${String(Math.max(38, Math.min(92, pages ? 26 + pages / 11 : 50)))}px`)
+		spine.style.setProperty('--spine-height', `${String(232 + (card.name.length * 7) % 46)}px`)
+		spine.style.setProperty('--spine-color', seed)
+		const creator = toStrArray(fm.Creator).map(linkLabel)[0] ?? ''
+		spine.createSpan({ cls: 'library-spine-title', text: card.name })
+		if (creator) spine.createSpan({ cls: 'library-spine-author', text: creator })
+		if (isFinished(fm, card.kind)) spine.createSpan({ cls: 'library-spine-ribbon' })
+		const open = (): void => { void this.app.workspace.getLeaf(false).openFile(file) }
+		spine.addEventListener('click', open)
+		spine.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault()
+				open()
+			}
+		})
+		// the cover's own colour where its picture lets itself be read; a picture from another site may not
+		const src = coverSrc(this.app, card.cover || coverValue(fm, this.plugin.settings.coverProperty))
+		if (!src) return
+		const known = this.spineColors.get(src)
+		if (known !== undefined) {
+			if (known) spine.style.setProperty('--spine-color', known)
+			return
+		}
+		this.spineColors.set(src, '')
+		const img = new Image()
+		img.crossOrigin = 'anonymous'
+		img.addEventListener('load', () => {
+			try {
+				const canvas = createEl('canvas', { attr: { width: '8', height: '8' } })
+				const ctx = canvas.getContext('2d')
+				if (!ctx) return
+				ctx.drawImage(img, 0, 0, 8, 8)
+				const px = ctx.getImageData(0, 0, 8, 8).data
+				let r = 0, g = 0, b = 0
+				for (let i = 0; i < px.length; i += 4) { r += px[i] ?? 0; g += px[i + 1] ?? 0; b += px[i + 2] ?? 0 }
+				const n = px.length / 4
+				// darkened a little, so the light lettering stays readable
+				const color = `rgb(${String(Math.round(r / n * 0.7))}, ${String(Math.round(g / n * 0.7))}, ${String(Math.round(b / n * 0.7))})`
+				this.spineColors.set(src, color)
+				spine.style.setProperty('--spine-color', color)
+			} catch { /* a picture from a site that does not allow reading it keeps the made-up colour */ }
+		})
+		img.src = src
+	}
+
 	renderCard(grid: HTMLElement, card: CardData): void {
+		if (grid.hasClass('is-shelf')) {
+			this.renderSpine(grid, card)
+			return
+		}
 		const { file, fm } = card
 		// album covers and NFTs are square, video thumbnails wide
 		const cardEl = grid.createDiv({
@@ -843,6 +923,8 @@ export class LibraryRenderer {
 				'aria-label': card.name
 			}
 		})
+		// a framed certificate or a boxed disc shows no text: its name comes up on hover
+		if (grid.hasClass('is-frame') || grid.hasClass('is-case') || grid.hasClass('is-jewel') || grid.hasClass('is-floppy') || grid.hasClass('is-holo')) setTooltip(cardEl, card.name, { placement: 'top' })
 		cardEl.addEventListener('click', () => {
 			void this.app.workspace.getLeaf(false).openFile(file)
 		})
@@ -854,7 +936,12 @@ export class LibraryRenderer {
 		})
 
 		const cover = card.cover || coverValue(fm, this.plugin.settings.coverProperty)
-		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
+		const shell = cardEl.createDiv({ cls: 'card-image' })
+		// a floppy's label and a framed certificate are a picture inside the object: the picture and the marks on it
+		// (platform, progress) go on that, not on the plastic or the mat around it
+		const imgDiv = grid.hasClass('is-floppy') || grid.hasClass('is-frame') ? shell.createDiv({ cls: 'card-surface' }) : shell
+		// a disc case's spine carries the title
+		if (grid.hasClass('is-case')) shell.setAttr('data-title', card.name)
 		let cardCover = coverSrc(this.app, cover)
 		if (cardCover && isCollectible(fm)) cardCover = viaPinata(cardCover)
 		// some NFT pictures are short videos
@@ -862,6 +949,11 @@ export class LibraryRenderer {
 			imgDiv.createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } })
 		} else if (cardCover) {
 			const img = imgDiv.createEl('img', { attr: { src: cardCover, alt: card.name, loading: 'lazy', decoding: 'async' } })
+			// a holographic card holds a square until its picture arrives, and keeps it if the picture never does
+			if (grid.hasClass('is-holo')) {
+				shell.addClass('is-empty')
+				img.addEventListener('load', () => shell.removeClass('is-empty'), { once: true })
+			}
 			// a token's "image" can be a video at an address with no extension or on an alternate IPFS gateway
 			img.addEventListener('error', () => {
 				if (!isCollectible(fm)) return
@@ -889,6 +981,8 @@ export class LibraryRenderer {
 				: type === 'manual' ? '📝'
 				: '🎬'
 			imgDiv.createSpan({ text: emoji })
+			// no picture: a holographic card keeps a picture's square instead of shrinking to a strip
+			shell.addClass('is-empty')
 		}
 		renderPlatforms(imgDiv, fm, 'card-platforms')
 		if (card.kind === 'book' || card.kind === 'comic') {
@@ -1009,6 +1103,10 @@ export class LibraryRenderer {
 export class LibraryView extends ItemView {
 	private plugin: LibraryPlugin
 	private renderTimer: number | null = null
+	// how long the last redraw took
+	private renderMs = 0
+	// how many times in a row a card under the pointer has put a redraw off
+	private renderHeld = 0
 	// Paths shown last render: a note ceasing to be one must still trigger the render that drops it.
 	// each shown note with its properties as drawn: a change to the note's text alone redraws nothing
 	private shown = new Map<string, string>()
@@ -1068,13 +1166,22 @@ export class LibraryView extends ItemView {
 		this.render()
 	}
 
+	// A redraw rebuilds every card: in a big library it takes a second or more, so while notes keep changing
+	// (an import, the metadata walk) it comes no more often than a few times its own length, and never under
+	// the cursor.
 	private scheduleRender(): void {
-		if (this.renderTimer) window.clearTimeout(this.renderTimer)
+		// one redraw already waiting takes this change too: changes that keep coming do not push it back forever
+		if (this.renderTimer) return
 		this.renderTimer = window.setTimeout(() => {
-			// an open menu is not redrawn from under the cursor: the redraw waits until a choice closes it
-			if (this.contentEl.querySelector('.library-sort-menu.open')) this.scheduleRender()
+			this.renderTimer = null
+			// an open menu is not redrawn from under the cursor: the redraw waits until a choice closes it. A card
+			// under the pointer holds it off a few times only: on a touch screen the last card tapped stays
+			// "hovered" for good.
+			const hovered = this.renderHeld < 3 && !!this.contentEl.querySelector('.library-card:hover, .library-spine:hover')
+			if (hovered) this.renderHeld++
+			if (hovered || this.contentEl.querySelector('.library-sort-menu.open')) this.scheduleRender()
 			else this.render()
-		}, 300)
+		}, Math.max(300, this.renderMs * 4))
 	}
 
 	private isLibraryNote(fm: Record<string, unknown> | undefined): boolean {
@@ -1094,6 +1201,9 @@ export class LibraryView extends ItemView {
 	}
 
 	render(): void {
+		const started = performance.now()
+		window.setTimeout(() => { this.renderMs = performance.now() - started }, 0)
+		this.renderHeld = 0
 		const root = this.contentEl
 		const scrollTop = root.scrollTop
 		root.empty()
@@ -1374,7 +1484,8 @@ export class LibraryView extends ItemView {
 
 		// certificates and badges are landscape pictures: wider columns, so a card shows the whole of one
 		const badges = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
-		const grid = section.createDiv({ cls: badges ? 'library-grid is-landscape' : 'library-grid' })
+		const look = spec.category && this.plugin.settings.shelfView ? lookOf(spec.category) : undefined
+		const grid = section.createDiv({ cls: `library-grid${badges ? ' is-landscape' : ''}${look ? ` is-objects is-${look}` : ''}` })
 
 		// tokens have no year, rating or progress: their own keys instead
 		const collectibles = cards.length > 0 && cards.every(card => isCollectible(card.fm))

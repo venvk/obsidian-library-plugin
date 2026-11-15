@@ -35,6 +35,7 @@
 - A Certificates category keeps your certificates and badges: paste the link to one into the search and the note gets its name, who issued it, the dates it was issued and expires, its skills and its picture. Credly badges, Claude Academy badges, Google for Education certificates (Exceed LMS), Anthropic Academy certificates and any page that publishes an Open Badge work, no key.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
 - One command draws your library as a canvas, with posters grouped around the actors and creators they share, and each category has its own, grouped by creator, actor and genre.
+- Turn on Shelf view in the settings and the library becomes a room: books stand as spines on a shelf, films, series and games in disc cases, albums in CD cases, comics as paperbacks, videos on floppy disks, certificates framed on the wall and NFTs as holographic cards.
 - Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
 - Genres, creators and actors are links. Open Horror and a canvas shows the covers of every horror title in your library, by category.
 - Searching a book also finds its audiobooks, with their length. Listening time counts in the statistics. Paste an ISBN, with or without hyphens, to find that exact edition, with its own cover and page count.
