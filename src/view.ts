@@ -949,6 +949,11 @@ export class LibraryRenderer {
 			imgDiv.createEl('video', { attr: { src: cardCover, muted: '', loop: '', autoplay: '', playsinline: '', 'aria-label': card.name } })
 		} else if (cardCover) {
 			const img = imgDiv.createEl('img', { attr: { src: cardCover, alt: card.name, loading: 'lazy', decoding: 'async' } })
+			// a holographic card holds a square until its picture arrives, and keeps it if the picture never does
+			if (grid.hasClass('is-holo')) {
+				shell.addClass('is-empty')
+				img.addEventListener('load', () => shell.removeClass('is-empty'), { once: true })
+			}
 			// a token's "image" can be a video at an address with no extension or on an alternate IPFS gateway
 			img.addEventListener('error', () => {
 				if (!isCollectible(fm)) return
@@ -976,6 +981,8 @@ export class LibraryRenderer {
 				: type === 'manual' ? '📝'
 				: '🎬'
 			imgDiv.createSpan({ text: emoji })
+			// no picture: a holographic card keeps a picture's square instead of shrinking to a strip
+			shell.addClass('is-empty')
 		}
 		renderPlatforms(imgDiv, fm, 'card-platforms')
 		if (card.kind === 'book' || card.kind === 'comic') {

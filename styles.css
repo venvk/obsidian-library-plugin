@@ -3828,6 +3828,21 @@ sort trigger, the chosen one in the accent colour. */
 	display: none;
 }
 
+.library-grid.is-holo .card-image.is-empty img {
+	position: absolute;
+	inset: 0;
+	height: 100%;
+	object-fit: contain;
+}
+
+.library-grid.is-holo .card-image.is-empty {
+	aspect-ratio: 1 / 1;
+	overflow: hidden;
+	align-items: center;
+	justify-content: center;
+	font-size: 40px;
+}
+
 /* the foil glint, moved with transform only */
 .library-grid.is-holo .library-card::after {
 	content: "";
