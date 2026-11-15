@@ -1,7 +1,7 @@
 import { App, ItemView, WorkspaceLeaf, TFile, getLanguage, setIcon, setTooltip } from 'obsidian'
 import { airingLabel, type Airing } from './airing'
 import type LibraryPlugin from './main'
-import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, isNftCategory } from './categories'
+import { categoryLabel, ownCreators, sectionOrder, NFT_CATEGORY, VIDEO_CATEGORY, isNftCategory } from './categories'
 import { cleanCollectionName, looksLikeSpam, viaPinata } from './nft'
 import { RATING_RT_ICON, type ICategory, type IStatsTop } from './constants'
 import type { ContentType } from './providers/types'
@@ -135,6 +135,12 @@ function filterCards(cards: CardData[], chosen: Record<string, string>): CardDat
 // and games in disc cases, albums in CD cases, certificates framed
 const OBJECT_LOOK: Partial<Record<ContentType, string>> = {
 	book: 'shelf', comic: 'paper', movie: 'case', series: 'case', anime: 'case', game: 'case', music: 'jewel', certificate: 'frame',
+}
+
+// the look a category takes shown as things; videos (a manual category of their own) go on floppy disks
+function lookOf(category: ICategory): string | undefined {
+	if (category.contentType === 'manual') return category.typeValue === VIDEO_CATEGORY ? 'floppy' : undefined
+	return OBJECT_LOOK[category.contentType]
 }
 
 // a colour of its own for a title with no cover to take one from, the same every time
@@ -916,7 +922,7 @@ export class LibraryRenderer {
 			}
 		})
 		// a framed certificate or a boxed disc shows no text: its name comes up on hover
-		if (grid.hasClass('is-frame') || grid.hasClass('is-case') || grid.hasClass('is-jewel')) setTooltip(cardEl, card.name, { placement: 'top' })
+		if (grid.hasClass('is-frame') || grid.hasClass('is-case') || grid.hasClass('is-jewel') || grid.hasClass('is-floppy')) setTooltip(cardEl, card.name, { placement: 'top' })
 		cardEl.addEventListener('click', () => {
 			void this.app.workspace.getLeaf(false).openFile(file)
 		})
@@ -1415,11 +1421,11 @@ export class LibraryView extends ItemView {
 
 		// covers or things: a shelf, disc cases, frames
 		const category = spec.category
-		if (category && OBJECT_LOOK[category.contentType]) {
+		if (category && lookOf(category)) {
 			const on = this.plugin.settings.objectViews.indexOf(category.typeValue) >= 0
 			const lookBtn = toolbar.createEl('button', { cls: `library-category-map-btn${on ? ' is-active' : ''}`, attr: { 'aria-label': tr('view.objects'), 'aria-pressed': on ? 'true' : 'false' } })
 			setTooltip(lookBtn, tr('view.objects'), { placement: 'top' })
-			setIcon(lookBtn, category.contentType === 'book' ? 'library' : category.contentType === 'certificate' ? 'frame' : category.contentType === 'comic' ? 'book-open' : 'disc')
+			setIcon(lookBtn, category.contentType === 'book' ? 'library' : category.contentType === 'certificate' ? 'frame' : category.contentType === 'comic' ? 'book-open' : category.contentType === 'manual' ? 'save' : 'disc')
 			lookBtn.addEventListener('click', (e) => {
 				e.stopPropagation()
 				const views = this.plugin.settings.objectViews
@@ -1472,7 +1478,7 @@ export class LibraryView extends ItemView {
 
 		// certificates and badges are landscape pictures: wider columns, so a card shows the whole of one
 		const badges = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
-		const look = spec.category && this.plugin.settings.objectViews.indexOf(spec.category.typeValue) >= 0 ? OBJECT_LOOK[spec.category.contentType] : undefined
+		const look = spec.category && this.plugin.settings.objectViews.indexOf(spec.category.typeValue) >= 0 ? lookOf(spec.category) : undefined
 		const grid = section.createDiv({ cls: `library-grid${badges ? ' is-landscape' : ''}${look ? ` is-objects is-${look}` : ''}` })
 
 		// tokens have no year, rating or progress: their own keys instead

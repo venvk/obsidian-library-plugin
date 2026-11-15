@@ -3656,3 +3656,81 @@ sort trigger, the chosen one in the accent colour. */
 	border-radius: 0;
 	object-fit: contain;
 }
+
+/* Videos on 3.5" floppy disks: a dark plastic shell with one corner cut, the metal shutter at the top, and the
+   video's picture on the paper label below; they stand on a shelf like the discs */
+.library-view .library-grid.is-floppy {
+	grid-template-columns: repeat(auto-fill, 200px);
+	grid-auto-rows: 220px;
+	gap: 26px 22px;
+	align-items: end;
+	padding: 0 16px;
+	background-image: linear-gradient(to bottom, transparent 220px, color-mix(in srgb, var(--text-faint) 55%, transparent) 220px, color-mix(in srgb, var(--text-faint) 30%, transparent) 236px, transparent 236px);
+	background-size: 100% 246px;
+}
+
+.library-view .library-grid.is-floppy.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 200px;
+}
+
+.library-grid.is-floppy .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.library-grid.is-floppy .card-info {
+	display: none;
+}
+
+.library-grid.is-floppy .card-image {
+	aspect-ratio: 1 / 1;
+	border-radius: 4px;
+	background: linear-gradient(160deg, #3a3d45, #24262c);
+	clip-path: polygon(0 0, 92% 0, 100% 8%, 100% 100%, 0 100%);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* the metal shutter with its slot */
+.library-grid.is-floppy .card-image::before {
+	content: "";
+	position: absolute;
+	top: 0;
+	left: 24%;
+	width: 52%;
+	height: 34%;
+	border-radius: 0 0 2px 2px;
+	background:
+		linear-gradient(to right, transparent 62%, #23252a 62%, #23252a 78%, transparent 78%) 0 18% / 100% 64% no-repeat,
+		linear-gradient(to bottom, #d9dce1, #a9adb5);
+	pointer-events: none;
+}
+
+/* the write-protect window */
+.library-grid.is-floppy .card-image::after {
+	content: "";
+	position: absolute;
+	left: 5%;
+	bottom: 5%;
+	width: 6%;
+	height: 7%;
+	background: #111214;
+	border-radius: 1px;
+	pointer-events: none;
+}
+
+/* the label: the video's picture on paper */
+.library-grid.is-floppy .card-image img {
+	position: absolute;
+	left: 12%;
+	right: 12%;
+	bottom: 6%;
+	width: 76%;
+	height: 52%;
+	object-fit: cover;
+	border: 4px solid #f3f0e8;
+	border-bottom-width: 10px;
+	border-radius: 2px;
+	box-sizing: border-box;
+}
