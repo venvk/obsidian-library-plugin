@@ -3555,11 +3555,11 @@ sort trigger, the chosen one in the accent colour. */
 	grid-auto-columns: 300px;
 }
 
-/* A disc case standing turned a little toward you: the sleeve under clear film in a black plastic shell (a border,
+/* A disc case standing turned slightly toward you: the sleeve under clear film in a black plastic shell (a border,
    so the marks on the picture stay on the picture), its spine turned back from the left edge with the title on it,
    and its shadow on the shelf */
 .library-grid.is-case .library-card {
-	perspective: 1100px;
+	perspective: 1800px;
 }
 
 .library-grid.is-case .card-image {
@@ -3569,7 +3569,9 @@ sort trigger, the chosen one in the accent colour. */
 	border-left-width: 6px;
 	border-radius: 5px 7px 7px 5px;
 	background: #111113;
-	transform: rotateY(30deg);
+	/* a slight turn about the bottom edge, so the case still stands on the shelf */
+	transform: rotateY(12deg);
+	transform-origin: center bottom;
 	transform-style: preserve-3d;
 	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.14);
 }
@@ -3580,7 +3582,7 @@ sort trigger, the chosen one in the accent colour. */
 	top: -4px;
 	bottom: -4px;
 	left: -6px;
-	width: 34px;
+	width: 44px;
 	box-sizing: border-box;
 	padding: 10px 0;
 	border-radius: 4px 0 0 4px;
@@ -3619,10 +3621,10 @@ sort trigger, the chosen one in the accent colour. */
 .library-grid.is-case .library-card::after {
 	content: "";
 	position: absolute;
-	left: 8%;
-	right: 4%;
-	bottom: -6px;
-	height: 10px;
+	left: 4%;
+	right: 2%;
+	bottom: -3px;
+	height: 8px;
 	border-radius: 50%;
 	background: rgba(0, 0, 0, 0.55);
 	filter: blur(6px);
