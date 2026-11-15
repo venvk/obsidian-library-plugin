@@ -288,11 +288,14 @@ async function photograph(url: string, code: string): Promise<{ answer: Record<s
 		let picture: ArrayBuffer | null = null
 		const id = guest.getWebContentsId?.()
 		const contents = id !== undefined ? win.require?.('electron').remote?.webContents?.fromId?.(id) : undefined
-		const shot = contents ? await wait(contents.capturePage(), 10000).catch(() => null) : null
-		if (shot && box.w && box.h && box.iw) {
+		// a frame taken before the page painted is one flat colour, which compresses to almost nothing: taken again
+		for (let attempt = 0; attempt < 4 && !picture && contents && box.w && box.h && box.iw; attempt++) {
+			if (attempt > 0) await new Promise(resolve => window.setTimeout(resolve, 1500))
+			const shot = await wait(contents.capturePage(), 10000).catch(() => null)
+			if (!shot) continue
 			const k = shot.getSize().width / box.iw
 			const png = shot.crop({ x: Math.round((box.x ?? 0) * k), y: Math.round((box.y ?? 0) * k), width: Math.round(box.w * k), height: Math.round(box.h * k) }).toPNG()
-			picture = png.byteLength > 0 ? png.slice().buffer : null
+			if (png.byteLength > 20000) picture = png.slice().buffer
 		}
 		return { answer, picture }
 	} catch {
@@ -315,6 +318,8 @@ const boxOf = (selector: string, extra = "{}"): string => `(async () => {
 				Promise.all(srcs.map(src => new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = src }))),
 				new Promise(r => setTimeout(r, 10000)),
 			])
+			// a badge comes in with an entrance animation: the picture is taken once it has settled
+			await Promise.race([Promise.all(document.getAnimations().map(a => a.finished.catch(() => null))), new Promise(r => setTimeout(r, 5000))])
 			await new Promise(r => setTimeout(r, 1200))
 			const box = el.getBoundingClientRect()
 			return JSON.stringify(Object.assign(${extra}, { x: box.x, y: box.y, w: box.width, h: box.height, iw: innerWidth }))
