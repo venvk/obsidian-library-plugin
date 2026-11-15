@@ -10,7 +10,7 @@ import { comparisonOfTheDay, comparisonText } from './facts'
 import { renderTrophies } from './ui/trophyIcons'
 import { tasteOf } from './taste'
 import { activityDays, logOf, todayIso } from './diary'
-import { platformFamily, renderPlatformLabels, renderPlatforms } from './ui/platformIcons'
+import { renderPlatformLabels, renderPlatforms } from './ui/platformIcons'
 import { YOUTUBE_TYPE } from './youtube'
 import {
 	toStr,
@@ -137,18 +137,6 @@ const OBJECT_LOOK: Partial<Record<ContentType, string>> = {
 	book: 'shelf', comic: 'paper', movie: 'case', series: 'case', anime: 'case', game: 'case', music: 'jewel', certificate: 'frame',
 }
 
-// The band across the top of a disc case: Blu-ray for a film, the platform's own for a game
-function caseBand(card: CardData): { cls: string; text: string } {
-	if (card.kind !== 'game') return { cls: 'is-bluray', text: 'BLU-RAY DISC' }
-	for (const platform of toStrArray(card.fm.Platforms)) {
-		const family = platformFamily(platform)
-		if (family === 'playstation') return { cls: 'is-playstation', text: (/ps\s?\d/i.exec(platform)?.[0] ?? 'PlayStation').replace(/\s/, '').toUpperCase() }
-		if (family === 'xbox') return { cls: 'is-xbox', text: 'XBOX' }
-		if (family === 'nintendo') return { cls: 'is-nintendo', text: 'NINTENDO SWITCH' }
-	}
-	return { cls: 'is-pc', text: 'PC' }
-}
-
 // a colour of its own for a title with no cover to take one from, the same every time
 function spineColor(text: string): string {
 	let h = 0
@@ -172,6 +160,9 @@ const UP_NEXT_SORT = '@upNext'
 
 // Cards, statistics and the Soon list, shared by the library tab and the note blocks.
 export class LibraryRenderer {
+	// each cover's colour for its book's spine, worked out once: a redraw would otherwise flash every spine
+	private spineColors = new Map<string, string>()
+
 	constructor(private app: App, private plugin: LibraryPlugin) {}
 
 	collectCards(category: ICategory): CardData[] {
@@ -882,6 +873,12 @@ export class LibraryRenderer {
 		// the cover's own colour where its picture lets itself be read; a picture from another site may not
 		const src = coverSrc(this.app, card.cover || coverValue(fm, this.plugin.settings.coverProperty))
 		if (!src) return
+		const known = this.spineColors.get(src)
+		if (known !== undefined) {
+			if (known) spine.style.setProperty('--spine-color', known)
+			return
+		}
+		this.spineColors.set(src, '')
 		const img = new Image()
 		img.crossOrigin = 'anonymous'
 		img.addEventListener('load', () => {
@@ -895,7 +892,9 @@ export class LibraryRenderer {
 				for (let i = 0; i < px.length; i += 4) { r += px[i] ?? 0; g += px[i + 1] ?? 0; b += px[i + 2] ?? 0 }
 				const n = px.length / 4
 				// darkened a little, so the light lettering stays readable
-				spine.style.setProperty('--spine-color', `rgb(${String(Math.round(r / n * 0.7))}, ${String(Math.round(g / n * 0.7))}, ${String(Math.round(b / n * 0.7))})`)
+				const color = `rgb(${String(Math.round(r / n * 0.7))}, ${String(Math.round(g / n * 0.7))}, ${String(Math.round(b / n * 0.7))})`
+				this.spineColors.set(src, color)
+				spine.style.setProperty('--spine-color', color)
 			} catch { /* a picture from a site that does not allow reading it keeps the made-up colour */ }
 		})
 		img.src = src
@@ -930,10 +929,6 @@ export class LibraryRenderer {
 
 		const cover = card.cover || coverValue(fm, this.plugin.settings.coverProperty)
 		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
-		if (grid.hasClass('is-case')) {
-			const band = caseBand(card)
-			imgDiv.createDiv({ cls: `library-case-band ${band.cls}`, text: band.text })
-		}
 		let cardCover = coverSrc(this.app, cover)
 		if (cardCover && isCollectible(fm)) cardCover = viaPinata(cardCover)
 		// some NFT pictures are short videos
@@ -1088,6 +1083,8 @@ export class LibraryRenderer {
 export class LibraryView extends ItemView {
 	private plugin: LibraryPlugin
 	private renderTimer: number | null = null
+	// how long the last redraw took
+	private renderMs = 0
 	// Paths shown last render: a note ceasing to be one must still trigger the render that drops it.
 	// each shown note with its properties as drawn: a change to the note's text alone redraws nothing
 	private shown = new Map<string, string>()
@@ -1147,13 +1144,18 @@ export class LibraryView extends ItemView {
 		this.render()
 	}
 
+	// A redraw rebuilds every card: in a big library it takes a second or more, so while notes keep changing
+	// (an import, the metadata walk) it comes no more often than a few times its own length, and never under
+	// the cursor.
 	private scheduleRender(): void {
-		if (this.renderTimer) window.clearTimeout(this.renderTimer)
+		// one redraw already waiting takes this change too: changes that keep coming do not push it back forever
+		if (this.renderTimer) return
 		this.renderTimer = window.setTimeout(() => {
-			// an open menu is not redrawn from under the cursor: the redraw waits until a choice closes it
-			if (this.contentEl.querySelector('.library-sort-menu.open')) this.scheduleRender()
+			this.renderTimer = null
+			// an open menu or a card under the pointer is not redrawn from under it: the redraw waits
+			if (this.contentEl.querySelector('.library-sort-menu.open, .library-card:hover, .library-spine:hover')) this.scheduleRender()
 			else this.render()
-		}, 300)
+		}, Math.max(300, this.renderMs * 4))
 	}
 
 	private isLibraryNote(fm: Record<string, unknown> | undefined): boolean {
@@ -1173,6 +1175,8 @@ export class LibraryView extends ItemView {
 	}
 
 	render(): void {
+		const started = performance.now()
+		window.setTimeout(() => { this.renderMs = performance.now() - started }, 0)
 		const root = this.contentEl
 		const scrollTop = root.scrollTop
 		root.empty()

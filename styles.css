@@ -3529,12 +3529,37 @@ sort trigger, the chosen one in the accent colour. */
 	display: none;
 }
 
-/* A disc case: dark plastic, a band across the top, the sleeve under clear film, and the case's depth
-   showing on the right and below */
+/* Discs stand on shelves as big as the book shelf: a row of cases on a board */
+.library-view .library-grid.is-case,
+.library-view .library-grid.is-jewel {
+	grid-template-columns: repeat(auto-fill, 200px);
+	grid-auto-rows: 330px;
+	gap: 26px 22px;
+	align-items: end;
+	padding: 0 16px;
+	background-image: linear-gradient(to bottom, transparent 330px, color-mix(in srgb, var(--text-faint) 55%, transparent) 330px, color-mix(in srgb, var(--text-faint) 30%, transparent) 346px, transparent 346px);
+	background-size: 100% 356px;
+}
+
+.library-view .library-grid.is-jewel {
+	grid-template-columns: repeat(auto-fill, 300px);
+}
+
+.library-view .library-grid.is-case.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 200px;
+}
+
+.library-view .library-grid.is-jewel.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 300px;
+}
+
+/* A disc case: dark plastic, the sleeve under clear film, and the case's depth showing on the right and below */
 .library-grid.is-case .card-image {
 	flex-direction: column;
 	justify-content: flex-start;
-	padding: 0 4px 4px 13px;
+	padding: 4px 4px 4px 13px;
 	border-radius: 7px;
 	background: linear-gradient(to right, #1d1f24, #2c2f36 12%, #24262c);
 	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 2px 2px 0 #15161a, 4px 4px 0 #0e0f12, 6px 9px 16px rgba(0, 0, 0, 0.55);
@@ -3553,46 +3578,23 @@ sort trigger, the chosen one in the accent colour. */
 	pointer-events: none;
 }
 
-.library-case-band {
-	flex: none;
-	width: 100%;
-	height: 9%;
-	min-height: 15px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	margin-bottom: 3px;
-	font-size: 10px;
-	font-weight: 700;
-	letter-spacing: 0.12em;
-	color: #ffffff;
-	border-radius: 0 0 2px 2px;
-}
-
-.library-case-band.is-bluray {
-	background: linear-gradient(to bottom, #2a7de1, #0b4fa8);
-}
-
-.library-case-band.is-playstation {
-	background: linear-gradient(to bottom, #1b7fe0, #0050a8);
-}
-
-.library-case-band.is-xbox {
-	background: linear-gradient(to bottom, #2a9d2a, #0e6b0e);
-}
-
-.library-case-band.is-nintendo {
-	background: linear-gradient(to bottom, #f0262f, #b80d15);
-}
-
-.library-case-band.is-pc {
-	background: linear-gradient(to bottom, #3a3d45, #1d1f24);
+/* the case is as tall as its sleeve needs: the whole poster shows, nothing cut off its edges */
+.library-grid.is-case .card-image,
+.library-grid.is-jewel .card-image {
+	aspect-ratio: auto;
 }
 
 .library-grid.is-case .card-image img {
-	flex: 1;
-	min-height: 0;
+	flex: none;
+	width: 100%;
 	height: auto;
+	aspect-ratio: 2 / 3;
+}
+
+.library-grid.is-jewel .card-image img {
+	width: 100%;
+	height: auto;
+	aspect-ratio: 1 / 1;
 }
 
 .library-grid.is-case .card-image img,
