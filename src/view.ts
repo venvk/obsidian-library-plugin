@@ -131,6 +131,19 @@ function filterCards(cards: CardData[], chosen: Record<string, string>): CardDat
 	return cards.filter(card => active.every(f => facetValues(card, f.facet).indexOf(chosen[f.facet] as string) >= 0))
 }
 
+// How a kind looks shown as things: books as spines on a shelf, comics as thin paperbacks, films and series
+// and games in disc cases, albums in CD cases, certificates framed
+const OBJECT_LOOK: Partial<Record<ContentType, string>> = {
+	book: 'shelf', comic: 'paper', movie: 'case', series: 'case', anime: 'case', game: 'case', music: 'jewel', certificate: 'frame',
+}
+
+// a colour of its own for a title with no cover to take one from, the same every time
+function spineColor(text: string): string {
+	let h = 0
+	for (let i = 0; i < text.length; i++) h = (h * 31 + text.charCodeAt(i)) >>> 0
+	return `hsl(${String(h % 360)}, ${String(28 + (h >> 9) % 20)}%, ${String(26 + (h >> 14) % 14)}%)`
+}
+
 interface SectionSpec {
 	title: string
 	sortId: string
@@ -832,7 +845,55 @@ export class LibraryRenderer {
 		if (Number(fm.Views) > 0) part(info.createDiv({ cls: 'card-year card-votes' }), 'eye', 'Views')
 	}
 
+	// A book on the shelf: its spine, as wide as the book is long, with the title and author down it
+	private renderSpine(grid: HTMLElement, card: CardData): void {
+		const { file, fm } = card
+		const slot = grid.createDiv({ cls: 'library-spine-slot' })
+		const spine = slot.createDiv({ cls: 'library-spine', attr: { role: 'button', tabindex: '0', 'aria-label': card.name } })
+		const pages = Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1] ?? fm.Pages) || 0
+		const seed = spineColor(card.name)
+		spine.style.setProperty('--spine-width', `${String(Math.max(38, Math.min(92, pages ? 26 + pages / 11 : 50)))}px`)
+		spine.style.setProperty('--spine-height', `${String(270 + (card.name.length * 7) % 60)}px`)
+		spine.style.setProperty('--spine-color', seed)
+		const creator = toStrArray(fm.Creator).map(linkLabel)[0] ?? ''
+		spine.createSpan({ cls: 'library-spine-title', text: card.name })
+		if (creator) spine.createSpan({ cls: 'library-spine-author', text: creator })
+		if (isFinished(fm, card.kind)) spine.createSpan({ cls: 'library-spine-ribbon' })
+		const open = (): void => { void this.app.workspace.getLeaf(false).openFile(file) }
+		spine.addEventListener('click', open)
+		spine.addEventListener('keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault()
+				open()
+			}
+		})
+		// the cover's own colour where its picture lets itself be read; a picture from another site may not
+		const src = coverSrc(this.app, card.cover || coverValue(fm, this.plugin.settings.coverProperty))
+		if (!src) return
+		const img = new Image()
+		img.crossOrigin = 'anonymous'
+		img.addEventListener('load', () => {
+			try {
+				const canvas = createEl('canvas', { attr: { width: '8', height: '8' } })
+				const ctx = canvas.getContext('2d')
+				if (!ctx) return
+				ctx.drawImage(img, 0, 0, 8, 8)
+				const px = ctx.getImageData(0, 0, 8, 8).data
+				let r = 0, g = 0, b = 0
+				for (let i = 0; i < px.length; i += 4) { r += px[i] ?? 0; g += px[i + 1] ?? 0; b += px[i + 2] ?? 0 }
+				const n = px.length / 4
+				// darkened a little, so the light lettering stays readable
+				spine.style.setProperty('--spine-color', `rgb(${String(Math.round(r / n * 0.7))}, ${String(Math.round(g / n * 0.7))}, ${String(Math.round(b / n * 0.7))})`)
+			} catch { /* a picture from a site that does not allow reading it keeps the made-up colour */ }
+		})
+		img.src = src
+	}
+
 	renderCard(grid: HTMLElement, card: CardData): void {
+		if (grid.hasClass('is-shelf')) {
+			this.renderSpine(grid, card)
+			return
+		}
 		const { file, fm } = card
 		// album covers and NFTs are square, video thumbnails wide
 		const cardEl = grid.createDiv({
@@ -843,6 +904,8 @@ export class LibraryRenderer {
 				'aria-label': card.name
 			}
 		})
+		// a framed certificate shows no text: its name comes up on hover
+		if (grid.hasClass('is-frame')) setTooltip(cardEl, card.name, { placement: 'top' })
 		cardEl.addEventListener('click', () => {
 			void this.app.workspace.getLeaf(false).openFile(file)
 		})
@@ -1330,6 +1393,21 @@ export class LibraryView extends ItemView {
 		if (spec.filters) this.sectionFilters(toolbar, spec.filters)
 		toolbar.createDiv({ cls: 'library-toolbar-spacer' })
 
+		// covers or things: a shelf, disc cases, frames
+		const category = spec.category
+		if (category && OBJECT_LOOK[category.contentType]) {
+			const on = this.plugin.settings.objectViews.indexOf(category.typeValue) >= 0
+			const lookBtn = toolbar.createEl('button', { cls: `library-category-map-btn${on ? ' is-active' : ''}`, attr: { 'aria-label': tr('view.objects'), 'aria-pressed': on ? 'true' : 'false' } })
+			setTooltip(lookBtn, tr('view.objects'), { placement: 'top' })
+			setIcon(lookBtn, category.contentType === 'book' ? 'library' : category.contentType === 'certificate' ? 'frame' : category.contentType === 'comic' ? 'book-open' : 'disc')
+			lookBtn.addEventListener('click', (e) => {
+				e.stopPropagation()
+				const views = this.plugin.settings.objectViews
+				this.plugin.settings.objectViews = on ? views.filter(v => v !== category.typeValue) : [...views, category.typeValue]
+				void this.plugin.saveSettings().then(() => this.render())
+			})
+		}
+
 		if (spec.category) {
 			const mapBtn = toolbar.createEl('button', {
 				cls: 'library-category-map-btn',
@@ -1374,7 +1452,8 @@ export class LibraryView extends ItemView {
 
 		// certificates and badges are landscape pictures: wider columns, so a card shows the whole of one
 		const badges = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
-		const grid = section.createDiv({ cls: badges ? 'library-grid is-landscape' : 'library-grid' })
+		const look = spec.category && this.plugin.settings.objectViews.indexOf(spec.category.typeValue) >= 0 ? OBJECT_LOOK[spec.category.contentType] : undefined
+		const grid = section.createDiv({ cls: `library-grid${badges ? ' is-landscape' : ''}${look ? ` is-objects is-${look}` : ''}` })
 
 		// tokens have no year, rating or progress: their own keys instead
 		const collectibles = cards.length > 0 && cards.every(card => isCollectible(card.fm))

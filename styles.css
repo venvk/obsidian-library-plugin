@@ -3417,3 +3417,183 @@ sort trigger, the chosen one in the accent colour. */
 .library-activity-day.is-level-4 {
 	background: var(--interactive-accent);
 }
+
+/* Things instead of covers (the toggle in a category's header). Books stand as spines on a shelf; comics are
+   thin paperbacks with their page edges showing; films, series and anime sit in disc cases; albums in clear CD
+   cases; certificates hang framed. The shelf draws its own spines; the rest dress the usual cover. */
+.library-view .library-grid.is-shelf {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: flex-end;
+	gap: 0 4px;
+	padding: 0 16px;
+	/* a board under every row of 356px */
+	background-image: linear-gradient(to bottom, transparent 340px, color-mix(in srgb, var(--text-faint) 55%, transparent) 340px, color-mix(in srgb, var(--text-faint) 30%, transparent) 356px);
+	background-size: 100% 356px;
+}
+
+.library-view .library-grid.is-shelf.collapsed {
+	flex-wrap: nowrap;
+	overflow-x: auto;
+}
+
+.library-spine-slot {
+	height: 340px;
+	margin-bottom: 16px;
+	display: flex;
+	align-items: flex-end;
+	flex-shrink: 0;
+}
+
+.library-spine {
+	position: relative;
+	width: var(--spine-width, 34px);
+	height: var(--spine-height, 190px);
+	background: linear-gradient(to right, rgba(0, 0, 0, 0.35), rgba(255, 255, 255, 0.08) 30%, rgba(0, 0, 0, 0.12) 75%, rgba(0, 0, 0, 0.4)), var(--spine-color, #3b4252);
+	border-radius: 2px 2px 1px 1px;
+	box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+	color: #f4efe6;
+	writing-mode: vertical-rl;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 14px 0;
+	overflow: hidden;
+	cursor: pointer;
+	transition: transform 0.15s;
+}
+
+.library-spine:hover,
+.library-spine:focus-visible {
+	transform: translateY(-8px);
+}
+
+.library-spine-title {
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.15;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-height: 72%;
+}
+
+.library-spine-author {
+	font-size: 12px;
+	opacity: 0.75;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-height: 26%;
+}
+
+/* read to the end: a ribbon bookmark out of the top */
+.library-spine-ribbon {
+	position: absolute;
+	top: 0;
+	right: 22%;
+	width: 7px;
+	height: 26px;
+	background: var(--color-red);
+	clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+}
+
+.library-grid.is-paper .card-image {
+	border-radius: 2px 4px 4px 2px;
+	box-shadow: 2px 0 0 #e8e4da, 4px 1px 0 #d9d4c8, 6px 2px 0 #cbc5b7, 6px 3px 6px rgba(0, 0, 0, 0.35);
+}
+
+.library-grid.is-paper .card-image img {
+	border-radius: 2px 4px 4px 2px;
+}
+
+/* the fold of a paperback's spine */
+.library-grid.is-paper .card-image::after {
+	content: "";
+	position: absolute;
+	inset: 0 auto 0 0;
+	width: 7%;
+	background: linear-gradient(to right, rgba(0, 0, 0, 0.3), rgba(255, 255, 255, 0.12) 60%, transparent);
+	pointer-events: none;
+}
+
+.library-grid.is-case .card-image {
+	border: 5px solid #2e3138;
+	border-left-width: 15px;
+	border-radius: 8px;
+	/* the plastic's lit rim, its inner edge, and the case's shadow */
+	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 5px 12px rgba(0, 0, 0, 0.55);
+	background: #2e3138;
+}
+
+/* the case's hinge: a seam down the spine */
+.library-grid.is-case .card-image::before {
+	content: "";
+	position: absolute;
+	top: -5px;
+	bottom: -5px;
+	left: -9px;
+	width: 2px;
+	background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.05));
+	pointer-events: none;
+}
+
+.library-grid.is-case .card-image img,
+.library-grid.is-jewel .card-image img {
+	border-radius: 1px;
+}
+
+/* the sleeve behind the case's plastic catches the light */
+.library-grid.is-case .card-image::after,
+.library-grid.is-jewel .card-image::after {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(115deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04) 35%, transparent 55%);
+	pointer-events: none;
+}
+
+.library-grid.is-jewel .card-image {
+	border: 3px solid rgba(220, 225, 230, 0.55);
+	border-left-width: 12px;
+	border-radius: 3px;
+	background: #0e0f11;
+	box-shadow: 0 3px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* the jewel case's hinge, ridged */
+.library-grid.is-jewel .card-image::before {
+	content: "";
+	position: absolute;
+	top: -3px;
+	bottom: -3px;
+	left: -12px;
+	width: 12px;
+	background: repeating-linear-gradient(to bottom, rgba(255, 255, 255, 0.5) 0 2px, rgba(160, 165, 170, 0.35) 2px 4px);
+	pointer-events: none;
+}
+
+/* a framed certificate hangs on its own: no card behind it, no text under it; its name shows on hover */
+.library-grid.is-frame .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.library-grid.is-frame .card-info {
+	display: none;
+}
+
+.library-grid.is-frame .card-image {
+	border: 6px solid #141414;
+	background: #f4f1ea;
+	padding: 9%;
+	box-shadow: 0 6px 14px rgba(0, 0, 0, 0.4);
+	border-radius: 1px;
+}
+
+.library-grid.is-frame .card-image img {
+	box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.25);
+	border-radius: 0;
+	object-fit: contain;
+}

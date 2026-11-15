@@ -7788,6 +7788,7 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.sortState || typeof this.settings.sortState !== 'object') this.settings.sortState = {}
 		if (!this.settings.filterState || typeof this.settings.filterState !== 'object') this.settings.filterState = {}
 		if (!Array.isArray(this.settings.searchFolded)) this.settings.searchFolded = []
+		if (!Array.isArray(this.settings.objectViews)) this.settings.objectViews = []
 		this.settings.searchFolded = this.settings.searchFolded.filter((type): type is string => typeof type === 'string')
 		if (typeof this.settings.statsCollapsed !== 'boolean') this.settings.statsCollapsed = false
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
