@@ -3,9 +3,9 @@
 // the user did. Settings keep the connected flag, last-import time and score echoes.
 const PARTITION = 'persist:library-auth'
 
-export type WatchSite = 'imdb' | 'netflix' | 'youtube' | 'claudeacademy'
+export type WatchSite = 'imdb' | 'netflix' | 'youtube' | 'claudeacademy' | 'googleedu'
 
-export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube', claudeacademy: 'Claude Academy' }
+export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube', claudeacademy: 'Claude Academy', googleedu: 'Google for Education' }
 
 export interface ImdbEcho {
 	r: number
@@ -19,7 +19,14 @@ export const SITE_SIGN_IN: Record<WatchSite, string> = {
 	youtube: 'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fhistory',
 	// the page's own "Sign in with Claude" goes through claude.ai and back; ACADEMY_SIGNED_IN says when it is done
 	claudeacademy: 'https://academy.claude.com/login?returnTo=%2F',
+	// Exceed LMS, where Google for Education issues its certificates, signs in with Google: the session YouTube's
+	// sign-in left leaves only the account to pick
+	googleedu: 'https://edu.exceedlms.com/authentication/google_authentication',
 }
+
+// Exceed LMS comes back through its own callback, which sets the session as it loads: done once a page of
+// the site has loaded with its Log Out link
+export const EXCEED_SIGNED_IN = "location.hostname === 'edu.exceedlms.com' && document.readyState === 'complete' && !!document.querySelector('a[href*=\"/authentication/logout\"]') ? 'ok' : ''"
 
 // Claude Academy signs in inside the page: done once it is back on the academy with no Sign in link left
 export const ACADEMY_SIGNED_IN = "location.hostname === 'academy.claude.com' && !/^\\/(login|oauth)/.test(location.pathname) && document.readyState === 'complete' && !document.querySelector('a[href*=\"/login\"]') && !!document.querySelector('header, nav') ? 'ok' : ''"
@@ -38,6 +45,7 @@ export function signedInAt(site: WatchSite, url: string): string | null {
 	// Google signs in on its own host, then hands the window to YouTube
 	if (site === 'youtube') return parsed.hostname === 'www.youtube.com' ? 'ok' : null
 	if (site === 'claudeacademy') return null
+	if (site === 'googleedu') return null
 	return parsed.hostname === 'www.netflix.com' && /^\/(browse|[a-z]{2}(-[a-z]{2})?\/browse)(\/|$)/.test(parsed.pathname) ? 'ok' : null
 }
 
@@ -337,6 +345,38 @@ export async function academyBadge(badgeId: string): Promise<AcademyBadge | null
 	const url = typeof shot?.answer.url === 'string' ? shot.answer.url : ''
 	if (!shot || !/^https:\/\/academy\.claude\.com\/verify\/[^/?#]+$/.test(url)) return null
 	return { verifyUrl: url, picture: shot.picture }
+}
+
+// The public pages of the certificates on Exceed LMS's Credentials list: each one opens in a dialog whose
+// "Add to LinkedIn" link carries it
+export async function exceedCertificates(): Promise<string[] | 'signed-out' | null> {
+	const code = `(async () => {
+		const sleep = ms => new Promise(r => setTimeout(r, ms))
+		for (let i = 0; i < 40 && !document.querySelector('button[class*="profileCredentialsListItem"]'); i++) {
+			if (document.querySelector('a[href*="/authentication/google_authentication"]')) return 'signed-out'
+			await sleep(250)
+		}
+		const urls = []
+		for (const item of document.querySelectorAll('button[class*="profileCredentialsListItem"]')) {
+			item.click()
+			let link = null
+			for (let i = 0; i < 20 && !link; i++) { await sleep(250); link = document.querySelector('[role=dialog] a[href*="linkedin.com/profile/add"]') }
+			const url = link ? new URL(link.href).searchParams.get('certUrl') || '' : ''
+			if (url) urls.push(url)
+			const close = document.querySelector('[role=dialog] button')
+			if (close) close.click()
+			await sleep(400)
+		}
+		return JSON.stringify(urls)
+	})().catch(() => '')`
+	const answer = await readPage('https://edu.exceedlms.com/student/my_learning/credentials', code, 120000, "document.readyState === 'complete' && !!document.querySelector('main')")
+	if (answer === 'signed-out') return answer
+	try {
+		const urls = JSON.parse(answer) as unknown
+		return Array.isArray(urls) ? urls.filter((u): u is string => typeof u === 'string' && /^https:\/\/[a-z0-9-]+\.exceedlms\.com\/student\/award\/[A-Za-z0-9]+$/.test(u)) : null
+	} catch {
+		return null
+	}
 }
 
 // A certificate page that draws its certificate (Exceed LMS), photographed

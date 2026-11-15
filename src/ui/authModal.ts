@@ -210,7 +210,12 @@ export class AuthModal extends Modal {
 				getURL?: () => string
 				executeJavaScript?: (code: string, userGesture: boolean) => unknown
 			}
-			if (guest.getURL) arrive(guest.getURL())
+			// before its first dom-ready a webview answers nothing but an error
+			try {
+				if (guest.getURL) arrive(guest.getURL())
+			} catch {
+				return
+			}
 			if (this.opts.pageProbe && guest.executeJavaScript) {
 				// The webview runs the call over IPC: a third callback argument fails
 				// structured clone, so only the two-argument promise form delivers.

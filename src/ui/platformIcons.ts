@@ -230,7 +230,7 @@ export function platformFamily(value: string): string | null {
 	if (v === 'ea' || v.includes('ea app') || v.includes('electronic arts') || v.includes('origin')) return 'ea'
 	if (v.includes('netflix')) return 'netflix'
 	if (v.includes('claude')) return 'claude'
-	if (v === 'google' || v.startsWith('google ')) return 'google'
+	if (v === 'google' || v === 'googleedu' || v.startsWith('google ')) return 'google'
 	if (v.includes('youtube')) return 'youtube'
 	// NFT networks; Arbitrum and Taiko have no mark and show their initial
 	if (v === 'ethereum' || v.includes('ethereum') || v === 'eth') return 'ethereum'

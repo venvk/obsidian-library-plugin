@@ -502,7 +502,10 @@ export class LibrarySettingTab extends PluginSettingTab {
 			{
 				page: "connectors",
 				heading: tr("settings.default.certificate"),
-				rows: [{ name: "Claude Academy", desc: tr("settings.claudeacademy.desc"), render: (row) => this.siteAccount(row, "claudeacademy") }],
+				rows: [
+					{ name: "Claude Academy", desc: tr("settings.claudeacademy.desc"), render: (row) => this.siteAccount(row, "claudeacademy") },
+					{ name: "Google for Education", desc: tr("settings.googleedu.desc"), render: (row) => this.siteAccount(row, "googleedu") },
+				],
 			},
 			{
 				page: "connectors",

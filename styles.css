@@ -2340,6 +2340,11 @@ sort trigger, the chosen one in the accent colour. */
 	color: #000000;
 }
 
+.library-platform-row-icon.is-googleedu {
+	background-color: #ffffff;
+	color: #4285f4;
+}
+
 .library-platform-row-icon.is-claudeacademy {
 	background-color: #d97757;
 	color: #ffffff;
