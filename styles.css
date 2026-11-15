@@ -3536,7 +3536,8 @@ sort trigger, the chosen one in the accent colour. */
 	grid-auto-rows: 330px;
 	gap: 26px 22px;
 	align-items: end;
-	padding: 0 16px;
+	/* room under the last row for its board */
+	padding: 0 16px 26px;
 	background-image: linear-gradient(to bottom, transparent 330px, color-mix(in srgb, var(--text-faint) 55%, transparent) 330px, color-mix(in srgb, var(--text-faint) 30%, transparent) 346px, transparent 346px);
 	background-size: 100% 356px;
 }
@@ -3716,7 +3717,8 @@ sort trigger, the chosen one in the accent colour. */
 	grid-auto-rows: 220px;
 	gap: 26px 22px;
 	align-items: end;
-	padding: 0 16px;
+	/* room under the last row for its board */
+	padding: 0 16px 26px;
 	background-image: linear-gradient(to bottom, transparent 220px, color-mix(in srgb, var(--text-faint) 55%, transparent) 220px, color-mix(in srgb, var(--text-faint) 30%, transparent) 236px, transparent 236px);
 	background-size: 100% 246px;
 }
