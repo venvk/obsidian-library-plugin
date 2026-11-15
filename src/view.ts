@@ -1105,6 +1105,8 @@ export class LibraryView extends ItemView {
 	private renderTimer: number | null = null
 	// how long the last redraw took
 	private renderMs = 0
+	// how many times in a row a card under the pointer has put a redraw off
+	private renderHeld = 0
 	// Paths shown last render: a note ceasing to be one must still trigger the render that drops it.
 	// each shown note with its properties as drawn: a change to the note's text alone redraws nothing
 	private shown = new Map<string, string>()
@@ -1172,8 +1174,12 @@ export class LibraryView extends ItemView {
 		if (this.renderTimer) return
 		this.renderTimer = window.setTimeout(() => {
 			this.renderTimer = null
-			// an open menu or a card under the pointer is not redrawn from under it: the redraw waits
-			if (this.contentEl.querySelector('.library-sort-menu.open, .library-card:hover, .library-spine:hover')) this.scheduleRender()
+			// an open menu is not redrawn from under the cursor: the redraw waits until a choice closes it. A card
+			// under the pointer holds it off a few times only: on a touch screen the last card tapped stays
+			// "hovered" for good.
+			const hovered = this.renderHeld < 3 && !!this.contentEl.querySelector('.library-card:hover, .library-spine:hover')
+			if (hovered) this.renderHeld++
+			if (hovered || this.contentEl.querySelector('.library-sort-menu.open')) this.scheduleRender()
 			else this.render()
 		}, Math.max(300, this.renderMs * 4))
 	}
@@ -1197,6 +1203,7 @@ export class LibraryView extends ItemView {
 	render(): void {
 		const started = performance.now()
 		window.setTimeout(() => { this.renderMs = performance.now() - started }, 0)
+		this.renderHeld = 0
 		const root = this.contentEl
 		const scrollTop = root.scrollTop
 		root.empty()
