@@ -501,6 +501,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			},
 			{
 				page: "connectors",
+				heading: tr("settings.default.certificate"),
+				rows: [
+					{ name: "Claude Academy", desc: tr("settings.claudeacademy.desc"), render: (row) => this.siteAccount(row, "claudeacademy") },
+					{ name: "Google for Education", desc: tr("settings.googleedu.desc"), render: (row) => this.siteAccount(row, "googleedu") },
+				],
+			},
+			{
+				page: "connectors",
 				heading: tr("settings.default.video"),
 				rows: [
 					{ name: "YouTube", desc: tr("settings.youtube.desc"), render: (row) => this.siteAccount(row, "youtube") },
@@ -1239,6 +1247,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 			["music", tr("settings.default.music") + " — Deezer"],
 			["anime", tr("settings.default.anime") + " — AniList, MyAnimeList"],
 			["collectible", tr("settings.default.collectible") + " — TCGdex, Scryfall, YGOPRODeck"],
+			["certificate", tr("settings.default.certificate") + " — Credly, Anthropic Academy, Open Badges"],
 			["manual", tr("settings.category.manual")],
 		];
 		for (const [value, label] of options) d.addOption(value, label);

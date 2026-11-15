@@ -1,11 +1,11 @@
-// IMDb, Netflix and YouTube have no API for a member's own history: the sign-in window
+// IMDb, Netflix, YouTube and Claude Academy have no open API for a member's own history: the sign-in window
 // keeps the session, and a hidden webview on its partition reads the site as
 // the user did. Settings keep the connected flag, last-import time and score echoes.
 const PARTITION = 'persist:library-auth'
 
-export type WatchSite = 'imdb' | 'netflix' | 'youtube'
+export type WatchSite = 'imdb' | 'netflix' | 'youtube' | 'claudeacademy' | 'googleedu'
 
-export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube' }
+export const SITE_NAME: Record<WatchSite, string> = { imdb: 'IMDb', netflix: 'Netflix', youtube: 'YouTube', claudeacademy: 'Claude Academy', googleedu: 'Google for Education' }
 
 export interface ImdbEcho {
 	r: number
@@ -17,7 +17,19 @@ export const SITE_SIGN_IN: Record<WatchSite, string> = {
 	imdb: 'https://www.imdb.com/registration/signin',
 	netflix: 'https://www.netflix.com/login',
 	youtube: 'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fwww.youtube.com%2Ffeed%2Fhistory',
+	// the page's own "Sign in with Claude" goes through claude.ai and back; ACADEMY_SIGNED_IN says when it is done
+	claudeacademy: 'https://academy.claude.com/login?returnTo=%2F',
+	// Exceed LMS, where Google for Education issues its certificates, signs in with Google: the session YouTube's
+	// sign-in left leaves only the account to pick
+	googleedu: 'https://edu.exceedlms.com/authentication/google_authentication',
 }
+
+// Exceed LMS comes back through its own callback, which sets the session as it loads: done once a page of
+// the site has loaded with its Log Out link
+export const EXCEED_SIGNED_IN = "location.hostname === 'edu.exceedlms.com' && document.readyState === 'complete' && !!document.querySelector('a[href*=\"/authentication/logout\"]') ? 'ok' : ''"
+
+// Claude Academy signs in inside the page: done once it is back on the academy with no Sign in link left
+export const ACADEMY_SIGNED_IN = "location.hostname === 'academy.claude.com' && !/^\\/(login|oauth)/.test(location.pathname) && document.readyState === 'complete' && !document.querySelector('a[href*=\"/login\"]') && !!document.querySelector('header, nav') ? 'ok' : ''"
 
 // Signed in once the window lands on the site's home: the sign-in pages live on
 // the same hosts, so the path decides.
@@ -32,6 +44,8 @@ export function signedInAt(site: WatchSite, url: string): string | null {
 	if (site === 'imdb') return parsed.hostname === 'www.imdb.com' && (parsed.pathname === '/' || parsed.pathname === '') ? 'ok' : null
 	// Google signs in on its own host, then hands the window to YouTube
 	if (site === 'youtube') return parsed.hostname === 'www.youtube.com' ? 'ok' : null
+	if (site === 'claudeacademy') return null
+	if (site === 'googleedu') return null
 	return parsed.hostname === 'www.netflix.com' && /^\/(browse|[a-z]{2}(-[a-z]{2})?\/browse)(\/|$)/.test(parsed.pathname) ? 'ok' : null
 }
 
@@ -224,6 +238,156 @@ export interface WatchHistory {
 }
 
 // Rated titles, rated episodes and the watchlist; null when the site does not answer.
+// The ids of the completion badges on the academy's "Your journey" page
+export async function academyBadges(): Promise<string[] | 'signed-out' | null> {
+	const code = `(async () => {
+		for (let i = 0; i < 40; i++) {
+			if (document.querySelector('a[href*="/login"]')) return 'signed-out'
+			if (document.querySelector('a[href^="/badges/"]')) break
+			await new Promise(r => setTimeout(r, 250))
+		}
+		await new Promise(r => setTimeout(r, 500))
+		return JSON.stringify([...new Set([...document.querySelectorAll('a[href^="/badges/"]')].map(a => a.getAttribute('href').split('/')[2]).filter(Boolean))])
+	})().catch(() => '')`
+	const answer = await readPage('https://academy.claude.com/dashboard', code, 60000, "document.readyState === 'complete' && !!document.querySelector('header, nav')")
+	if (answer === 'signed-out') return answer
+	try {
+		const ids = JSON.parse(answer) as unknown
+		return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : null
+	} catch {
+		return null
+	}
+}
+
+interface Capturable {
+	capturePage: () => Promise<{ getSize: () => { width: number }; crop: (rect: { x: number; y: number; width: number; height: number }) => { toPNG: () => Uint8Array } }>
+}
+
+export interface AcademyBadge {
+	// the badge's public check, read from its "Add to LinkedIn" link
+	verifyUrl: string
+	// the badge as the page draws it (the same picture its PDF holds), PNG; null when the page would not paint
+	picture: ArrayBuffer | null
+}
+
+// Opens `url` in a webview laid out on screen, nearly transparent and behind the workspace (a webview off
+// screen paints nothing), runs `code`, which answers JSON with the box of what to photograph ({x, y, w, h, iw})
+// and anything else, and photographs that box. null when the page gives no box in time.
+async function photograph(url: string, code: string): Promise<{ answer: Record<string, unknown>; picture: ArrayBuffer | null } | null> {
+	const doc = activeDocument
+	const win = doc.win as Window & { createEl: typeof createEl; require?: (mod: string) => { remote?: { webContents?: { fromId?: (id: number) => Capturable | undefined } } } }
+	const view = win.createEl('webview' as keyof HTMLElementTagNameMap, { cls: 'library-badge-probe', attr: { partition: PARTITION, src: url } })
+	doc.body.appendChild(view)
+	const guest = view as unknown as { executeJavaScript: (code: string) => Promise<unknown>; getWebContentsId?: () => number }
+	const wait = async <T>(work: Promise<T>, ms: number): Promise<T | null> => {
+		let timer = 0
+		try {
+			return await Promise.race([work, new Promise<null>(resolve => { timer = window.setTimeout(() => resolve(null), ms) })])
+		} finally {
+			window.clearTimeout(timer)
+		}
+	}
+	try {
+		await wait(new Promise<void>(resolve => view.addEventListener('dom-ready', () => resolve(), { once: true })), 30000)
+		const raw = await wait(guest.executeJavaScript(code).catch(() => ''), 30000)
+		const answer = typeof raw === 'string' && raw ? JSON.parse(raw) as Record<string, unknown> : null
+		if (!answer) return null
+		const box = answer as { x?: number; y?: number; w?: number; h?: number; iw?: number }
+		let picture: ArrayBuffer | null = null
+		const id = guest.getWebContentsId?.()
+		const contents = id !== undefined ? win.require?.('electron').remote?.webContents?.fromId?.(id) : undefined
+		// a frame taken before the page painted is one flat colour, which compresses to almost nothing: taken again
+		for (let attempt = 0; attempt < 4 && !picture && contents && box.w && box.h && box.iw; attempt++) {
+			if (attempt > 0) await new Promise(resolve => window.setTimeout(resolve, 1500))
+			const shot = await wait(contents.capturePage(), 10000).catch(() => null)
+			if (!shot) continue
+			const k = shot.getSize().width / box.iw
+			const png = shot.crop({ x: Math.round((box.x ?? 0) * k), y: Math.round((box.y ?? 0) * k), width: Math.round(box.w * k), height: Math.round(box.h * k) }).toPNG()
+			if (png.byteLength > 20000) picture = png.slice().buffer
+		}
+		return { answer, picture }
+	} catch {
+		return null
+	} finally {
+		view.remove()
+	}
+}
+
+// the box of `selector` once it and its fonts are in, as `photograph` reads it. The selector goes into code
+// run in the page, so it keeps only the characters a plain class or tag selector has.
+const boxOf = (selector: string, extra = "{}"): string => {
+	const sel = selector.replace(/[^\w.\- ]/g, '')
+	return `(async () => {
+	for (let i = 0; i < 60; i++) {
+		if (document.querySelector('a[href*="/login"]') && !document.querySelector('${sel}')) return ''
+		const el = document.querySelector('${sel}')
+		if (el) {
+			await document.fonts.ready
+			// pictures inside it (an SVG certificate's background) load on their own time
+			const srcs = [...el.querySelectorAll('img, image')].map(i => i.getAttribute('src') || i.getAttribute('href') || i.getAttribute('xlink:href') || '').filter(Boolean)
+			await Promise.race([
+				Promise.all(srcs.map(src => new Promise(r => { const im = new Image(); im.onload = im.onerror = r; im.src = src }))),
+				new Promise(r => setTimeout(r, 10000)),
+			])
+			// a badge comes in with an entrance animation: the picture is taken once it has settled
+			await Promise.race([Promise.all(document.getAnimations().map(a => a.finished.catch(() => null))), new Promise(r => setTimeout(r, 5000))])
+			await new Promise(r => setTimeout(r, 1200))
+			const box = el.getBoundingClientRect()
+			return JSON.stringify(Object.assign(${extra}, { x: box.x, y: box.y, w: box.width, h: box.height, iw: innerWidth }))
+		}
+		await new Promise(r => setTimeout(r, 250))
+	}
+	return ''
+})()`
+}
+
+// One badge page, read and photographed: the page draws the badge itself and serves no file of it
+export async function academyBadge(badgeId: string): Promise<AcademyBadge | null> {
+	const extra = "{ url: (() => { const a = document.querySelector('a[href*=\"linkedin.com/profile/add\"]'); return a ? new URL(a.href).searchParams.get('certUrl') || '' : '' })() }"
+	const ready = `(async () => { for (let i = 0; i < 60 && !document.querySelector('a[href*="linkedin.com/profile/add"]'); i++) await new Promise(r => setTimeout(r, 250)); return ${boxOf('svg.absolute.inset-0', extra)} })()`
+	const shot = await photograph(`https://academy.claude.com/badges/${encodeURIComponent(badgeId)}`, ready)
+	const url = typeof shot?.answer.url === 'string' ? shot.answer.url : ''
+	if (!shot || !/^https:\/\/academy\.claude\.com\/verify\/[^/?#]+$/.test(url)) return null
+	return { verifyUrl: url, picture: shot.picture }
+}
+
+// The public pages of the certificates on Exceed LMS's Credentials list: each one opens in a dialog whose
+// "Add to LinkedIn" link carries it
+export async function exceedCertificates(): Promise<string[] | 'signed-out' | null> {
+	const code = `(async () => {
+		const sleep = ms => new Promise(r => setTimeout(r, ms))
+		for (let i = 0; i < 40 && !document.querySelector('button[class*="profileCredentialsListItem"]'); i++) {
+			if (document.querySelector('a[href*="/authentication/google_authentication"]')) return 'signed-out'
+			await sleep(250)
+		}
+		const urls = []
+		for (const item of document.querySelectorAll('button[class*="profileCredentialsListItem"]')) {
+			item.click()
+			let link = null
+			for (let i = 0; i < 20 && !link; i++) { await sleep(250); link = document.querySelector('[role=dialog] a[href*="linkedin.com/profile/add"]') }
+			const url = link ? new URL(link.href).searchParams.get('certUrl') || '' : ''
+			if (url) urls.push(url)
+			const close = document.querySelector('[role=dialog] button')
+			if (close) close.click()
+			await sleep(400)
+		}
+		return JSON.stringify(urls)
+	})().catch(() => '')`
+	const answer = await readPage('https://edu.exceedlms.com/student/my_learning/credentials', code, 120000, "document.readyState === 'complete' && !!document.querySelector('main')")
+	if (answer === 'signed-out') return answer
+	try {
+		const urls = JSON.parse(answer) as unknown
+		return Array.isArray(urls) ? urls.filter((u): u is string => typeof u === 'string' && /^https:\/\/[a-z0-9-]+\.exceedlms\.com\/student\/award\/[A-Za-z0-9]+$/.test(u)) : null
+	} catch {
+		return null
+	}
+}
+
+// A certificate page that draws its certificate (Exceed LMS), photographed
+export async function certificatePicture(url: string, selector: string): Promise<ArrayBuffer | null> {
+	return (await photograph(url, boxOf(selector)))?.picture ?? null
+}
+
 export async function imdbHistory(): Promise<WatchHistory | 'signed-out' | null> {
 	const answer = await readPage('https://www.imdb.com/', IMDB_READ, 120000, "!!document.getElementById('__NEXT_DATA__')")
 	if (answer === 'signed-out') return answer

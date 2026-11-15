@@ -29,6 +29,7 @@ import { AnimeAggregatorProvider } from './providers/animeAggregator'
 import { GameTrailerFinder } from './providers/gameTrailer'
 import { DeezerProvider } from './providers/deezer'
 import { COLLECTIBLE_SOURCE, CollectibleProvider, setCards, type SetCard } from './providers/collectibles'
+import { CERTIFICATE_SOURCE, CertificateProvider, drawnCertificate } from './providers/certificates'
 import { MissingModal } from './ui/missingModal'
 import { AnimeProvider } from './providers/anime'
 import { MalProvider } from './providers/mal'
@@ -56,7 +57,7 @@ import { ShareModal, shareTargetFromFile } from './ui/shareModal'
 import { CoverModal } from './ui/coverModal'
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, deleteEntry, fetchList, listStatus, pushEntry, toTenPoint, tokenFromRedirect, type AniListEntry } from './anilistSync'
 import { recommendationsFor, type Recommendation } from './recommendations'
-import { SITE_NAME, SITE_SIGN_IN, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
+import { SITE_NAME, SITE_SIGN_IN, ACADEMY_SIGNED_IN, EXCEED_SIGNED_IN, academyBadge, academyBadges, certificatePicture, exceedCertificates, imdbHistory, netflixHistory, netflixRate, thumbOf, type NetflixEpisode, imdbRate, imdbRatingDelete, imdbSeason, imdbWatchlistAdd, imdbWatchlistRemove, netflixAddToList, netflixHideEpisodes, netflixHideViewing, seasonIndex, signedInAt, type EpisodeRating, type ImdbEcho, type WatchSite, type WatchedTitle } from './watchSites'
 import { earnedAchievements, gameAchievements, ownedGames, playtimeHours, steamAuthUrl, steamIdFromRedirect, steamLanguage, steamSession, type SteamSession } from './steamLibrary'
 import { MAL_CLIENT_ID, anilistIdsFor, anilistMangaIdsFor, animeIds, codeFromRedirect, deleteMalEntry, exchangeCode, fetchMalList, isExpired, makeVerifier, mangaIds, malAuthUrl, malClientPair, malIdsFor, malMangaIdsFor, malStatus, pushMalEntry, refreshTokens, type MalEntry } from './malSync'
 import { deleteKitsuEntry, externalIdsFor, fetchKitsuList, findKitsuEntry, isKitsuExpired, KITSU_SESSION_PROBE, kitsuIdsFor, kitsuPasswordGrant, kitsuRefreshGrant, kitsuStatus, kitsuViewer, pushKitsuEntry, tokensFromKitsuSession, type KitsuEntry, type KitsuTokens } from './kitsuSync'
@@ -403,6 +404,7 @@ export default class LibraryPlugin extends Plugin {
 		))
 		this.registry.register(new DeezerProvider())
 		this.registry.register(new CollectibleProvider(() => this.apiKey('numistaApiKey')))
+		this.registry.register(new CertificateProvider())
 		this.registry.register(new AnimeAggregatorProvider(new AnimeProvider(() => this.settings), new MalProvider(() => MAL_CLIENT_ID, () => this.settings), new KitsuProvider(() => this.settings)))
 		this.registry.register(new ComicsAggregatorProvider(
 			new ComicsProvider(() => this.apiKey('comicVineApiKey')),
@@ -948,14 +950,14 @@ export default class LibraryPlugin extends Plugin {
 			const category = await this.categoryFor(target)
 			const path = await this.uniqueNotePath(title, category.folder)
 			const file = await this.app.vault.create(path, await this.templateText(category))
-			const tracking = category.contentType === 'collectible' ? null : trackingOf(category.contentType)
+			const tracking = category.contentType === 'collectible' || category.contentType === 'certificate' ? null : trackingOf(category.contentType)
 			await this.app.fileManager.processFrontMatter(file, (fm) => {
 				Object.assign(fm, {
 					Type: category.typeValue,
 					Name: title,
-					'My Rating': null,
+					...(category.contentType === 'certificate' ? { Favorite: false } : { 'My Rating': null }),
 					...(tracking && tracking !== 'progress' ? { Complete: false } : {}),
-					...(tracking ? {} : { Count: 1 }),
+					...(category.contentType === 'collectible' ? { Count: 1 } : {}),
 					...(tracking && tracking !== 'watched' ? { Progress: '' } : {}),
 					Date: todayDmy(),
 				})
@@ -1015,16 +1017,18 @@ export default class LibraryPlugin extends Plugin {
 		const disambiguator = source === NFT_SOURCE ? (toStrArray(extra.Platforms)[0] || toStr(extra.Platforms) || undefined) : (toStr(meta.fields.Year) || undefined)
 		const path = await this.uniqueNotePath(title, category.folder, disambiguator)
 		const file = await this.app.vault.create(path, await this.templateText(category))
-		// series/anime/books track progress, movies a watched switch (Complete), others both
-		const tracking = category.contentType === 'collectible' ? null : trackingOf(category.contentType)
+		// series/anime/books track progress, movies a watched switch (Complete), others both; a card or a
+		// certificate is held, not watched
+		const tracking = category.contentType === 'collectible' || category.contentType === 'certificate' ? null : trackingOf(category.contentType)
 		await this.app.fileManager.processFrontMatter(file, (fm) => {
 			Object.assign(fm, {
 				Type: category.typeValue,
 				...(tracking && tracking !== 'watched' ? { Progress: meta.progressTotal ? `0/${String(meta.progressTotal)}` : '' } : {}),
-				'My Rating': null,
+				...(category.contentType === 'certificate' ? { Favorite: false } : { 'My Rating': null }),
 				...(tracking && tracking !== 'progress' ? { Complete: false } : {}),
-				...(tracking ? {} : { Count: 1 }),
-				Date: (source === NFT_SOURCE && (extra.Date || extra.Minted || extra.Acquired)) ? (extra.Date || extra.Minted || extra.Acquired) : (source === NFT_SOURCE ? '-' : todayDmy()),
+				...(category.contentType === 'collectible' ? { Count: 1 } : {}),
+				// a certificate's date is the day it was earned
+				Date: source === CERTIFICATE_SOURCE && meta.fields.Issued ? meta.fields.Issued : (source === NFT_SOURCE && (extra.Date || extra.Minted || extra.Acquired)) ? (extra.Date || extra.Minted || extra.Acquired) : (source === NFT_SOURCE ? '-' : todayDmy()),
 				Source: source,
 				'Source ID': sourceId,
 			}, extra)
@@ -1033,6 +1037,14 @@ export default class LibraryPlugin extends Plugin {
 		})
 		// only a note added by hand is described at once: an import makes hundreds, and the background walk describes those
 		if (about && await this.describe(file, sourceId, category.contentType, meta.fields)) void this.persistSettings()
+		// a certificate's picture can be a signed link that soon expires (Skilljar): kept in the vault at once;
+		// one the page only draws (Exceed LMS) is photographed there
+		if (source === CERTIFICATE_SOURCE) {
+			const drawn = Platform.isDesktopApp ? drawnCertificate(sourceId) : null
+			const picture = drawn ? await certificatePicture(sourceId, drawn) : null
+			if (picture) await this.saveCover(file, picture, 'png')
+			else await this.localizeCover(file)
+		}
 		return file
 	}
 
@@ -1760,7 +1772,7 @@ export default class LibraryPlugin extends Plugin {
 					resolve(answer !== null)
 					if (answer) void this.watchImport(site, true)
 				})()
-			}, { title: tr(`site.${site}.loginTitle`), extract: (url) => signedInAt(site, url) }).open()
+			}, { title: tr(`site.${site}.loginTitle`), extract: (url) => signedInAt(site, url), pageProbe: site === 'claudeacademy' ? ACADEMY_SIGNED_IN : site === 'googleedu' ? EXCEED_SIGNED_IN : undefined, popupsInPlace: site === 'claudeacademy' }).open()
 		})
 	}
 
@@ -1774,6 +1786,8 @@ export default class LibraryPlugin extends Plugin {
 			return
 		}
 		if (site === 'youtube') return this.youtubeImport(loud)
+		if (site === 'claudeacademy') return this.academyImport(loud)
+		if (site === 'googleedu') return this.googleEduImport(loud)
 		this.watchImporting = true
 		const name = SITE_NAME[site]
 		try {
@@ -1846,6 +1860,114 @@ export default class LibraryPlugin extends Plugin {
 	// YouTube: a note per video, Shorts left out, in the Video category made on first use. The first import brings
 	// the last 7 days, later ones every day since the last; a video seen again on a later day counts a rewatch.
 	// Then one older month a day, back to the start of the history, so years of it never land at once.
+	// Google for Education's certificates into Certificates: the public page of each one on the Credentials list,
+	// which the note is made from (and photographed for its picture) without a sign-in
+	private async googleEduImport(loud: boolean): Promise<void> {
+		this.watchImporting = true
+		const site = SITE_NAME.googleedu
+		try {
+			if (loud) new Notice(tr('notice.site.importing', { site }))
+			const urls = await exceedCertificates()
+			if (urls === 'signed-out') {
+				this.settings.watchSites.googleedu.connected = false
+				await this.saveSettings()
+				new Notice(tr('notice.site.signedOut', { site }))
+				return
+			}
+			if (!urls) { if (loud) new Notice(tr('notice.site.failed', { site })); return }
+			const provider = this.registry.forType('certificate')
+			if (!provider) return
+			const known = new Set<string>()
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (fm && toStr(fm.Source) === CERTIFICATE_SOURCE) known.add(toStr(fm['Source ID']))
+			}
+			let category: ICategory | undefined
+			let created = 0
+			for (const url of urls) {
+				if (this.unloaded) return
+				if (known.has(url)) continue
+				try {
+					const meta = await provider.fetch(url, 'certificate')
+					if (!meta) continue
+					category = category ?? await this.categoryFor('certificate')
+					await this.newNote(category, CERTIFICATE_SOURCE, url, toStr(meta.fields.Name) || url, meta)
+					known.add(url)
+					created++
+				} catch (e) {
+					console.error('Library: Google for Education import error', url, e)
+				}
+			}
+			this.settings.watchSites.googleedu.lastImport = Date.now()
+			await this.saveSettings()
+			if (loud || created > 0) new Notice(tr('notice.site.imported', { site, created, updated: 0 }))
+		} finally {
+			this.watchImporting = false
+		}
+	}
+
+	// Claude Academy's completion badges into Certificates: the list from "Your journey", then for each new
+	// badge its public check, which the note is made and later refreshed from without a sign-in
+	private async academyImport(loud: boolean): Promise<void> {
+		this.watchImporting = true
+		const site = SITE_NAME.claudeacademy
+		try {
+			if (loud) new Notice(tr('notice.site.importing', { site }))
+			const badges = await academyBadges()
+			if (badges === 'signed-out') {
+				this.settings.watchSites.claudeacademy.connected = false
+				await this.saveSettings()
+				new Notice(tr('notice.site.signedOut', { site }))
+				return
+			}
+			if (!badges) { if (loud) new Notice(tr('notice.site.failed', { site })); return }
+			const provider = this.registry.forType('certificate')
+			if (!provider) return
+			const known = new Set<string>()
+			// notes made before badges had pictures get theirs
+			const bare = new Map<string, TFile>()
+			for (const file of this.app.vault.getMarkdownFiles()) {
+				const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
+				if (!fm || toStr(fm.Source) !== CERTIFICATE_SOURCE) continue
+				const badgeId = toStr(fm['Academy Badge ID'])
+				if (badgeId) known.add(badgeId)
+				if (badgeId && !coverValue(fm, this.coverProperty())) bare.set(badgeId, file)
+				known.add(toStr(fm['Source ID']))
+			}
+			let category: ICategory | undefined
+			let created = 0
+			for (const id of badges) {
+				if (this.unloaded) return
+				const bareFile = bare.get(id)
+				if (bareFile) {
+					const picture = (await academyBadge(id))?.picture
+					if (picture) await this.saveCover(bareFile, picture, 'png')
+					continue
+				}
+				if (known.has(id)) continue
+				try {
+					const badge = await academyBadge(id)
+					const url = badge?.verifyUrl ?? ''
+					const meta = url && !known.has(url) ? await provider.fetch(url, 'certificate') : null
+					if (!badge || !meta) continue
+					category = category ?? await this.categoryFor('certificate')
+					const file = await this.newNote(category, CERTIFICATE_SOURCE, url, toStr(meta.fields.Name) || id, meta, { 'Academy Badge ID': id })
+					if (badge.picture) await this.saveCover(file, badge.picture, 'png')
+					known.add(id)
+					known.add(url)
+					created++
+				} catch (e) {
+					console.error('Library: Claude Academy import error', id, e)
+				}
+			}
+			this.settings.watchSites.claudeacademy.lastImport = Date.now()
+			await this.saveSettings()
+			if (loud || created > 0) new Notice(tr('notice.site.imported', { site, created, updated: 0 }))
+		} finally {
+			this.watchImporting = false
+		}
+	}
+
 	private async youtubeImport(loud: boolean): Promise<void> {
 		this.watchImporting = true
 		try {
@@ -3928,7 +4050,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private watchSyncTick(): void {
-		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
+		void this.watchSyncIfDue('imdb').then(() => this.watchSyncIfDue('netflix')).then(() => this.watchSyncIfDue('youtube')).then(() => this.watchSyncIfDue('claudeacademy')).then(() => this.watchSyncIfDue('googleedu')).then(() => this.nftSyncIfDue()).then(() => this.traktSyncIfDue()).catch((e: unknown) => console.error('Library: watch sync error', e))
 	}
 
 	// Nintendo: consent first: a third-party signing service carries the requests
@@ -5069,7 +5191,7 @@ export default class LibraryPlugin extends Plugin {
 		if (this.settings.nintendoTokens) await this.nintendoImport(true)
 		if (this.settings.epicTokens) await this.epicImport(true)
 		if (this.settings.eaTokens) await this.eaImport(true)
-		for (const site of ['imdb', 'netflix', 'youtube'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
+		for (const site of ['imdb', 'netflix', 'youtube', 'claudeacademy', 'googleedu'] as const) if (this.settings.watchSites[site].connected) await this.watchImport(site, true)
 		if (walletPairs(this.settings.nftWallets).length > 0) await this.nftImport(true)
 	}
 
@@ -5299,6 +5421,18 @@ export default class LibraryPlugin extends Plugin {
 		} finally {
 			this.coverWorking = false
 		}
+	}
+
+	// A picture made here rather than downloaded (a Claude Academy badge) into <library>/Covers, linked from the note
+	private async saveCover(file: TFile, data: ArrayBuffer, ext: string): Promise<void> {
+		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
+		await this.ensureFolder(dir)
+		const base = sanitizeFilename(file.basename) || 'Cover'
+		let path = `${dir}/${base}.${ext}`
+		for (let n = 2; this.app.vault.getAbstractFileByPath(path) || await this.app.vault.adapter.exists(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
+		await this.app.vault.createBinary(path, data)
+		const key = this.coverProperty()
+		await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => { current[key] = `[[${path}]]` })
 	}
 
 	private async localizeCover(file: TFile): Promise<void> {
@@ -5914,7 +6048,8 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.categories.some(c => c.typeValue === toStr(fm.Type))) return
 
 		// the properties panel can appear a beat late: retry until the header anchors in mod-header
-		if (!this.insertNoteHeader(view.file, sizer, fm) && this.bannerRetries < 5) {
+		// a note with nothing in it renders an empty sizer for good: after the retries the header goes in anyway
+		if (!this.insertNoteHeader(view.file, sizer, fm, this.bannerRetries >= 5) && this.bannerRetries < 5) {
 			this.bannerRetries += 1
 			if (this.bannerTimer) window.clearTimeout(this.bannerTimer)
 			this.bannerTimer = window.setTimeout(() => this.refreshBanner(), 80)
@@ -5952,7 +6087,7 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// anchors in `mod-header` (survives section re-renders); false when it fell back to a sizer child
-	private insertNoteHeader(file: TFile, root: HTMLElement, fm: Record<string, unknown>): boolean {
+	private insertNoteHeader(file: TFile, root: HTMLElement, fm: Record<string, unknown>, empty = false): boolean {
 		root.querySelectorAll('.note-header-wrap, .library-note-footer').forEach(h => h.remove())
 		const header = this.buildNoteHeader(file, fm)
 		const props = root.querySelector('.metadata-container')
@@ -5964,7 +6099,7 @@ export default class LibraryPlugin extends Plugin {
 			title.insertAdjacentElement('afterend', header)
 		} else if (modHeader) {
 			modHeader.appendChild(header)
-		} else if (root.childElementCount > 0) {
+		} else if (root.childElementCount > 0 || empty) {
 			// pre-1.13 renderers take a plain sizer child; an empty sizer has not rendered yet
 			root.insertBefore(header, root.firstChild)
 		} else {
@@ -6180,7 +6315,8 @@ export default class LibraryPlugin extends Plugin {
 			new ShareModal(this.app, fm, name, this.coverProperty()).open()
 		})
 		const video = toStr(fm.Source) === YOUTUBE_SOURCE
-		if (toStr(fm.Source) === NFT_SOURCE) {
+		// a token or a certificate is kept, not scored: a favorite star instead of a rating
+		if (toStr(fm.Source) === NFT_SOURCE || toStr(fm.Source) === CERTIFICATE_SOURCE) {
 			const on = fm.Favorite === true
 			const star = titleEl.createEl('button', { cls: `note-header-favorite${on ? ' is-on' : ''}`, attr: { 'aria-label': tr('header.favorite'), 'aria-pressed': on ? 'true' : 'false' } })
 			setIcon(star, 'star')
@@ -6261,7 +6397,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		const nft = toStr(fm.Source) === NFT_SOURCE
-		addNames(tr(nft ? 'header.collection' : kind === 'collectible' ? 'collection.illustrator' : 'header.creator'), creators)
+		addNames(tr(nft ? 'header.collection' : kind === 'collectible' ? 'collection.illustrator' : kind === 'certificate' ? 'header.issuer' : 'header.creator'), creators)
 		if (nft) {
 			const standard = toStr(fm.Standard)
 			if (standard) addRow(tr('header.standard'), standard)
@@ -6369,7 +6505,12 @@ export default class LibraryPlugin extends Plugin {
 		const airing = this.airingFor(fm)
 		if (airing) addRow(tr('header.nextEpisode'), airingLabel(airing))
 
-		addNames(tr('header.genre'), toStrArray(fm.Genre))
+		addNames(tr(kind === 'certificate' ? 'header.skills' : 'header.genre'), toStrArray(fm.Genre))
+		if (kind === 'certificate') {
+			addRow(tr('header.issued'), toStr(fm.Issued))
+			addRow(tr('header.expires'), toStr(fm.Expires))
+			addRow(tr('header.credentialId'), toStr(fm['Credential ID']))
+		}
 		this.addAwards(infoSide, fm, name, kind)
 		const countries = toStrArray(fm.Country)
 		if (countries.length > 0) addRow(tr('filter.country'), countries.join(', '))
@@ -6393,7 +6534,7 @@ export default class LibraryPlugin extends Plugin {
 		if (fm['Last Played']) addRow(tr('header.lastPlayed'), toStr(fm['Last Played']))
 
 		// a token is a favorite or not, a video liked or disliked on YouTube: neither is scored
-		if (!video && toStr(fm.Source) !== NFT_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
+		if (!video && toStr(fm.Source) !== NFT_SOURCE && toStr(fm.Source) !== CERTIFICATE_SOURCE) scores.appendChild(this.ratingStars(file, Number(myRating) || 0))
 		addScore('IMDb', ratingIMDB, 'is-imdb')
 		addScore(RATING_RT_ICON, ratingRT, 'is-rt')
 		addScore('RAWG', ratingRawg, 'is-rawg')
@@ -6422,7 +6563,7 @@ export default class LibraryPlugin extends Plugin {
 		}
 
 		// Complete as a switch in the header: with the properties hidden, a note offers no other way to set it
-		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
+		if (trackingOf(kind) !== 'progress' && kind !== 'collectible' && kind !== 'certificate' && toStr(fm.Source) !== NFT_SOURCE && fm.Type !== NFT_TYPE) {
 			const toggle = top.createEl('button', { cls: `note-header-complete${complete ? ' is-on' : ''}`, attr: { 'aria-pressed': complete ? 'true' : 'false' } })
 			setIcon(toggle.createSpan(), complete ? 'check-circle-2' : 'circle')
 			toggle.createSpan({ text: tr(complete ? 'header.complete' : 'header.markComplete') })
@@ -7709,8 +7850,8 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.imdbEcho || typeof this.settings.imdbEcho !== 'object') this.settings.imdbEcho = {}
 		if (!this.settings.netflixEcho || typeof this.settings.netflixEcho !== 'object') this.settings.netflixEcho = {}
 		const sites = (this.settings.watchSites && typeof this.settings.watchSites === 'object' ? this.settings.watchSites : {}) as Partial<ILibrarySettings['watchSites']>
-		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 } }
-		for (const site of ['imdb', 'netflix', 'youtube'] as const) {
+		this.settings.watchSites = { imdb: { connected: false, lastImport: 0 }, netflix: { connected: false, lastImport: 0 }, youtube: { connected: false, lastImport: 0 }, claudeacademy: { connected: false, lastImport: 0 }, googleedu: { connected: false, lastImport: 0 } }
+		for (const site of ['imdb', 'netflix', 'youtube', 'claudeacademy', 'googleedu'] as const) {
 			const saved = sites[site]
 			if (saved && typeof saved === 'object') this.settings.watchSites[site] = { connected: saved.connected === true, lastImport: typeof saved.lastImport === 'number' ? saved.lastImport : 0 }
 		}

@@ -32,6 +32,7 @@
 - Ticking an episode or a chapter, or marking a title complete, writes the day into the note's `Log` property.
 - A sync button on each category pulls new data from its connected services and sources. The statistics can show an activity grid, a cell per day as on GitHub.
 - A Collection category keeps Pokémon, Magic and Yu-Gi-Oh! cards with their set, price and the cards still missing, and coins, banknotes and tokens from Numista with your free Numista key. A book without chapters writes the pages or listening time you got through that day.
+- A Certificates category keeps your certificates and badges: paste the link to one into the search and the note gets its name, who issued it, the dates it was issued and expires, its skills and its picture. Credly badges, Claude Academy badges, Google for Education certificates (Exceed LMS), Anthropic Academy certificates and any page that publishes an Open Badge work, no key.
 - A `library` code block puts cards in any note, picked by category, genre, year or score, or shows what you are in the middle of, the Soon list or the statistics.
 - One command draws your library as a canvas, with posters grouped around the actors and creators they share, and each category has its own, grouped by creator, actor and genre.
 - Turn on "Keep covers in the vault" and covers go to a Covers folder, so the library looks the same without internet.
@@ -64,8 +65,10 @@ Connect an account in the plugin settings. Your lists arrive as notes, and anime
 - <img src="assets/connectors/nintendo.svg" width="18" height="18" alt=""> **Nintendo Switch**: played games and playtime
 - <img src="assets/connectors/epic.svg" width="18" height="18" alt=""> **Epic Games**: library and store links
 - <img src="assets/connectors/ea.svg" width="18" height="18" alt=""> **EA App**: library and playtime from your sessions
+- <img src="assets/connectors/claude.svg" width="18" height="18" alt=""> **Claude Academy**: your completion badges, with their pictures and verification codes, into Certificates; sign in with your email and the code Claude sends
+- <img src="assets/connectors/google.svg" width="18" height="18" alt=""> **Google for Education**: your certificates, such as Gemini Academy, with their pictures and dates, into Certificates; sign in with Google
 
-Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games and EA App work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
+Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games, EA App, Claude Academy and Google for Education work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
 
 ## Sources
 
@@ -134,6 +137,11 @@ Nintendo accepts requests only from its own app, so they pass through a third-pa
 | `openlibrary.org`, `covers.openlibrary.org` | Books, chapters, covers | Title, author, ISBN, genres |
 | `api.tcgdex.net`, `assets.tcgdex.net`, `api.scryfall.com`, `cards.scryfall.io`, `db.ygoprodeck.com`, `images.ygoprodeck.com` | Collection: Pokémon, Magic and Yu-Gi-Oh! cards, their sets and prices, no key | Card name, set |
 | `api.numista.com`, `en.numista.com` | Collection: coins, banknotes and tokens, with your Numista key | Search text, Numista ID, key |
+| `www.credly.com`, `images.credly.com` | Certificates: a Credly badge's Open Badges record and picture | The badge's ID |
+| `academy.claude.com`, `claude.ai` | Certificates: a Claude Academy badge checked by its code; the Claude Academy connector signs in on the academy's page and reads your badges in a hidden window | The badge's code; sign-in |
+| `edu.exceedlms.com` and other `*.exceedlms.com` | Certificates: a Google for Education (Gemini Academy) or other Exceed LMS award page, read and photographed for its picture; the Google for Education connector signs in with Google and reads your Credentials list in a hidden window | The award's link; sign-in |
+| `verify.skilljar.com`, `cc.sj-cdn.net` | Certificates: an Anthropic Academy certificate's page and picture | The certificate's link |
+| The certificate page you paste | Certificates: its Open Badge or share tags | The link |
 | `api.audible.com`, `itunes.apple.com`, `books.apple.com`, `is1-ssl.mzstatic.com` to `is5-ssl.mzstatic.com`, `librivox.org`, `archive.org` | Audiobook search, length, covers, chapters | Title and author |
 | `www.googleapis.com`, `books.google.com` | Book search with a key, covers | Title, key |
 | `api.rawg.io`, `media.rawg.io` | Games, with a key | Title or id, genre, key |

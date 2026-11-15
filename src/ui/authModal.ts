@@ -23,6 +23,8 @@ export interface AuthModalOptions {
 	// Some sites keep the token in page storage instead of the redirect URL;
 	// poll this expression in the guest page and take a truthy result as the answer.
 	pageProbe?: string
+	// A sign-in that hops through another site's sign-in (Claude's) opens each popup in the sign-in window itself
+	popupsInPlace?: boolean
 }
 
 interface ElectronBrowserWindow {
@@ -110,6 +112,10 @@ export class AuthModal extends Modal {
 		// Popups for Google/Apple sign-ins share the partition so cookies carry over.
 		const openPopup = (targetUrl: string): void => {
 			if (!targetUrl) return
+			if (this.opts.popupsInPlace) {
+				navigateGuest(targetUrl)
+				return
+			}
 			if (this.activePopup && !this.activePopup.isDestroyed()) {
 				this.activePopup.loadURL(targetUrl)
 				return
@@ -195,11 +201,21 @@ export class AuthModal extends Modal {
 		view.addEventListener('render-process-gone', () => trail.push('webview crashed'))
 		this.timerWin = win
 		this.poll = win.setInterval(() => {
+			// the window was taken off the page without closing: nothing left to ask
+			if (!view.isConnected) {
+				win.clearInterval(this.poll)
+				return
+			}
 			const guest = view as unknown as {
 				getURL?: () => string
 				executeJavaScript?: (code: string, userGesture: boolean) => unknown
 			}
-			if (guest.getURL) arrive(guest.getURL())
+			// before its first dom-ready a webview answers nothing but an error
+			try {
+				if (guest.getURL) arrive(guest.getURL())
+			} catch {
+				return
+			}
 			if (this.opts.pageProbe && guest.executeJavaScript) {
 				// The webview runs the call over IPC: a third callback argument fails
 				// structured clone, so only the two-argument promise form delivers.

@@ -836,7 +836,7 @@ export class LibraryRenderer {
 		const { file, fm } = card
 		// album covers and NFTs are square, video thumbnails wide
 		const cardEl = grid.createDiv({
-			cls: card.kind === 'music' || toStr(fm.Source) === 'nft' ? 'library-card is-square' : toStr(fm.Source) === 'youtube' ? 'library-card is-wide' : 'library-card',
+			cls: card.kind === 'music' || toStr(fm.Source) === 'nft' ? 'library-card is-square' : toStr(fm.Source) === 'youtube' ? 'library-card is-wide' : toStr(fm.Source) === 'certificates' ? 'library-card is-landscape' : 'library-card',
 			attr: {
 				'role': 'button',
 				'tabindex': '0',
@@ -885,6 +885,7 @@ export class LibraryRenderer {
 				: type === 'book' ? '📖'
 				: type === 'game' ? '🎮'
 				: type === 'music' ? '🎵'
+				: type === 'certificate' ? '🏅'
 				: type === 'manual' ? '📝'
 				: '🎬'
 			imgDiv.createSpan({ text: emoji })
@@ -979,7 +980,7 @@ export class LibraryRenderer {
 		// a video: likes, dislikes and views where a score would be; your own like or dislike filled
 		if (video) this.renderVotes(info, fm)
 		// an NFT's star where a score would be: filled for a favorite; it is set in the note
-		if (toStr(fm.Source) === 'nft') {
+		if (toStr(fm.Source) === 'nft' || toStr(fm.Source) === 'certificates') {
 			const on = fm.Favorite === true
 			const star = info.createDiv({ cls: 'card-rating card-favorite-row' }).createSpan({ cls: `card-favorite${on ? ' is-on' : ''}`, attr: on ? { 'role': 'img', 'aria-label': tr('header.favorite') } : { 'aria-hidden': 'true' } })
 			setIcon(star, 'star')
@@ -1371,11 +1372,19 @@ export class LibraryView extends ItemView {
 		})
 		const sortMenu = sortDropdown.createDiv({ cls: 'library-sort-menu' })
 
-		const grid = section.createDiv({ cls: 'library-grid' })
+		// certificates and badges are landscape pictures: wider columns, so a card shows the whole of one
+		const badges = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
+		const grid = section.createDiv({ cls: badges ? 'library-grid is-landscape' : 'library-grid' })
 
 		// tokens have no year, rating or progress: their own keys instead
 		const collectibles = cards.length > 0 && cards.every(card => isCollectible(card.fm))
-		const sortOptions: { label: string; key: SortKey }[] = collectibles ? [
+		const certificates = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
+		const sortOptions: { label: string; key: SortKey }[] = certificates ? [
+			{ label: tr('sort.name'), key: 'name' },
+			{ label: tr('sort.date'), key: 'date' },
+			{ label: tr('sort.modified'), key: 'modified' },
+			{ label: tr('header.favorite'), key: 'favorite' },
+		] : collectibles ? [
 			{ label: tr('sort.name'), key: 'name' },
 			{ label: tr('header.minted'), key: 'minted' },
 			{ label: tr('sort.modified'), key: 'modified' },
@@ -1395,7 +1404,7 @@ export class LibraryView extends ItemView {
 
 		const restored = this.readSort(spec.sortId, spec.defaultSort)
 		// Date and Minted are one date on a token: an older choice of Date reads as Minted
-		if (collectibles && restored.key === 'date') restored.key = 'minted'
+		if (collectibles && !certificates && restored.key === 'date') restored.key = 'minted'
 		const fallback = sortOptions.some(o => o.key === spec.defaultSort.key) ? spec.defaultSort : { key: 'date' as SortKey, asc: false }
 		const savedSort = sortOptions.some(o => o.key === restored.key) ? restored : fallback
 		let currentSort: SortKey = savedSort.key
