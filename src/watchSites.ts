@@ -313,11 +313,14 @@ async function photograph(url: string, code: string): Promise<{ answer: Record<s
 	}
 }
 
-// the box of `selector` once it and its fonts are in, as `photograph` reads it
-const boxOf = (selector: string, extra = "{}"): string => `(async () => {
+// the box of `selector` once it and its fonts are in, as `photograph` reads it. The selector goes into code
+// run in the page, so it keeps only the characters a plain class or tag selector has.
+const boxOf = (selector: string, extra = "{}"): string => {
+	const sel = selector.replace(/[^\w.\- ]/g, '')
+	return `(async () => {
 	for (let i = 0; i < 60; i++) {
-		if (document.querySelector('a[href*="/login"]') && !document.querySelector(${JSON.stringify(selector)})) return ''
-		const el = document.querySelector(${JSON.stringify(selector)})
+		if (document.querySelector('a[href*="/login"]') && !document.querySelector('${sel}')) return ''
+		const el = document.querySelector('${sel}')
 		if (el) {
 			await document.fonts.ready
 			// pictures inside it (an SVG certificate's background) load on their own time
@@ -336,6 +339,7 @@ const boxOf = (selector: string, extra = "{}"): string => `(async () => {
 	}
 	return ''
 })()`
+}
 
 // One badge page, read and photographed: the page draws the badge itself and serves no file of it
 export async function academyBadge(badgeId: string): Promise<AcademyBadge | null> {

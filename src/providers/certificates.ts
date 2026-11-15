@@ -46,13 +46,16 @@ async function getJson<T>(url: string): Promise<T | null> {
 	}
 }
 
-const decode = (text: string): string => text
-	.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&#x27;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-	.replace(/\s+/g, ' ').trim()
+// a page is read as a document, never run: no script in it executes, and its entities come decoded
+const parse = (html: string): Document => new DOMParser().parseFromString(html, 'text/html')
 
-function meta(html: string, name: string): string {
-	const tag = new RegExp(`<meta[^>]+(?:property|name)=["']${name}["'][^>]*>`, 'i').exec(html)?.[0] ?? ''
-	return decode(/content=["']([^"']*)["']/i.exec(tag)?.[1] ?? '')
+const clean = (text: string | null | undefined): string => (text ?? '').replace(/\s+/g, ' ').trim()
+
+function meta(doc: Document, name: string): string {
+	for (const tag of Array.from(doc.querySelectorAll('meta'))) {
+		if (tag.getAttribute('property') === name || tag.getAttribute('name') === name) return clean(tag.getAttribute('content'))
+	}
+	return ''
 }
 
 // "May 6, 2026" or an ISO date, as the note's dd.mm.yyyy
@@ -84,20 +87,22 @@ async function openBadge(assertionUrl: string, pageUrl: string): Promise<Certifi
 }
 
 // The verify page lists its facts as label, then value
-function skilljar(html: string, url: string): Certificate | null {
-	const lines = html.replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi, '').split(/<[^>]+>/).map(decode).filter(Boolean)
+function skilljar(doc: Document, url: string): Certificate | null {
+	const lines = Array.from(doc.body.querySelectorAll('*'))
+		.filter(el => el.children.length === 0 && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE')
+		.map(el => clean(el.textContent)).filter(Boolean)
 	const after = (label: string): string => {
 		const i = lines.indexOf(label)
 		return i >= 0 ? lines[i + 1] ?? '' : ''
 	}
-	const name = after('Course Completed') || meta(html, 'og:title').replace(/^Certificate for /, '')
+	const name = after('Course Completed') || meta(doc, 'og:title').replace(/^Certificate for /, '')
 	if (!name) return null
 	return {
 		name,
 		issuer: after('Offered By'),
 		issued: dateOf(after('Completion Date')),
 		expires: dateOf(after('Expiration Date')),
-		image: meta(html, 'og:image'),
+		image: meta(doc, 'og:image'),
 		skills: [],
 		description: '',
 		url,
@@ -131,14 +136,16 @@ export function credentialId(url: string): string {
 
 // The award page draws the certificate as an SVG: the activity's name heads the page, the issue and expiry
 // dates are its texts, the program its title
-function exceed(html: string, url: string): Certificate | null {
-	const name = decode((/<h1[^>]*>\s*<a[^>]*>([^<]+)<\/a>/i.exec(html)?.[1] ?? '').trim())
+function exceed(doc: Document, url: string): Certificate | null {
+	const name = clean(doc.querySelector('h1 a')?.textContent)
 	if (!name) return null
-	const program = decode(/<svg[\s\S]*?<title>([^<]+)<\/title>/i.exec(html)?.[1] ?? '')
-	const site = decode(/<title>([^<]+)<\/title>/i.exec(html.replace(/<svg[\s\S]*?<\/svg>/gi, ''))?.[1] ?? '')
+	const program = clean(doc.querySelector('svg title')?.textContent)
+	const site = clean(doc.querySelector('head title')?.textContent)
 	const dates: string[] = []
-	for (const m of html.match(/<tspan[^>]*>\s*\d{2}\/\d{2}\/\d{4}\s*<\/tspan>/g) ?? []) {
-		const [mm, dd, yyyy] = (/\d{2}\/\d{2}\/\d{4}/.exec(m)?.[0] ?? '').split('/')
+	for (const span of Array.from(doc.querySelectorAll('tspan'))) {
+		const date = /^\d{2}\/\d{2}\/\d{4}$/.exec(clean(span.textContent))?.[0]
+		if (!date) continue
+		const [mm, dd, yyyy] = date.split('/')
 		const dmy = `${dd ?? ''}.${mm ?? ''}.${yyyy ?? ''}`
 		if (dates.indexOf(dmy) < 0) dates.push(dmy)
 	}
@@ -168,25 +175,25 @@ export async function readCertificate(url: string): Promise<Certificate | null> 
 	if (EXCEED.test(url)) {
 		// in English the dates come as MM/DD/YYYY; another language writes them its own way
 		const html = await getText(url, { 'Accept-Language': 'en-US,en;q=0.9' })
-		return html ? exceed(html, url) : null
+		return html ? exceed(parse(html), url) : null
 	}
 	const credly = CREDLY_BADGE.exec(url)
 	if (credly) return openBadge(`https://www.credly.com/api/v1/obi/v2/badge_assertions/${credly[1] ?? ''}`, url)
 	const html = await getText(url)
 	if (!html) return null
-	if (SKILLJAR.test(url)) return skilljar(html, url)
+	const doc = parse(html)
+	if (SKILLJAR.test(url)) return skilljar(doc, url)
 	// an issuer that publishes Open Badges links the assertion from the page
-	const assertion = /<link[^>]+type=["']application\/ld\+json["'][^>]*href=["']([^"']+)["']/i.exec(html)?.[1]
-		?? /<link[^>]+href=["']([^"']+)["'][^>]*type=["']application\/ld\+json["']/i.exec(html)?.[1]
-	if (assertion?.startsWith('https://')) {
-		const found = await openBadge(decode(assertion), url)
+	const assertion = doc.querySelector('link[type="application/ld+json"]')?.getAttribute('href') ?? ''
+	if (assertion.startsWith('https://')) {
+		const found = await openBadge(assertion, url)
 		if (found) return found
 	}
 	// share tags alone: only a page that says it is a certificate, else every pasted link would be one
 	if (!/certificat|credential|badge|verif|accomplishment/i.test(url)) return null
-	const name = meta(html, 'og:title') || decode(/<title>([^<]*)<\/title>/i.exec(html)?.[1] ?? '')
+	const name = meta(doc, 'og:title') || clean(doc.title)
 	if (!name) return null
-	return { name, issuer: meta(html, 'og:site_name'), issued: '', expires: '', image: meta(html, 'og:image'), skills: [], description: meta(html, 'og:description'), url }
+	return { name, issuer: meta(doc, 'og:site_name'), issued: '', expires: '', image: meta(doc, 'og:image'), skills: [], description: meta(doc, 'og:description'), url }
 }
 
 export class CertificateProvider implements ContentProvider {
