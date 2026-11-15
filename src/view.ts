@@ -934,7 +934,10 @@ export class LibraryRenderer {
 		})
 
 		const cover = card.cover || coverValue(fm, this.plugin.settings.coverProperty)
-		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
+		const shell = cardEl.createDiv({ cls: 'card-image' })
+		// a floppy's label and a framed certificate are a picture inside the object: the picture and the marks on it
+		// (platform, progress) go on that, not on the plastic or the mat around it
+		const imgDiv = grid.hasClass('is-floppy') || grid.hasClass('is-frame') ? shell.createDiv({ cls: 'card-surface' }) : shell
 		let cardCover = coverSrc(this.app, cover)
 		if (cardCover && isCollectible(fm)) cardCover = viaPinata(cardCover)
 		// some NFT pictures are short videos
