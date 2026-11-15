@@ -137,8 +137,10 @@ const OBJECT_LOOK: Partial<Record<ContentType, string>> = {
 	book: 'shelf', comic: 'paper', movie: 'case', series: 'case', anime: 'case', game: 'case', music: 'jewel', certificate: 'frame',
 }
 
-// the look a category takes shown as things; videos (a manual category of their own) go on floppy disks
+// the look a category takes shown as things; videos (a manual category of their own) go on floppy disks, NFTs
+// become holographic collectible cards
 function lookOf(category: ICategory): string | undefined {
+	if (isNftCategory(category)) return 'holo'
 	if (category.contentType === 'manual') return category.typeValue === VIDEO_CATEGORY ? 'floppy' : undefined
 	return OBJECT_LOOK[category.contentType]
 }
@@ -1430,7 +1432,7 @@ export class LibraryView extends ItemView {
 			const on = this.plugin.settings.objectViews.indexOf(category.typeValue) >= 0
 			const lookBtn = toolbar.createEl('button', { cls: `library-category-map-btn${on ? ' is-active' : ''}`, attr: { 'aria-label': tr('view.objects'), 'aria-pressed': on ? 'true' : 'false' } })
 			setTooltip(lookBtn, tr('view.objects'), { placement: 'top' })
-			setIcon(lookBtn, category.contentType === 'book' ? 'library' : category.contentType === 'certificate' ? 'frame' : category.contentType === 'comic' ? 'book-open' : category.contentType === 'manual' ? 'save' : 'disc')
+			setIcon(lookBtn, category.contentType === 'book' ? 'library' : category.contentType === 'certificate' ? 'frame' : category.contentType === 'comic' ? 'book-open' : isNftCategory(category) ? 'gem' : category.contentType === 'manual' ? 'save' : 'disc')
 			lookBtn.addEventListener('click', (e) => {
 				e.stopPropagation()
 				const views = this.plugin.settings.objectViews

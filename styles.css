@@ -3781,3 +3781,69 @@ sort trigger, the chosen one in the accent colour. */
 	left: 4px;
 	bottom: 4px;
 }
+
+/* NFTs as holographic collectible cards: a card of trading-card proportions with an iridescent rim, the picture in
+   its window and the name printed on the dark panel below; a foil glint crosses it on hover */
+.library-view .library-grid.is-holo {
+	grid-template-columns: repeat(auto-fill, 190px);
+	gap: 24px 22px;
+	padding: 4px 16px 26px;
+}
+
+.library-view .library-grid.is-holo.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 190px;
+}
+
+.library-grid.is-holo .library-card {
+	position: relative;
+	aspect-ratio: 63 / 88;
+	padding: 7px;
+	border-radius: 14px;
+	overflow: hidden;
+	background: conic-gradient(from 200deg at 50% 50%, #ff6ec4, #7873f5, #38bdf8, #4ade80, #facc15, #fb923c, #ff6ec4);
+	box-shadow: 0 10px 20px -6px rgba(0, 0, 0, 0.6), 0 2px 4px rgba(0, 0, 0, 0.4);
+	transition: transform 0.2s ease-out;
+}
+
+.library-grid.is-holo .library-card:hover {
+	transform: translateY(-6px);
+}
+
+.library-grid.is-holo .card-image {
+	aspect-ratio: 1 / 1;
+	border-radius: 9px 9px 2px 2px;
+	overflow: hidden;
+	background: #0d0d14;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.library-grid.is-holo .card-image img {
+	border-radius: 0;
+}
+
+.library-grid.is-holo .card-info {
+	flex: 1;
+	margin-top: 5px;
+	border-radius: 2px 2px 9px 9px;
+	background: linear-gradient(to bottom, rgba(18, 18, 30, 0.92), rgba(8, 8, 14, 0.96));
+	color: #f2f2f7;
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+/* the foil glint, moved with transform only */
+.library-grid.is-holo .library-card::after {
+	content: "";
+	position: absolute;
+	inset: -40% -60%;
+	background: linear-gradient(115deg, transparent 38%, rgba(255, 255, 255, 0.28) 48%, rgba(255, 255, 255, 0.06) 54%, transparent 62%);
+	transform: translateX(-35%);
+	opacity: 0;
+	transition: transform 0.7s ease-out, opacity 0.3s;
+	pointer-events: none;
+}
+
+.library-grid.is-holo .library-card:hover::after {
+	transform: translateX(35%);
+	opacity: 1;
+}
