@@ -856,7 +856,7 @@ export class LibraryRenderer {
 		const pages = Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1] ?? fm.Pages) || 0
 		const seed = spineColor(card.name)
 		spine.style.setProperty('--spine-width', `${String(Math.max(38, Math.min(92, pages ? 26 + pages / 11 : 50)))}px`)
-		spine.style.setProperty('--spine-height', `${String(270 + (card.name.length * 7) % 60)}px`)
+		spine.style.setProperty('--spine-height', `${String(250 + (card.name.length * 7) % 46)}px`)
 		spine.style.setProperty('--spine-color', seed)
 		const creator = toStrArray(fm.Creator).map(linkLabel)[0] ?? ''
 		spine.createSpan({ cls: 'library-spine-title', text: card.name })

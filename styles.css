@@ -3427,8 +3427,8 @@ sort trigger, the chosen one in the accent colour. */
 	align-items: flex-end;
 	gap: 0 4px;
 	padding: 0 16px;
-	/* a board under every row of 356px */
-	background-image: linear-gradient(to bottom, transparent 340px, color-mix(in srgb, var(--text-faint) 55%, transparent) 340px, color-mix(in srgb, var(--text-faint) 30%, transparent) 356px);
+	/* a board under every row, the same as under the disc shelves */
+	background-image: linear-gradient(to bottom, transparent 330px, color-mix(in srgb, var(--text-faint) 55%, transparent) 330px, color-mix(in srgb, var(--text-faint) 30%, transparent) 346px, transparent 346px);
 	background-size: 100% 356px;
 }
 
@@ -3438,8 +3438,8 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-spine-slot {
-	height: 340px;
-	margin-bottom: 16px;
+	height: 330px;
+	margin-bottom: 26px;
 	display: flex;
 	align-items: flex-end;
 	flex-shrink: 0;
