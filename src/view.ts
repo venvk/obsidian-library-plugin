@@ -924,7 +924,7 @@ export class LibraryRenderer {
 			}
 		})
 		// a framed certificate or a boxed disc shows no text: its name comes up on hover
-		if (grid.hasClass('is-frame') || grid.hasClass('is-case') || grid.hasClass('is-jewel') || grid.hasClass('is-floppy') || grid.hasClass('is-holo')) setTooltip(cardEl, card.name, { placement: 'top' })
+		if (grid.hasClass('is-frame') || grid.hasClass('is-case') || grid.hasClass('is-jewel') || grid.hasClass('is-floppy') || grid.hasClass('is-holo') || grid.hasClass('is-paper')) setTooltip(cardEl, card.name, { placement: 'top' })
 		cardEl.addEventListener('click', () => {
 			void this.app.workspace.getLeaf(false).openFile(file)
 		})
