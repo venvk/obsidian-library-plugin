@@ -10,7 +10,7 @@ import { comparisonOfTheDay, comparisonText } from './facts'
 import { renderTrophies } from './ui/trophyIcons'
 import { tasteOf } from './taste'
 import { activityDays, logOf, todayIso } from './diary'
-import { renderPlatformLabels, renderPlatforms } from './ui/platformIcons'
+import { platformFamily, renderPlatformLabels, renderPlatforms } from './ui/platformIcons'
 import { YOUTUBE_TYPE } from './youtube'
 import {
 	toStr,
@@ -135,6 +135,18 @@ function filterCards(cards: CardData[], chosen: Record<string, string>): CardDat
 // and games in disc cases, albums in CD cases, certificates framed
 const OBJECT_LOOK: Partial<Record<ContentType, string>> = {
 	book: 'shelf', comic: 'paper', movie: 'case', series: 'case', anime: 'case', game: 'case', music: 'jewel', certificate: 'frame',
+}
+
+// The band across the top of a disc case: Blu-ray for a film, the platform's own for a game
+function caseBand(card: CardData): { cls: string; text: string } {
+	if (card.kind !== 'game') return { cls: 'is-bluray', text: 'BLU-RAY DISC' }
+	for (const platform of toStrArray(card.fm.Platforms)) {
+		const family = platformFamily(platform)
+		if (family === 'playstation') return { cls: 'is-playstation', text: (/ps\s?\d/i.exec(platform)?.[0] ?? 'PlayStation').replace(/\s/, '').toUpperCase() }
+		if (family === 'xbox') return { cls: 'is-xbox', text: 'XBOX' }
+		if (family === 'nintendo') return { cls: 'is-nintendo', text: 'NINTENDO SWITCH' }
+	}
+	return { cls: 'is-pc', text: 'PC' }
 }
 
 // a colour of its own for a title with no cover to take one from, the same every time
@@ -904,8 +916,8 @@ export class LibraryRenderer {
 				'aria-label': card.name
 			}
 		})
-		// a framed certificate shows no text: its name comes up on hover
-		if (grid.hasClass('is-frame')) setTooltip(cardEl, card.name, { placement: 'top' })
+		// a framed certificate or a boxed disc shows no text: its name comes up on hover
+		if (grid.hasClass('is-frame') || grid.hasClass('is-case') || grid.hasClass('is-jewel')) setTooltip(cardEl, card.name, { placement: 'top' })
 		cardEl.addEventListener('click', () => {
 			void this.app.workspace.getLeaf(false).openFile(file)
 		})
@@ -918,6 +930,10 @@ export class LibraryRenderer {
 
 		const cover = card.cover || coverValue(fm, this.plugin.settings.coverProperty)
 		const imgDiv = cardEl.createDiv({ cls: 'card-image' })
+		if (grid.hasClass('is-case')) {
+			const band = caseBand(card)
+			imgDiv.createDiv({ cls: `library-case-band ${band.cls}`, text: band.text })
+		}
 		let cardCover = coverSrc(this.app, cover)
 		if (cardCover && isCollectible(fm)) cardCover = viaPinata(cardCover)
 		// some NFT pictures are short videos

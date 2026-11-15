@@ -3517,25 +3517,82 @@ sort trigger, the chosen one in the accent colour. */
 	pointer-events: none;
 }
 
-.library-grid.is-case .card-image {
-	border: 5px solid #2e3138;
-	border-left-width: 15px;
-	border-radius: 8px;
-	/* the plastic's lit rim, its inner edge, and the case's shadow */
-	box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.22), inset 0 0 0 1px rgba(0, 0, 0, 0.7), 0 5px 12px rgba(0, 0, 0, 0.55);
-	background: #2e3138;
+.library-grid.is-case .library-card,
+.library-grid.is-jewel .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
 }
 
-/* the case's hinge: a seam down the spine */
+.library-grid.is-case .card-info,
+.library-grid.is-jewel .card-info {
+	display: none;
+}
+
+/* A disc case: dark plastic, a band across the top, the sleeve under clear film, and the case's depth
+   showing on the right and below */
+.library-grid.is-case .card-image {
+	flex-direction: column;
+	justify-content: flex-start;
+	padding: 0 4px 4px 13px;
+	border-radius: 7px;
+	background: linear-gradient(to right, #1d1f24, #2c2f36 12%, #24262c);
+	box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16), 2px 2px 0 #15161a, 4px 4px 0 #0e0f12, 6px 9px 16px rgba(0, 0, 0, 0.55);
+}
+
+/* the hinge: a ridge down the spine */
 .library-grid.is-case .card-image::before {
 	content: "";
 	position: absolute;
-	top: -5px;
-	bottom: -5px;
-	left: -9px;
-	width: 2px;
-	background: linear-gradient(to bottom, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.05));
+	top: 3px;
+	bottom: 3px;
+	left: 4px;
+	width: 3px;
+	border-radius: 2px;
+	background: linear-gradient(to right, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0.5));
 	pointer-events: none;
+}
+
+.library-case-band {
+	flex: none;
+	width: 100%;
+	height: 9%;
+	min-height: 15px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	margin-bottom: 3px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.12em;
+	color: #ffffff;
+	border-radius: 0 0 2px 2px;
+}
+
+.library-case-band.is-bluray {
+	background: linear-gradient(to bottom, #2a7de1, #0b4fa8);
+}
+
+.library-case-band.is-playstation {
+	background: linear-gradient(to bottom, #1b7fe0, #0050a8);
+}
+
+.library-case-band.is-xbox {
+	background: linear-gradient(to bottom, #2a9d2a, #0e6b0e);
+}
+
+.library-case-band.is-nintendo {
+	background: linear-gradient(to bottom, #f0262f, #b80d15);
+}
+
+.library-case-band.is-pc {
+	background: linear-gradient(to bottom, #3a3d45, #1d1f24);
+}
+
+.library-grid.is-case .card-image img {
+	flex: 1;
+	min-height: 0;
+	height: auto;
 }
 
 .library-grid.is-case .card-image img,
