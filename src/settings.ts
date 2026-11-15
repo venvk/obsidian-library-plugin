@@ -342,6 +342,19 @@ export class LibrarySettingTab extends PluginSettingTab {
 						},
 					},
 					{
+						name: tr("settings.shelfView.name"),
+						desc: tr("settings.shelfView.desc"),
+						render: (row) => {
+							row.addToggle((toggle) =>
+								toggle.setValue(this.plugin.settings.shelfView).onChange(async (value) => {
+									this.plugin.settings.shelfView = value;
+									await this.plugin.saveSettings();
+									this.plugin.refreshViews();
+								}),
+							);
+						},
+					},
+					{
 						name: tr("settings.upNext.name"),
 						desc: tr("settings.upNext.desc"),
 						render: (row) => {

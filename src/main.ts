@@ -7788,7 +7788,11 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.sortState || typeof this.settings.sortState !== 'object') this.settings.sortState = {}
 		if (!this.settings.filterState || typeof this.settings.filterState !== 'object') this.settings.filterState = {}
 		if (!Array.isArray(this.settings.searchFolded)) this.settings.searchFolded = []
-		if (!Array.isArray(this.settings.objectViews)) this.settings.objectViews = []
+		// an earlier build kept the shelves per category: any one on turns the whole view on
+		const older = (this.settings as unknown as Record<string, unknown>).objectViews
+		if (Array.isArray(older) && older.length > 0) this.settings.shelfView = true
+		delete (this.settings as unknown as Record<string, unknown>).objectViews
+		if (typeof this.settings.shelfView !== 'boolean') this.settings.shelfView = false
 		this.settings.searchFolded = this.settings.searchFolded.filter((type): type is string => typeof type === 'string')
 		if (typeof this.settings.statsCollapsed !== 'boolean') this.settings.statsCollapsed = false
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true

@@ -864,7 +864,7 @@ export class LibraryRenderer {
 		const pages = Number(/\/(\d+)/.exec(toStr(fm.Progress))?.[1] ?? fm.Pages) || 0
 		const seed = spineColor(card.name)
 		spine.style.setProperty('--spine-width', `${String(Math.max(38, Math.min(92, pages ? 26 + pages / 11 : 50)))}px`)
-		spine.style.setProperty('--spine-height', `${String(250 + (card.name.length * 7) % 46)}px`)
+		spine.style.setProperty('--spine-height', `${String(232 + (card.name.length * 7) % 46)}px`)
 		spine.style.setProperty('--spine-color', seed)
 		const creator = toStrArray(fm.Creator).map(linkLabel)[0] ?? ''
 		spine.createSpan({ cls: 'library-spine-title', text: card.name })
@@ -1433,21 +1433,6 @@ export class LibraryView extends ItemView {
 		if (spec.filters) this.sectionFilters(toolbar, spec.filters)
 		toolbar.createDiv({ cls: 'library-toolbar-spacer' })
 
-		// covers or things: a shelf, disc cases, frames
-		const category = spec.category
-		if (category && lookOf(category)) {
-			const on = this.plugin.settings.objectViews.indexOf(category.typeValue) >= 0
-			const lookBtn = toolbar.createEl('button', { cls: `library-category-map-btn${on ? ' is-active' : ''}`, attr: { 'aria-label': tr('view.objects'), 'aria-pressed': on ? 'true' : 'false' } })
-			setTooltip(lookBtn, tr('view.objects'), { placement: 'top' })
-			setIcon(lookBtn, category.contentType === 'book' ? 'library' : category.contentType === 'certificate' ? 'frame' : category.contentType === 'comic' ? 'book-open' : isNftCategory(category) ? 'gem' : category.contentType === 'manual' ? 'save' : 'disc')
-			lookBtn.addEventListener('click', (e) => {
-				e.stopPropagation()
-				const views = this.plugin.settings.objectViews
-				this.plugin.settings.objectViews = on ? views.filter(v => v !== category.typeValue) : [...views, category.typeValue]
-				void this.plugin.saveSettings().then(() => this.render())
-			})
-		}
-
 		if (spec.category) {
 			const mapBtn = toolbar.createEl('button', {
 				cls: 'library-category-map-btn',
@@ -1492,7 +1477,7 @@ export class LibraryView extends ItemView {
 
 		// certificates and badges are landscape pictures: wider columns, so a card shows the whole of one
 		const badges = cards.length > 0 && cards.every(card => toStr(card.fm.Source) === 'certificates')
-		const look = spec.category && this.plugin.settings.objectViews.indexOf(spec.category.typeValue) >= 0 ? lookOf(spec.category) : undefined
+		const look = spec.category && this.plugin.settings.shelfView ? lookOf(spec.category) : undefined
 		const grid = section.createDiv({ cls: `library-grid${badges ? ' is-landscape' : ''}${look ? ` is-objects is-${look}` : ''}` })
 
 		// tokens have no year, rating or progress: their own keys instead

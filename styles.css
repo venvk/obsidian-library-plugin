@@ -1182,7 +1182,7 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-view .library-section {
-	margin-bottom: 36px;
+	margin-bottom: 22px;
 }
 
 .library-view .library-section h2 {
@@ -1194,7 +1194,7 @@ sort trigger, the chosen one in the accent colour. */
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 10px;
-	margin-bottom: 14px;
+	margin-bottom: 8px;
 }
 
 .library-filter-trigger {
@@ -3428,8 +3428,8 @@ sort trigger, the chosen one in the accent colour. */
 	gap: 0 4px;
 	padding: 0 16px;
 	/* a board under every row, the same as under the disc shelves */
-	background-image: linear-gradient(to bottom, transparent 330px, color-mix(in srgb, var(--text-faint) 55%, transparent) 330px, color-mix(in srgb, var(--text-faint) 30%, transparent) 346px, transparent 346px);
-	background-size: 100% 356px;
+	background-image: linear-gradient(to bottom, transparent 282px, color-mix(in srgb, var(--text-faint) 55%, transparent) 282px, color-mix(in srgb, var(--text-faint) 30%, transparent) 296px, transparent 296px);
+	background-size: 100% 300px;
 }
 
 .library-view .library-grid.is-shelf.collapsed {
@@ -3438,8 +3438,8 @@ sort trigger, the chosen one in the accent colour. */
 }
 
 .library-spine-slot {
-	height: 330px;
-	margin-bottom: 26px;
+	height: 282px;
+	margin-bottom: 18px;
 	display: flex;
 	align-items: flex-end;
 	flex-shrink: 0;
@@ -3532,28 +3532,28 @@ sort trigger, the chosen one in the accent colour. */
 /* Discs stand on shelves as big as the book shelf: a row of cases on a board */
 .library-view .library-grid.is-case,
 .library-view .library-grid.is-jewel {
-	grid-template-columns: repeat(auto-fill, 200px);
-	grid-auto-rows: 330px;
-	gap: 26px 22px;
+	grid-template-columns: repeat(auto-fill, 180px);
+	grid-auto-rows: 282px;
+	gap: 18px 18px;
 	align-items: end;
 	/* room under the last row for its board */
-	padding: 0 16px 26px;
-	background-image: linear-gradient(to bottom, transparent 330px, color-mix(in srgb, var(--text-faint) 55%, transparent) 330px, color-mix(in srgb, var(--text-faint) 30%, transparent) 346px, transparent 346px);
-	background-size: 100% 356px;
+	padding: 0 16px 18px;
+	background-image: linear-gradient(to bottom, transparent 282px, color-mix(in srgb, var(--text-faint) 55%, transparent) 282px, color-mix(in srgb, var(--text-faint) 30%, transparent) 296px, transparent 296px);
+	background-size: 100% 300px;
 }
 
 .library-view .library-grid.is-jewel {
-	grid-template-columns: repeat(auto-fill, 300px);
+	grid-template-columns: repeat(auto-fill, 260px);
 }
 
 .library-view .library-grid.is-case.collapsed {
 	grid-template-columns: none;
-	grid-auto-columns: 200px;
+	grid-auto-columns: 180px;
 }
 
 .library-view .library-grid.is-jewel.collapsed {
 	grid-template-columns: none;
-	grid-auto-columns: 300px;
+	grid-auto-columns: 260px;
 }
 
 /* A disc case standing turned slightly toward you: the sleeve under clear film in a black plastic shell (a border,
@@ -3640,10 +3640,20 @@ sort trigger, the chosen one in the accent colour. */
 
 .library-grid.is-case .card-image img {
 	flex: none;
-	width: 100%;
+	width: auto;
 	height: auto;
+	/* as wide as the shelf's slot, as tall as its row: a narrow poster makes a narrower case, never a cut one */
+	max-width: 161px;
+	max-height: 266px;
 	object-fit: fill;
 	border-radius: 0;
+}
+
+.library-grid.is-case .card-image {
+	width: auto;
+	align-self: center;
+	/* the picture keeps its own width instead of being stretched across the case */
+	align-items: flex-start;
 }
 
 .library-grid.is-jewel .card-image img {
@@ -3713,19 +3723,19 @@ sort trigger, the chosen one in the accent colour. */
 /* Videos on 3.5" floppy disks: a drawn disk (grained plastic, the brushed shutter over the brown disk, the recessed
    label well) with the video's picture on a paper label in the well; they stand on a shelf like the discs */
 .library-view .library-grid.is-floppy {
-	grid-template-columns: repeat(auto-fill, 200px);
-	grid-auto-rows: 220px;
-	gap: 26px 22px;
+	grid-template-columns: repeat(auto-fill, 180px);
+	grid-auto-rows: 190px;
+	gap: 18px 18px;
 	align-items: end;
 	/* room under the last row for its board */
-	padding: 0 16px 26px;
-	background-image: linear-gradient(to bottom, transparent 220px, color-mix(in srgb, var(--text-faint) 55%, transparent) 220px, color-mix(in srgb, var(--text-faint) 30%, transparent) 236px, transparent 236px);
-	background-size: 100% 246px;
+	padding: 0 16px 18px;
+	background-image: linear-gradient(to bottom, transparent 190px, color-mix(in srgb, var(--text-faint) 55%, transparent) 190px, color-mix(in srgb, var(--text-faint) 30%, transparent) 204px, transparent 204px);
+	background-size: 100% 208px;
 }
 
 .library-view .library-grid.is-floppy.collapsed {
 	grid-template-columns: none;
-	grid-auto-columns: 200px;
+	grid-auto-columns: 180px;
 }
 
 .library-grid.is-floppy .library-card {
@@ -3785,15 +3795,15 @@ sort trigger, the chosen one in the accent colour. */
 /* NFTs as holographic collectible cards: the whole picture in an iridescent rim, no text on it (the name shows on
    hover); a foil glint crosses it on hover */
 .library-view .library-grid.is-holo {
-	grid-template-columns: repeat(auto-fill, 190px);
+	grid-template-columns: repeat(auto-fill, 180px);
 	align-items: end;
-	gap: 24px 22px;
-	padding: 4px 16px 26px;
+	gap: 18px 18px;
+	padding: 4px 16px 18px;
 }
 
 .library-view .library-grid.is-holo.collapsed {
 	grid-template-columns: none;
-	grid-auto-columns: 190px;
+	grid-auto-columns: 180px;
 }
 
 .library-grid.is-holo .library-card {
