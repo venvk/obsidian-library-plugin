@@ -5441,72 +5441,52 @@ export default class LibraryPlugin extends Plugin {
 		const key = coverKey(fm, this.coverProperty())
 		const remote = key ? toStr(fm[key]) : ''
 		const isNft = toStr(fm.Source) === NFT_SOURCE || toStr(fm.Type) === 'NFT'
-		if (isNft && remote && isInvalidNftMedia(remote) && key) {
-			const k = key
-			const gallery = toStrArray(fm.Gallery).filter(g => g && !isInvalidNftMedia(g) && !this.coverFailed.has(g))
-			if (gallery.length > 0) {
-				await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
-					current[k] = gallery[0]
-				})
-				this.queueCover(file)
-			}
-			return
-		}
-		const url = publicHttpsUrl(remote)
-		if (!key || !url || this.coverFailed.has(url)) return
-		const k = key
+		if (!key) return
+		// A token whose picture is gone (a dead host, a placeholder) takes another from its gallery. The pictures are
+		// tried here, a few a session, and the note is written once, with the one that came: writing each candidate
+		// in turn rewrote the note dozens of times.
+		const candidates = (isNft ? [remote, ...toStrArray(fm.Gallery)] : [remote])
+			.filter((c, n, all) => c && all.indexOf(c) === n && !(isNft && isInvalidNftMedia(c)))
+			.map(c => ({ remote: c, url: publicHttpsUrl(c) }))
+			.filter((c): c is { remote: string; url: string } => !!c.url && !this.coverFailed.has(c.url))
+			.slice(0, 5)
 		const dir = joinFolder(this.settings.libraryFolder, 'Covers')
-		// tokens of one collection often share a picture: one file named after its address serves them all
-		const shared = toStr(fm.Source) === NFT_SOURCE ? `nft-${urlHash(url)}` : ''
 		const link = (path: string): Promise<void> => this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
 			if (toStr(current[key]) === remote) current[key] = `[[${path}]]`
 		})
-		const known = shared ? ['png', 'jpg', 'webp', 'gif', 'avif', 'mp4', 'webm'].map(ext => `${dir}/${shared}.${ext}`).find(path => this.app.vault.getAbstractFileByPath(path)) : undefined
-		if (known) {
-			await link(known)
-			return
-		}
-		try {
-			const resp = await requestUrl({ url: viaPinata(url), throw: false })
-			const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
-			const ext = imageExtension(type ? resp.headers[type] ?? '' : '') ?? sniffImage(resp.arrayBuffer)
-			if (resp.status !== 200 || !ext || resp.arrayBuffer.byteLength === 0) {
-				this.coverFailed.add(url)
-				if (isNft) {
-					const gallery = toStrArray(fm.Gallery).filter(g => g && !isInvalidNftMedia(g) && !this.coverFailed.has(g))
-					if (gallery.length > 0 && gallery[0] !== remote) {
-						await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
-							current[k] = gallery[0]
-						})
-						this.queueCover(file)
-					}
-				}
+		for (const { url } of candidates) {
+			// tokens of one collection often share a picture: one file named after its address serves them all
+			const shared = toStr(fm.Source) === NFT_SOURCE ? `nft-${urlHash(url)}` : ''
+			const known = shared ? ['png', 'jpg', 'webp', 'gif', 'avif', 'mp4', 'webm'].map(ext => `${dir}/${shared}.${ext}`).find(path => this.app.vault.getAbstractFileByPath(path)) : undefined
+			if (known) {
+				await link(known)
 				return
 			}
-			await this.ensureFolder(dir)
-			const base = shared || sanitizeFilename(file.basename) || 'Cover'
-			let path = `${dir}/${base}.${ext}`
-			// asked of the disk too: where names ignore case (macOS, Windows), "SUPERMAN.jpg" is taken by "Superman.jpg",
-			// which the vault's own index, exact about case, does not show
-			const taken = async (candidate: string): Promise<boolean> => !!this.app.vault.getAbstractFileByPath(candidate) || this.app.vault.adapter.exists(candidate)
-			if (!shared || !(await taken(path))) {
-				for (let n = 2; !shared && await taken(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
-				await this.app.vault.createBinary(path, resp.arrayBuffer)
-			}
-			await link(path)
-		} catch (e) {
-			this.coverFailed.add(url)
-			if (isNft) {
-				const gallery = toStrArray(fm.Gallery).filter(g => g && !isInvalidNftMedia(g) && !this.coverFailed.has(g))
-				if (gallery.length > 0 && gallery[0] !== remote) {
-					await this.app.fileManager.processFrontMatter(file, (current: Record<string, unknown>) => {
-						current[k] = gallery[0]
-					})
-					this.queueCover(file)
+			try {
+				const resp = await requestUrl({ url: viaPinata(url), throw: false })
+				const type = Object.keys(resp.headers).find(name => name.toLowerCase() === 'content-type')
+				const ext = imageExtension(type ? resp.headers[type] ?? '' : '') ?? sniffImage(resp.arrayBuffer)
+				if (resp.status !== 200 || !ext || resp.arrayBuffer.byteLength === 0) {
+					this.coverFailed.add(url)
+					continue
 				}
+				await this.ensureFolder(dir)
+				const base = shared || sanitizeFilename(file.basename) || 'Cover'
+				let path = `${dir}/${base}.${ext}`
+				// asked of the disk too: where names ignore case (macOS, Windows), "SUPERMAN.jpg" is taken by "Superman.jpg",
+				// which the vault's own index, exact about case, does not show
+				const taken = async (candidate: string): Promise<boolean> => !!this.app.vault.getAbstractFileByPath(candidate) || this.app.vault.adapter.exists(candidate)
+				if (!shared || !(await taken(path))) {
+					for (let n = 2; !shared && await taken(path); n++) path = `${dir}/${base} ${String(n)}.${ext}`
+					await this.app.vault.createBinary(path, resp.arrayBuffer)
+				}
+				await link(path)
+				return
+			} catch (e) {
+				this.coverFailed.add(url)
+				// a host that is gone or a network that is down: expected, so a warning, not an error
+				console.warn('Library: cover download failed', file.path, e)
 			}
-			// a host that is gone or a network that is down: expected, so a warning, not an error
-			console.warn('Library: cover download failed', file.path, e)
 		}
 	}
 
