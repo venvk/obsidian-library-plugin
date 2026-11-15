@@ -938,6 +938,8 @@ export class LibraryRenderer {
 		// a floppy's label and a framed certificate are a picture inside the object: the picture and the marks on it
 		// (platform, progress) go on that, not on the plastic or the mat around it
 		const imgDiv = grid.hasClass('is-floppy') || grid.hasClass('is-frame') ? shell.createDiv({ cls: 'card-surface' }) : shell
+		// a disc case's spine carries the title
+		if (grid.hasClass('is-case')) shell.setAttr('data-title', card.name)
 		let cardCover = coverSrc(this.app, cover)
 		if (cardCover && isCollectible(fm)) cardCover = viaPinata(cardCover)
 		// some NFT pictures are short videos
