@@ -120,7 +120,13 @@ async function academyBadge(code: string, url: string): Promise<Certificate | nu
 // Claude Academy's verify code, Credly's badge id, Skilljar's certificate code
 export function credentialId(url: string): string {
 	const m = /^https:\/\/(?:academy\.claude\.com\/verify|(?:www\.)?credly\.com\/badges|verify\.skilljar\.com\/c|[a-z0-9-]+\.exceedlms\.com\/student\/award)\/([^/?#]+)/i.exec(url)
-	return m ? decodeURIComponent(m[1] ?? '') : ''
+	if (!m) return ''
+	// a stray % in a pasted link would throw: the code is kept as written then
+	try {
+		return decodeURIComponent(m[1] ?? '')
+	} catch {
+		return m[1] ?? ''
+	}
 }
 
 // The award page draws the certificate as an SVG: the activity's name heads the page, the issue and expiry
