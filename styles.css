@@ -3487,15 +3487,17 @@ sort trigger, the chosen one in the accent colour. */
 	max-height: 26%;
 }
 
-/* read to the end: a ribbon bookmark out of the top */
+/* read to the end: a ribbon bookmark out of the top, its V-cut end drawn by borders (clip-path is only partly
+   supported on Obsidian 1.7) */
 .library-spine-ribbon {
 	position: absolute;
 	top: 0;
 	right: 22%;
-	width: 7px;
-	height: 26px;
-	background: var(--color-red);
-	clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
+	width: 0;
+	height: 20px;
+	border-left: 3.5px solid var(--color-red);
+	border-right: 3.5px solid var(--color-red);
+	border-bottom: 6px solid transparent;
 }
 
 /* Comics and manga as paperbacks on a shelf, like the discs: the whole cover, its page edges showing, no text */
