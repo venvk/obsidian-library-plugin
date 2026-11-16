@@ -3498,12 +3498,48 @@ sort trigger, the chosen one in the accent colour. */
 	clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%);
 }
 
+/* Comics and manga as paperbacks on a shelf, like the discs: the whole cover, its page edges showing, no text */
+.library-view .library-grid.is-paper {
+	grid-template-columns: repeat(auto-fill, 180px);
+	grid-auto-rows: 282px;
+	gap: 18px 18px;
+	align-items: end;
+	/* room under the last row for its board */
+	padding: 0 16px 18px;
+	background-image: linear-gradient(to bottom, transparent 282px, color-mix(in srgb, var(--text-faint) 55%, transparent) 282px, color-mix(in srgb, var(--text-faint) 30%, transparent) 296px, transparent 296px);
+	background-size: 100% 300px;
+}
+
+.library-view .library-grid.is-paper.collapsed {
+	grid-template-columns: none;
+	grid-auto-columns: 180px;
+}
+
+.library-grid.is-paper .library-card {
+	background: transparent;
+	box-shadow: none;
+	overflow: visible;
+}
+
+.library-grid.is-paper .card-info {
+	display: none;
+}
+
 .library-grid.is-paper .card-image {
+	aspect-ratio: auto;
+	width: auto;
+	align-self: center;
+	align-items: flex-start;
 	border-radius: 2px 4px 4px 2px;
 	box-shadow: 2px 0 0 #e8e4da, 4px 1px 0 #d9d4c8, 6px 2px 0 #cbc5b7, 6px 3px 6px rgba(0, 0, 0, 0.35);
 }
 
 .library-grid.is-paper .card-image img {
+	width: auto;
+	height: auto;
+	max-width: 168px;
+	max-height: 276px;
+	object-fit: fill;
 	border-radius: 2px 4px 4px 2px;
 }
 
