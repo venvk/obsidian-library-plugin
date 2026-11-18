@@ -1,7 +1,7 @@
 // IMDb, Netflix, YouTube and Claude Academy have no open API for a member's own history: the sign-in window
 // keeps the session, and a hidden webview on its partition reads the site as
 // the user did. Settings keep the connected flag, last-import time and score echoes.
-const PARTITION = 'persist:library-auth'
+import { authPartition } from './session'
 
 export type WatchSite = 'imdb' | 'netflix' | 'youtube' | 'claudeacademy' | 'googleedu'
 
@@ -57,7 +57,7 @@ export async function readPage(url: string, code: string, timeout = 30000, ready
 	const win = doc.win as Window & { createEl: typeof createEl }
 	const view = win.createEl('webview' as keyof HTMLElementTagNameMap, {
 		cls: 'library-steam-probe',
-		attr: { partition: PARTITION, src: url },
+		attr: { partition: authPartition(), src: url },
 	})
 	doc.body.appendChild(view)
 	const guest = view as unknown as { executeJavaScript: (code: string) => Promise<unknown> }
@@ -276,7 +276,7 @@ export interface AcademyBadge {
 async function photograph(url: string, code: string): Promise<{ answer: Record<string, unknown>; picture: ArrayBuffer | null } | null> {
 	const doc = activeDocument
 	const win = doc.win as Window & { createEl: typeof createEl; require?: (mod: string) => { remote?: { webContents?: { fromId?: (id: number) => Capturable | undefined } } } }
-	const view = win.createEl('webview' as keyof HTMLElementTagNameMap, { cls: 'library-badge-probe', attr: { partition: PARTITION, src: url } })
+	const view = win.createEl('webview' as keyof HTMLElementTagNameMap, { cls: 'library-badge-probe', attr: { partition: authPartition(), src: url } })
 	doc.body.appendChild(view)
 	const guest = view as unknown as { executeJavaScript: (code: string) => Promise<unknown>; getWebContentsId?: () => number }
 	const wait = async <T>(work: Promise<T>, ms: number): Promise<T | null> => {

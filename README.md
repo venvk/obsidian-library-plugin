@@ -69,7 +69,7 @@ Connect an account in the plugin settings. Your lists arrive as notes, and anime
 - <img src="assets/connectors/claude.svg" width="18" height="18" alt=""> **Claude Academy**: your completion badges, with their pictures and verification codes, into Certificates; sign in with your email and the code Claude sends
 - <img src="assets/connectors/google.svg" width="18" height="18" alt=""> **Google for Education**: your certificates, such as Gemini Academy, with their pictures and dates, into Certificates; sign in with Google
 
-Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games, EA App, Claude Academy and Google for Education work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
+Connect more than one account of a service with the add-account button next to it: lists and scores come in from every account, and changes from your notes go back to the first one. Imports run once a day on desktop. Your own scores are never overwritten, and progress never moves backwards. IMDb, Netflix, YouTube, PlayStation, Steam, Nintendo, Epic Games, EA App, Claude Academy and Google for Education work on desktop only. Trakt also signs in and sends changes from mobile. When you delete a note, the plugin asks whether to remove the title from the connected sites too.
 
 ## Sources
 

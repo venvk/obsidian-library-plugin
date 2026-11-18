@@ -1,5 +1,6 @@
 import { requestUrl } from 'obsidian'
 import type { PsnTrophy } from './psn'
+import { authPartition } from './session'
 
 // Steam sign-in and library. No key: a hidden webview on the sign-in window's
 // partition reads steamcommunity.com as the user (nothing is kept in settings).
@@ -7,7 +8,6 @@ const API = 'https://api.steampowered.com'
 const WEB = 'https://steamcommunity.com'
 const ORIGIN = encodeURIComponent(WEB)
 // The sign-in window's partition, so the hidden webview sees its cookies.
-const PARTITION = 'persist:library-auth'
 
 // The OpenID window returns to steamcommunity.com with the account in the address.
 export function steamAuthUrl(): string {
@@ -77,7 +77,7 @@ export async function steamSession(steamId: string): Promise<SteamSession | null
 	const win = activeDocument.win as Window & { createEl: typeof createEl }
 	const view = win.createEl('webview' as keyof HTMLElementTagNameMap, {
 		cls: 'library-steam-probe',
-		attr: { partition: PARTITION, src: `${WEB}/pointssummary/ajaxgetasyncconfig` }
+		attr: { partition: authPartition(), src: `${WEB}/pointssummary/ajaxgetasyncconfig` }
 	})
 	activeDocument.body.appendChild(view)
 	const guest = view as unknown as { executeJavaScript: (code: string) => Promise<unknown> }

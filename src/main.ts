@@ -14,7 +14,7 @@ import {
 	Component,
 	type CachedMetadata,
 } from 'obsidian'
-import { API_KEY_NAMES, progressPattern, RATING_RT_ICON, type ApiKeyName, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
+import { API_KEY_NAMES, progressPattern, RATING_RT_ICON, type AccountService, type ApiKeyName, type ExtraAccount, type ICategory, type ILibrarySettings, type IStatsSettings, type IStatsTop, DEFAULT_SETTINGS } from './constants'
 import { compactNumber, formatNumber, tr, trCount } from './i18n'
 import { LibrarySettingTab } from './settings'
 import { ProviderRegistry } from './providers/registry'
@@ -87,6 +87,7 @@ import { ChaptersModal } from './ui/chaptersModal'
 import { ChapterNotesModal } from './ui/chapterNotesModal'
 import { TrailerModal } from './ui/trailerModal'
 import { Lightbox } from './ui/lightbox'
+import { DEFAULT_PARTITION, accountPartition, setAuthPartition } from './session'
 import {
 	toStr,
 	toStrArray,
@@ -268,6 +269,11 @@ interface NftTrackInfo {
 	chain: string
 	name: string
 	tokenIds: string[]
+}
+
+// a deep copy of a settings value, which is plain JSON
+function copyValue<T>(value: T): T {
+	return value === undefined ? value : JSON.parse(JSON.stringify(value)) as T
 }
 
 export default class LibraryPlugin extends Plugin {
@@ -1049,7 +1055,15 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// Steam library into Games: Playtime in hours per owned game; the store API limits requests per minute, so lookups are spaced
+	// the first account, then every other one of the service
 	async steamImport(loud = false): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.steamImportOne(loud)
+			await this.importExtras('steam', () => this.steamImportOne(loud))
+		})
+	}
+
+	private async steamImportOne(loud = false): Promise<void> {
 		if (this.gameImporting()) {
 			if (loud) new Notice(tr('notice.steam.importing'))
 			return
@@ -1561,6 +1575,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async anilistPushCurrent(): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		const token = this.settings.anilistToken.trim()
 		if (!token) { new Notice(tr('notice.anilist.noToken')); return }
 		const file = this.app.workspace.getActiveFile()
@@ -1778,7 +1794,15 @@ export default class LibraryPlugin extends Plugin {
 
 	// IMDb ratings, watchlist and episode scores; Netflix viewing history and thumbs into Movies and Series.
 	// A note found by its IMDb id, Netflix id or name only gains what it lacks; a wrong Netflix id is replaced, your edits win.
+	// the first account, then every other one of the site
 	async watchImport(site: WatchSite, loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.watchImportOne(site, loud)
+			await this.importExtras(site, () => this.watchImportOne(site, loud))
+		})
+	}
+
+	private async watchImportOne(site: WatchSite, loud: boolean): Promise<void> {
 		if (!Platform.isDesktopApp || !this.settings.watchSites[site].connected) return
 		// one import at a time; a press while one runs says so instead of doing nothing
 		if (this.watchImporting) {
@@ -2219,6 +2243,7 @@ export default class LibraryPlugin extends Plugin {
 
 	// An opened video note reads its like, subscription and date afresh, once a session.
 	private async youtubeRefresh(file: TFile): Promise<void> {
+		if (this.accountSwapping) return
 		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 		const id = toStr(fm?.['Source ID'])
 		if (!fm || toStr(fm.Source) !== YOUTUBE_SOURCE || this.youtubeFresh.has(id) || !this.settings.watchSites.youtube.connected || !Platform.isDesktopApp) return
@@ -2239,6 +2264,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// The note's like or channel subscription, sent to YouTube; the notes follow once it took.
 	private async youtubeToggle(file: TFile, action: YoutubeAction): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
 		const id = toStr(fm?.['Source ID'])
 		if (!fm || !this.settings.watchSites.youtube.connected) { new Notice(tr('notice.site.failed', { site: 'YouTube' })); return }
@@ -3333,6 +3360,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// Library to Netflix: the note's score as a thumb on the title its Netflix ID names.
 	private async netflixPush(file: TFile): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		if (!this.settings.watchSites.netflix.connected) return
 		if (this.watchImporting || this.watchPushing) { this.armImdbPush(file); return }
 		const fm = this.app.metadataCache.getFileCache(file)?.frontmatter
@@ -3368,6 +3397,8 @@ export default class LibraryPlugin extends Plugin {
 	// Library to IMDb: a new score, a new unwatched title (watchlist), episode scores.
 	// Nothing is taken off IMDb when a score is cleared here.
 	private async imdbPush(file: TFile): Promise<boolean> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		if (!this.settings.watchSites.imdb.connected) return false
 		// an import or another push in flight: try again shortly
 		if (this.watchImporting || this.watchPushing) {
@@ -3733,7 +3764,15 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// Trakt into Movies and Series: watched, rated and listed titles, ticked and scored episodes.
+	// the first account, then every other one of the service
 	async traktImport(loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.traktImportOne(loud)
+			await this.importExtras('trakt', () => this.traktImportOne(loud))
+		})
+	}
+
+	private async traktImportOne(loud: boolean): Promise<void> {
 		if (this.watchImporting || !this.settings.traktTokens) return
 		this.watchImporting = true
 		try {
@@ -3837,6 +3876,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// Library to Trakt: a new score, a new unwatched title (watchlist), ticked episodes, episode scores.
 	private async traktPush(file: TFile): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		if (!this.settings.traktTokens) return
 		// Trakt is plain HTTP: it waits only for its own import and pushes, never for IMDb's page
 		if (this.watchImporting || this.traktPushing) { this.armTraktPush(file); return }
@@ -3951,6 +3992,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// One title off one site; true when it is gone there.
 	private async removeFrom(site: RemoteSite, item: Removal): Promise<boolean> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		if (site === 'netflix' && item.netflix !== null) {
 			// the score stays on Netflix, and its import would bring the note back: skip the title there
 			if (this.settings.netflixIgnored.indexOf(item.netflix) < 0) this.settings.netflixIgnored.push(item.netflix)
@@ -4041,6 +4084,174 @@ export default class LibraryPlugin extends Plugin {
 			await this.traktPush(file)
 			await this.pause(1500)
 		}
+	}
+
+	// What each service keeps per account: switched out for another account while that one is read
+	private static readonly ACCOUNT_KEYS: Record<AccountService, string[]> = {
+		anilist: ['anilistToken', 'anilistLastImport'],
+		mal: ['malTokens', 'malEcho', 'malStats', 'malLastImport'],
+		kitsu: ['kitsuTokens', 'kitsuEcho', 'kitsuLastImport'],
+		trakt: ['traktTokens', 'traktEcho', 'traktLastImport'],
+		psn: ['psnTokens', 'psnStats'],
+		steam: ['steamId', 'steamLastImport'],
+		nintendo: ['nintendoTokens', 'nintendoStats', 'nintendoLastImport'],
+		epic: ['epicTokens', 'epicLastImport'],
+		ea: ['eaTokens', 'eaLastImport'],
+		imdb: ['watchSites.imdb', 'imdbEcho'],
+		netflix: ['watchSites.netflix', 'netflixEcho', 'netflixSeen', 'netflixListed', 'netflixIgnored'],
+		youtube: ['watchSites.youtube', 'youtubeBackfill'],
+		claudeacademy: ['watchSites.claudeacademy'],
+		googleedu: ['watchSites.googleedu'],
+	}
+
+	// true while an account beyond a service's first is switched in
+	private accountSwapping = false
+	// imports and account changes run one at a time: a switch never lands in the middle of another import
+	private accountLock: Promise<void> = Promise.resolve()
+
+	private withAccountLock<T>(work: () => Promise<T>): Promise<T> {
+		const run = this.accountLock.then(work, work)
+		this.accountLock = run.then(() => undefined, () => undefined)
+		return run
+	}
+
+	private accountValue(key: string): unknown {
+		if (key.startsWith('watchSites.')) return this.settings.watchSites[key.slice(11) as WatchSite]
+		return (this.settings as unknown as Record<string, unknown>)[key]
+	}
+
+	private setAccountValue(key: string, value: unknown): void {
+		const fresh = value === undefined ? this.accountDefault(key) : value
+		if (key.startsWith('watchSites.')) this.settings.watchSites[key.slice(11) as WatchSite] = fresh as { connected: boolean; lastImport: number }
+		else (this.settings as unknown as Record<string, unknown>)[key] = fresh
+	}
+
+	private accountDefault(key: string): unknown {
+		if (key.startsWith('watchSites.')) return { connected: false, lastImport: 0 }
+		return copyValue((DEFAULT_SETTINGS as unknown as Record<string, unknown>)[key])
+	}
+
+	// Runs `run` as another account of the service: its settings and its sign-in partition switched in, the first
+	// account's put back after, whatever happens. One account at a time.
+	async asAccount<T>(service: AccountService, account: ExtraAccount, run: () => Promise<T>): Promise<T> {
+		await this.untilOneAccount()
+		const keys = LibraryPlugin.ACCOUNT_KEYS[service]
+		const first: Record<string, unknown> = {}
+		for (const key of keys) first[key] = copyValue(this.accountValue(key))
+		this.accountSwapping = true
+		this.settings.accountSwap = { service, data: first }
+		for (const key of keys) this.setAccountValue(key, copyValue(account.data[key]))
+		setAuthPartition(accountPartition(account.id))
+		try {
+			return await run()
+		} finally {
+			for (const key of keys) account.data[key] = copyValue(this.accountValue(key))
+			for (const key of keys) this.setAccountValue(key, first[key])
+			setAuthPartition(DEFAULT_PARTITION)
+			this.settings.accountSwap = null
+			this.accountSwapping = false
+			await this.saveSettings()
+		}
+	}
+
+	// changes from notes and other writes go to a service's first account: they wait out a switch
+	async untilOneAccount(): Promise<void> {
+		while (this.accountSwapping && !this.unloaded) await this.pause(400)
+	}
+
+	// The accounts beyond the first, read the way the first was
+	private async importExtras(service: AccountService, run: () => Promise<void>): Promise<void> {
+		for (const account of [...(this.settings.extraAccounts[service] ?? [])]) {
+			if (this.unloaded) return
+			try {
+				await this.asAccount(service, account, run)
+			} catch (e) {
+				console.error('Library: account import error', service, e)
+			}
+		}
+	}
+
+	// Another account of a service: signed in through the service's own connect, in a partition of its own, then read
+	async addAccount(service: AccountService): Promise<boolean> {
+		return this.withAccountLock(async () => {
+			const account: ExtraAccount = { id: Math.random().toString(36).slice(2, 10), data: {} }
+			const ok = await this.asAccount(service, account, () => this.accountConnect(service))
+			if (!ok) {
+				await this.forgetPartition(account.id)
+				return false
+			}
+			const list = this.settings.extraAccounts[service] ?? []
+			list.push(account)
+			this.settings.extraAccounts[service] = list
+			await this.saveSettings()
+			// the connect's own import waits behind this and then reads every account, this one too
+			return true
+		})
+	}
+
+	private accountConnect(service: AccountService): Promise<boolean> {
+		switch (service) {
+			case 'anilist': return this.connectAnilist()
+			case 'mal': return this.connectMal()
+			case 'kitsu': return this.connectKitsu()
+			case 'trakt': return this.connectTrakt()
+			case 'psn': return this.connectPsn()
+			case 'steam': return this.connectSteam()
+			case 'nintendo': return this.connectNintendo()
+			case 'epic': return this.connectEpic()
+			case 'ea': return this.connectEa()
+			default: return this.connectSite(service)
+		}
+	}
+
+	// A service's first account is disconnected: the next one, if there is one, takes its place. A site read through
+	// the sign-in window takes that account's sign-in into the default session with it.
+	async disconnectFirst(service: AccountService, clear: () => void): Promise<void> {
+		await this.withAccountLock(async () => {
+			const extras = this.settings.extraAccounts[service] ?? []
+			const next = extras[0]
+			if (!next) {
+				clear()
+				await this.saveSettings()
+				return
+			}
+			for (const key of LibraryPlugin.ACCOUNT_KEYS[service]) this.setAccountValue(key, copyValue(next.data[key]))
+			await this.moveSignIn(accountPartition(next.id), DEFAULT_PARTITION)
+			this.settings.extraAccounts[service] = extras.slice(1)
+			await this.saveSettings()
+			await this.forgetPartition(next.id)
+		})
+	}
+
+	// an account's cookies, moved from its own partition to another one
+	private async moveSignIn(from: string, to: string): Promise<void> {
+		type Cookie = { name: string; value: string; domain?: string; path?: string; secure?: boolean; httpOnly?: boolean; expirationDate?: number; sameSite?: string }
+		type Cookies = { get: (filter: object) => Promise<Cookie[]>; set: (details: object) => Promise<void> }
+		try {
+			const remote = (window as unknown as { require?: (m: string) => { remote?: { session?: { fromPartition: (p: string) => { cookies: Cookies } } } } }).require?.('electron').remote
+			const session = remote?.session
+			if (!session) return
+			const target = session.fromPartition(to).cookies
+			for (const c of await session.fromPartition(from).cookies.get({})) {
+				const host = (c.domain ?? '').replace(/^\./, '')
+				if (!host) continue
+				await target.set({ url: `https://${host}${c.path ?? '/'}`, name: c.name, value: c.value, domain: c.domain, path: c.path, secure: c.secure, httpOnly: c.httpOnly, expirationDate: c.expirationDate, sameSite: c.sameSite }).catch(() => undefined)
+			}
+		} catch { /* no Electron session here (mobile): token services need none */ }
+	}
+
+	async removeAccount(service: AccountService, id: string): Promise<void> {
+		this.settings.extraAccounts[service] = (this.settings.extraAccounts[service] ?? []).filter(a => a.id !== id)
+		await this.saveSettings()
+		await this.forgetPartition(id)
+	}
+
+	// an account's sign-in leaves nothing behind once it is removed
+	private async forgetPartition(id: string): Promise<void> {
+		try {
+			const remote = (window as unknown as { require?: (m: string) => { remote?: { session?: { fromPartition: (p: string) => { clearStorageData: () => Promise<void> } } } } }).require?.('electron').remote
+			await remote?.session?.fromPartition(accountPartition(id)).clearStorageData()
+		} catch { /* no Electron session here (mobile): nothing was kept */ }
 	}
 
 	private async watchSyncIfDue(site: WatchSite): Promise<void> {
@@ -4148,7 +4359,15 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// Switch play activity into Games: one note per game (shared with PSN/Steam); Nintendo reports minutes and only played games
+	// the first account, then every other one of the service
 	async nintendoImport(loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.nintendoImportOne(loud)
+			await this.importExtras('nintendo', () => this.nintendoImportOne(loud))
+		})
+	}
+
+	private async nintendoImportOne(loud: boolean): Promise<void> {
 		if (this.gameImporting()) return
 		if (!this.settings.nintendoTokens) return
 		const provider = this.registry.forType('game')
@@ -4249,7 +4468,15 @@ export default class LibraryPlugin extends Plugin {
 		return this.epicRefreshing
 	}
 
+	// the first account, then every other one of the service
 	async epicImport(loud = false): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.epicImportOne(loud)
+			await this.importExtras('epic', () => this.epicImportOne(loud))
+		})
+	}
+
+	private async epicImportOne(loud = false): Promise<void> {
 		if (this.gameImporting()) {
 			if (loud) new Notice(tr('notice.epic.importing'))
 			return
@@ -4348,7 +4575,15 @@ export default class LibraryPlugin extends Plugin {
 		return this.eaRefreshing
 	}
 
+	// the first account, then every other one of the service
 	async eaImport(loud = false): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.eaImportOne(loud)
+			await this.importExtras('ea', () => this.eaImportOne(loud))
+		})
+	}
+
+	private async eaImportOne(loud = false): Promise<void> {
 		if (this.gameImporting()) {
 			if (loud) new Notice(tr('notice.ea.importing'))
 			return
@@ -4435,7 +4670,15 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	// PSN games into Games: those played, and library games with trophies (apps have none)
+	// the first account, then every other one of the service
 	async psnImport(loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.psnImportOne(loud)
+			await this.importExtras('psn', () => this.psnImportOne(loud))
+		})
+	}
+
+	private async psnImportOne(loud: boolean): Promise<void> {
 		if (this.gameImporting()) return
 		this.psnImporting = true
 		let token: string | null = null
@@ -4856,6 +5099,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async kitsuPushCurrent(): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		const file = this.app.workspace.getActiveFile()
 		const fm = file ? this.app.metadataCache.getFileCache(file)?.frontmatter : undefined
 		if (!file || !fm || toStr(fm.Source) !== 'anilist' || !toStr(fm['Source ID'])) {
@@ -4867,6 +5112,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// send progress and rating to Kitsu unless they match what we last pushed (the echo)
 	private async kitsuPush(file: TFile): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		// a push or import in flight would drop this edit: re-arm the debounce
 		if (this.kitsuImporting || this.kitsuPushing) {
 			this.kitsuPushTimers.set(file.path, window.setTimeout(() => {
@@ -4940,6 +5187,8 @@ export default class LibraryPlugin extends Plugin {
 	}
 
 	private async malPushCurrent(): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		const token = await this.malToken()
 		if (!token) { new Notice(tr('notice.mal.noToken')); return }
 		const file = this.app.workspace.getActiveFile()
@@ -4983,6 +5232,8 @@ export default class LibraryPlugin extends Plugin {
 
 	// send progress and rating to MAL unless they match what we last pushed (the echo)
 	private async malPush(file: TFile): Promise<void> {
+		// a change goes to the service's first account
+		await this.untilOneAccount()
 		// a push or import in flight would drop this edit: re-arm the debounce
 		if (this.malImporting || this.malPushing) {
 			this.malPushTimers.set(file.path, window.setTimeout(() => {
@@ -5030,7 +5281,15 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// the first account, then every other one of the service
 	async malImport(loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.malImportOne(loud)
+			await this.importExtras('mal', () => this.malImportOne(loud))
+		})
+	}
+
+	private async malImportOne(loud: boolean): Promise<void> {
 		if (this.malImporting || this.anilistImporting || this.kitsuImporting) {
 			if (loud) new Notice(tr('notice.mal.importing'))
 			return
@@ -5057,7 +5316,15 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// the first account, then every other one of the service
 	async anilistImport(loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.anilistImportOne(loud)
+			await this.importExtras('anilist', () => this.anilistImportOne(loud))
+		})
+	}
+
+	private async anilistImportOne(loud: boolean): Promise<void> {
 		if (this.anilistImporting || this.malImporting || this.kitsuImporting) {
 			if (loud) new Notice(tr('notice.mal.importing'))
 			return
@@ -5100,7 +5367,15 @@ export default class LibraryPlugin extends Plugin {
 		}
 	}
 
+	// the first account, then every other one of the service
 	async kitsuImport(loud: boolean): Promise<void> {
+		return this.withAccountLock(async () => {
+			await this.kitsuImportOne(loud)
+			await this.importExtras('kitsu', () => this.kitsuImportOne(loud))
+		})
+	}
+
+	private async kitsuImportOne(loud: boolean): Promise<void> {
 		const name = tr('kitsu.name')
 		if (this.kitsuImporting || this.malImporting || this.anilistImporting) {
 			if (loud) new Notice(tr('notice.site.importing', { site: name }))
@@ -7769,6 +8044,13 @@ export default class LibraryPlugin extends Plugin {
 		if (!this.settings.filterState || typeof this.settings.filterState !== 'object') this.settings.filterState = {}
 		if (!Array.isArray(this.settings.searchFolded)) this.settings.searchFolded = []
 		if (typeof this.settings.shelfView !== 'boolean') this.settings.shelfView = false
+		if (!this.settings.extraAccounts || typeof this.settings.extraAccounts !== 'object') this.settings.extraAccounts = {}
+		// Obsidian closed while another account was switched in: the first account's state goes back
+		const swap = this.settings.accountSwap
+		if (swap && typeof swap === 'object' && LibraryPlugin.ACCOUNT_KEYS[swap.service]) {
+			for (const key of LibraryPlugin.ACCOUNT_KEYS[swap.service]) this.setAccountValue(key, swap.data[key])
+		}
+		this.settings.accountSwap = null
 		this.settings.searchFolded = this.settings.searchFolded.filter((type): type is string => typeof type === 'string')
 		if (typeof this.settings.statsCollapsed !== 'boolean') this.settings.statsCollapsed = false
 		if (typeof this.settings.showUpNext !== 'boolean') this.settings.showUpNext = true
