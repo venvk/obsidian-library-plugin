@@ -17,6 +17,7 @@ import type { ApiKeyName, ICategory, IStatsTop, TitleLanguage } from "./constant
 import { isTemplateFile, rankableProperties, toStr, topLabel } from "./util";
 import { isContentType, type ContentType } from "./providers/types";
 import type { WatchSite } from "./watchSites";
+import type { AccountService } from "./constants";
 import { TYPE_DEFAULTS, addCategoryTop, categoryLabel, cleanFolder, isBuiltInCategory, isDefaultTypeValue, isNftCategory, newCategory, ownCreators, sectionOrder, splitOrder, type SectionEntry } from "./categories";
 import { tr } from "./i18n";
 import { ANILIST_CLIENT_ID, aniListViewer, anilistAuthUrl, tokenFromInput } from "./anilistSync";
@@ -729,8 +730,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.anilistToken = "";
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("anilist", () => { this.plugin.settings.anilistToken = ""; });
 					this.refresh();
 				} else if (Platform.isDesktopApp) {
 					await this.plugin.connectAnilist();
@@ -747,6 +747,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				}
 			});
 		});
+		this.accountRows(row, "anilist", this.plugin.settings.anilistToken.trim() !== "");
 	}
 
 	private async anilistConnect(token: string): Promise<void> {
@@ -775,8 +776,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.malTokens = null;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("mal", () => { this.plugin.settings.malTokens = null; });
 					this.refresh();
 				} else if (Platform.isDesktopApp) {
 					await this.plugin.connectMal();
@@ -795,6 +795,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				}
 			});
 		});
+		this.accountRows(row, "mal", this.plugin.settings.malTokens !== null);
 	}
 
 	private async malConnect(id: string, secret: string, code: string, verifier: string): Promise<void> {
@@ -823,8 +824,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.kitsuTokens = null;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("kitsu", () => { this.plugin.settings.kitsuTokens = null; });
 				} else {
 					// desktop opens the real Kitsu site; the plain form is the mobile path
 					await this.plugin.connectKitsu();
@@ -832,6 +832,7 @@ export class LibrarySettingTab extends PluginSettingTab {
 				this.refresh();
 			});
 		});
+		this.accountRows(row, "kitsu", this.plugin.settings.kitsuTokens !== null);
 	}
 
 	private traktAccount(row: Setting): void {
@@ -847,15 +848,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.traktTokens = null;
-					this.plugin.settings.traktEcho = {};
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("trakt", () => { this.plugin.settings.traktTokens = null; this.plugin.settings.traktEcho = {}; });
 				} else {
 					await this.plugin.connectTrakt();
 				}
 				this.refresh();
 			});
 		});
+		this.accountRows(row, "trakt", this.plugin.settings.traktTokens !== null);
 	}
 
 	private psnAccount(row: Setting): void {
@@ -871,14 +871,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.psnTokens = null;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("psn", () => { this.plugin.settings.psnTokens = null; });
 				} else {
 					await this.plugin.connectPsn();
 				}
 				this.refresh();
 			});
 		});
+		this.accountRows(row, "psn", this.plugin.settings.psnTokens !== null);
 	}
 
 	private steamAccount(row: Setting): void {
@@ -894,14 +894,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.steamId = "";
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("steam", () => { this.plugin.settings.steamId = ""; });
 				} else {
 					await this.plugin.connectSteam();
 				}
 				this.refresh();
 			});
 		});
+		this.accountRows(row, "steam", this.plugin.settings.steamId.trim() !== "");
 	}
 
 	private epicAccount(row: Setting): void {
@@ -917,14 +917,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.epicTokens = null;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("epic", () => { this.plugin.settings.epicTokens = null; });
 				} else {
 					await this.plugin.connectEpic();
 				}
 				this.refresh();
 			});
 		});
+		this.accountRows(row, "epic", this.plugin.settings.epicTokens !== null);
 	}
 
 	private eaAccount(row: Setting): void {
@@ -940,11 +940,37 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.eaTokens = null;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("ea", () => { this.plugin.settings.eaTokens = null; });
 				} else {
 					await this.plugin.connectEa();
 				}
+				this.refresh();
+			});
+		});
+		this.accountRows(row, "ea", this.plugin.settings.eaTokens !== null);
+	}
+
+	// A service's accounts beyond the first: each with its own Disconnect, and Add account once the first is connected.
+	// Lists and scores come from every account; changes from notes go to the first.
+	private accountRows(row: Setting, service: AccountService, connected: boolean): void {
+		const extras = this.plugin.settings.extraAccounts[service] ?? [];
+		if (extras.length > 0) {
+			const list = row.descEl.createDiv({ cls: "library-extra-accounts" });
+			extras.forEach((account, i) => {
+				const line = list.createDiv({ cls: "library-extra-account" });
+				line.createSpan({ text: tr("settings.accountN", { n: i + 2 }) });
+				const off = line.createEl("button", { text: tr("settings.disconnect") });
+				off.addEventListener("click", () => {
+					void this.plugin.removeAccount(service, account.id).then(() => this.refresh());
+				});
+			});
+		}
+		if (!connected || !Platform.isDesktopApp) return;
+		row.addButton((button) => {
+			button.setIcon("user-plus");
+			button.setTooltip(tr("settings.addAccount"));
+			button.onClick(async () => {
+				await this.plugin.addAccount(service);
 				this.refresh();
 			});
 		});
@@ -970,14 +996,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!state.connected) button.setCta();
 			button.onClick(async () => {
 				if (state.connected) {
-					state.connected = false;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst(site, () => { state.connected = false; });
 				} else {
 					await this.plugin.connectSite(site);
 				}
 				this.refresh();
 			});
 		});
+		this.accountRows(row, site, state.connected);
 	}
 
 	// Connecting asks first: requests go through a third-party signing service.
@@ -994,14 +1020,14 @@ export class LibrarySettingTab extends PluginSettingTab {
 			if (!connected) button.setCta();
 			button.onClick(async () => {
 				if (connected) {
-					this.plugin.settings.nintendoTokens = null;
-					await this.plugin.saveSettings();
+					await this.plugin.disconnectFirst("nintendo", () => { this.plugin.settings.nintendoTokens = null; });
 				} else {
 					await this.plugin.connectNintendo();
 				}
 				this.refresh();
 			});
 		});
+		this.accountRows(row, "nintendo", this.plugin.settings.nintendoTokens !== null);
 	}
 
 	private categoryRows(cat: ICategory, index: number): Row[] {
