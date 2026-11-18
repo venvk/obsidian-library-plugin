@@ -1,4 +1,5 @@
 import { App, Modal, Platform } from 'obsidian'
+import { authPartition } from '../session'
 
 // Real Chrome version so Google and Apple sign-in pages don't block the webview.
 export function resolveUserAgent(custom?: string): string {
@@ -74,7 +75,7 @@ export class AuthModal extends Modal {
 		const view = win.createEl('webview' as keyof HTMLElementTagNameMap, {
 			cls: 'library-auth-webview',
 			attr: {
-				partition: 'persist:library-auth',
+				partition: authPartition(),
 				allowpopups: 'true',
 				src: this.authUrl,
 				useragent: userAgent,
@@ -129,7 +130,7 @@ export class AuthModal extends Modal {
 					parent: BrowserWindow.getFocusedWindow ? BrowserWindow.getFocusedWindow() : undefined,
 					modal: true,
 					webPreferences: {
-						partition: 'persist:library-auth',
+						partition: authPartition(),
 						nodeIntegration: false,
 						contextIsolation: true,
 					},
@@ -200,6 +201,11 @@ export class AuthModal extends Modal {
 		})
 		view.addEventListener('render-process-gone', () => trail.push('webview crashed'))
 		this.timerWin = win
+		// Cloudflare's check (AniList, others) never passes while the page is told it runs in Chrome: it tests the engine
+		// and finds Obsidian's. On a page that runs the check the window takes Obsidian's own agent back and loads again;
+		// Google's sign-in, which needs the Chrome agent, keeps it.
+		let ownAgent = false
+		const cloudflare = "!!(window._cf_chl_opt || document.querySelector('[name=\"cf-turnstile-response\"], script[src*=\"challenges.cloudflare.com\"]'))"
 		this.poll = win.setInterval(() => {
 			// the window was taken off the page without closing: nothing left to ask
 			if (!view.isConnected) {
@@ -209,6 +215,21 @@ export class AuthModal extends Modal {
 			const guest = view as unknown as {
 				getURL?: () => string
 				executeJavaScript?: (code: string, userGesture: boolean) => unknown
+				setUserAgent?: (agent: string) => void
+				reload?: () => void
+			}
+			if (!ownAgent && guest.executeJavaScript && guest.setUserAgent && guest.reload) {
+				try {
+					const found: unknown = guest.executeJavaScript(cloudflare, false)
+					if (found && typeof (found as Promise<unknown>).then === 'function') {
+						void (found as Promise<unknown>).then((yes) => {
+							if (yes !== true || ownAgent) return
+							ownAgent = true
+							guest.setUserAgent?.(win.navigator.userAgent)
+							guest.reload?.()
+						}).catch(() => { /* the guest page went away mid-probe */ })
+					}
+				} catch { /* the guest page is not ready for scripts yet */ }
 			}
 			// before its first dom-ready a webview answers nothing but an error
 			try {
